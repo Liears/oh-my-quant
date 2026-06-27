@@ -8,7 +8,7 @@
 import { assertPortfolioCacheDisabled } from "./policy.ts";
 import { emitFileEvent } from "./fs-events.ts";
 import { listLocalPortfolios, type LocalPortfolioSummary } from "./local-portfolios.ts";
-import { isValidPanelSymbol, loadPanelPortfolio, savePanelPortfolio } from "./panel-portfolio.ts";
+import { isValidPanelSymbol, loadPanelPortfolio, savePanelPortfolio, type PanelPortfolioFile } from "./panel-portfolio.ts";
 import type { DailyFile, HoldingsFile } from "../../types/data.ts";
 
 export interface PortfolioSymbol {
@@ -30,12 +30,22 @@ export function loadHoldings(_variant = "live"): HoldingsFile {
   return { updated: "", funds: [] };
 }
 
+export function collectPanelPortfolioSymbols(portfolio: PanelPortfolioFile): PortfolioSymbol[] {
+  const byCode = new Map<string, PortfolioSymbol>();
+  for (const entry of portfolio.symbols) {
+    byCode.set(entry.code, { code: entry.code, name: entry.name || entry.code });
+  }
+  for (const group of portfolio.groups ?? []) {
+    for (const code of group.symbolCodes) {
+      if (!byCode.has(code)) byCode.set(code, { code, name: code });
+    }
+  }
+  return [...byCode.values()];
+}
+
 /** Read Overview Portfolio codes/names from panel-portfolio.json. */
 export async function loadPortfolioSymbols(): Promise<PortfolioSymbol[]> {
-  return loadPanelPortfolio().symbols.map((entry) => ({
-    code: entry.code,
-    name: entry.name || entry.code,
-  }));
+  return collectPanelPortfolioSymbols(loadPanelPortfolio());
 }
 
 export interface SyncedPanelPortfolio {

@@ -56,7 +56,24 @@ describe("panel-portfolio storage", () => {
     ]);
   });
 
-  it("keeps groups when panel portfolio has only group codes", () => {
+  it("keeps groups when panel portfolio has only group codes", async () => {
+    savePanelPortfolio({
+      updated: "2026-06-10",
+      symbols: [],
+      groups: [{ id: "group-1", name: "核心组合", symbolCodes: ["510300.SH"] }],
+    });
+    const loaded = loadPanelPortfolio();
+    expect(loaded.symbols).toEqual([]);
+    expect(loaded.groups.map((group) => group.symbolCodes)).toEqual([["510300.SH"]]);
+    expect(await loadPortfolioSymbols()).toEqual([{ code: "510300.SH", name: "510300.SH" }]);
+  });
+
+  it("keeps groups-only panel data ahead of legacy holdings import", () => {
+    mkdirSync(join(OHQ, "portfolio"), { recursive: true });
+    writeFileSync(
+      join(OHQ, "portfolio", "holdings.json"),
+      JSON.stringify({ funds: [{ code: "022364", name: "Legacy Fund" }] }),
+    );
     savePanelPortfolio({
       updated: "2026-06-10",
       symbols: [],
@@ -239,4 +256,3 @@ describe("panel-portfolio groups", () => {
     expect(loaded.groups[1].symbolCodes).toEqual(["159915.SZ"]);
   });
 });
-

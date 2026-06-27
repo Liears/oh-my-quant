@@ -87,7 +87,6 @@ export function isValidPanelSymbol(code: string): boolean {
 export function loadPanelPortfolio(): PanelPortfolioFile {
   const path = panelPortfolioPath();
   const existing = readPanelFile(path);
-  const legacy = importLegacyHoldings();
   const validSymbols = existing.symbols.filter((entry) => isValidPanelSymbol(entry.code));
   const validGroupCodes = new Set(
     existing.groups.flatMap((group) => group.symbolCodes).filter((code) => isValidPanelSymbol(code)),
@@ -99,14 +98,15 @@ export function loadPanelPortfolio(): PanelPortfolioFile {
     .filter(g => g.symbolCodes.length > 0);
 
   if (validSymbols.length === 0) {
-    if (legacy.symbols.length > 0) {
-      savePanelPortfolio(legacy);
-      return legacy;
-    }
     if (repairedGroups.length > 0) {
       const repaired: PanelPortfolioFile = { updated: existing.updated, symbols: [], groups: repairedGroups };
       savePanelPortfolio(repaired);
       return repaired;
+    }
+    const legacy = importLegacyHoldings();
+    if (legacy.symbols.length > 0) {
+      savePanelPortfolio(legacy);
+      return legacy;
     }
     if (existing.symbols.length > 0 || existing.groups.length > 0) {
       savePanelPortfolio({ updated: existing.updated, symbols: [], groups: [] });
@@ -201,8 +201,3 @@ function generateGroupId(data: PanelPortfolioFile): string {
   }
   return `group-${Date.now()}`;
 }
-
-
-
-
-
