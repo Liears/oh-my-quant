@@ -39,6 +39,16 @@ describe("compareHandler", () => {
     expect(result.message).toContain("--threshold");
   });
 
+  it("uses group-only portfolio codes for comparisons", async () => {
+    savePanelPortfolio({
+      updated: "",
+      symbols: [],
+      groups: [{ id: "group-1", name: "Core", symbolCodes: ["000001"] }],
+    });
+    const result = await compareHandler({ rule: "volatility", threshold: "0.25" }, ["run"], {});
+    expect(result.message).not.toContain("panel portfolio is empty");
+  });
+
   it("rejects drawdown rule without threshold", async () => {
     savePanelPortfolio({ updated: "", symbols: [{ code: "000001", name: "Test", added: "2024-01-01" }], groups: [] });
     const result = await compareHandler({ rule: "drawdown" }, ["run"], {});
