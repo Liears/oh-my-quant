@@ -14,12 +14,15 @@ import { readFileSync } from "node:fs";
 import { esc, renderArtifactTemplate, type ArtifactTemplateInput } from "./template.ts";
 import { readWhyjEnvValue } from "../../storage/src/env-keys.ts";
 import type { GenerateArtifactInput, GenerateArtifactResult, GenCtx, RawEntry, ContentBlock } from "./types.ts";
-export type { GenerateArtifactInput, GenerateArtifactResult } from "./types.ts";
+import { extractText } from "./message-text.ts";
 import { tryKline, tryNavChart, tryMetrics, tryScoreTable, tryDataTable, tryFactorBars, tryCompareFactors, renderDataTable } from "./detectors.ts";
 import { renderEchartsKline, renderNavEcharts, renderEchartsBars, renderFactorMatrix, renderMetricCards, renderScoreTable, highlight } from "./renderers.ts";
 import { renderDock } from "./dock.ts";
 import { buildTrajectoryFromSession } from "./trajectory.ts";
 import { renderTrajectoryDocument } from "./trajectory-renderer.ts";
+
+export { extractText } from "./message-text.ts";
+export type { GenerateArtifactInput, GenerateArtifactResult } from "./types.ts";
 
 function resolveQuantModel(): string {
   return readWhyjEnvValue(process.env as Record<string, string | undefined>, "model") || "whyj-quant";
@@ -313,14 +316,6 @@ export function normalizeRole(r: string): "user" | "assistant" | "tool" | null {
   if (r === "assistant") return "assistant";
   if (r === "toolResult") return "tool";
   return null;
-}
-
-export function extractText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return (content as Array<{ type?: string; text?: string }>)
-    .filter((b) => b.type === "text" && typeof b.text === "string")
-    .map((b) => b.text).join("\n\n");
 }
 
 function detectSourceUrls(title: string, entries: RawEntry[]): { label: string; url: string }[] {

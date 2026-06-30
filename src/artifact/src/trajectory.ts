@@ -7,7 +7,7 @@
  */
 import type { RawEntry, ContentBlock, TrajectoryDocument, TrajectoryEvent, TrajectorySummary } from "./types.ts";
 import { redactEventToolArgs } from "./redact.ts";
-import { extractText } from "./generator.ts";
+import { extractText } from "./message-text.ts";
 
 const SKILL_NAME_RE = /<skill\s+name\s*=\s*"([^"]+)"/;
 
