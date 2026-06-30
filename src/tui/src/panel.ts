@@ -2,11 +2,11 @@ import type * as readline from "node:readline";
 import { Buffer } from "./buffer.ts";
 import { S } from "./styles.ts";
 import { drawPanelFrame, renderConfigHeaderInfo, type PanelFrame } from "./panel-chrome.ts";
-import { renderConfigPanelView, renderHelpPanelView, renderPortfolioPanelView, renderResumePanelView, type ConfigRowView } from "./panel-views.ts";
-import { buildConfigRowViews, buildHelpPanelData, buildPortfolioPanelData, buildResumePanelData } from "./panel-models.ts";
+import { renderArtifactPanelView, renderConfigPanelView, renderHelpPanelView, renderPortfolioPanelView, renderResumePanelView, type ConfigRowView } from "./panel-views.ts";
+import { buildArtifactPanelData, buildConfigRowViews, buildHelpPanelData, buildPortfolioPanelData, buildResumePanelData } from "./panel-models.ts";
 import { COMMAND_CATALOG } from "../../cli/catalog.ts";
 import { describeEndpointMode } from "../../cli/doctor.ts";
-import { loadSettings, saveSettings, listStoredSessions, listLocalPortfolios, syncPanelPortfolioFromLocalPortfolio, hasWhyjEnvValue, stripTerminalControlCodes, type StoredSessionSummary, type LocalPortfolioSummary, type WhyjEnvAliasKey } from "../../storage/index.ts";
+import { loadSettings, saveSettings, listStoredSessions, listLocalPortfolios, listArtifacts, loadPanelPortfolio, syncPanelPortfolioFromLocalPortfolio, hasWhyjEnvValue, stripTerminalControlCodes, type StoredSessionSummary, type LocalPortfolioSummary, type ArtifactMeta, type WhyjEnvAliasKey } from "../../storage/index.ts";
 import type { DataSource, OhQuantSettings } from "../../types/config.ts";
 
 export type PanelResult = { command?: string; close?: boolean; refreshPanel?: boolean };
@@ -87,6 +87,7 @@ export class PanelController {
   private cfg: OhQuantSettings | null = null;
   private recentSessions: StoredSessionSummary[] = [];
   private localPortfolios: LocalPortfolioSummary[] = [];
+  private artifacts: ArtifactMeta[] = [];
   private resumeQuery = "";
   private resumeFilter: ResumeFilter = "cwd";
   private resumeSort: ResumeSort = "updated";
@@ -101,6 +102,7 @@ export class PanelController {
   private dirty = false;
   private currentSessionMeta: CurrentSessionMeta | null = null;
   private helpSelection = 0;
+  private artifactSelection = 0;
 
   open(mode: PanelMode = "config"): void {
     this.mode = mode;
@@ -117,9 +119,11 @@ export class PanelController {
     this.portfolioSort = "updated";
     this.portfolioSelection = 0;
     this.helpSelection = 0;
+    this.artifactSelection = 0;
     this.dirty = false;
-    this.refreshResumeSessions();
-    this.refreshLocalPortfolios();
+    if (mode === "resume") this.refreshResumeSessions();
+    if (mode === "portfolio") this.refreshLocalPortfolios();
+    if (mode === "artifact") this.refreshArtifacts();
   }
 
   setCurrentSessionMeta(meta: CurrentSessionMeta): void {
@@ -139,7 +143,8 @@ export class PanelController {
     if (!this.cfg) return null;
     if (this.mode === "resume") return this.handleResumeKey(input, key);
     if (this.mode === "portfolio") return this.handlePortfolioKey(input, key);
-    if (this.mode === "help" || this.mode === "artifact") {
+    if (this.mode === "artifact") return this.handleArtifactKey(input, key);
+    if (this.mode === "help") {
       if (key.name === "escape") return { close: true };
       const total = COMMAND_CATALOG.length;
       if (key.name === "up") { this.helpSelection = (this.helpSelection - 1 + total) % total; return {}; }
@@ -201,6 +206,31 @@ export class PanelController {
     return {};
   }
 
+
+  private handleArtifactKey(input: string, key: readline.Key): PanelResult {
+    if (key.name === "escape") return { close: true };
+    if (input.toLowerCase() === "g") {
+      this.status = "Generating artifact...";
+      return { command: "/artifact --generate", close: true };
+    }
+    if (key.name === "up") {
+      const items = this.artifacts;
+      if (items.length > 0) this.artifactSelection = (this.artifactSelection - 1 + items.length) % items.length;
+      return {};
+    }
+    if (key.name === "down") {
+      const items = this.artifacts;
+      if (items.length > 0) this.artifactSelection = (this.artifactSelection + 1) % items.length;
+      return {};
+    }
+    if (key.name === "return") {
+      const selected = this.artifacts[this.artifactSelection];
+      if (!selected) return {};
+      this.status = `Opening ${selected.sessionId}...`;
+      return { command: `/artifact --open ${selected.sessionId}`, close: true };
+    }
+    return {};
+  }
   private handlePortfolioKey(_input: string, key: readline.Key): PanelResult {
     if (key.name === "escape") return { close: true };
     if (key.name === "up") {
@@ -248,8 +278,12 @@ export class PanelController {
       this.renderPortfolioPanel(buf);
       return;
     }
-    if (this.mode === "help" || this.mode === "artifact") {
+    if (this.mode === "help") {
       this.renderHelpPanel(buf);
+      return;
+    }
+    if (this.mode === "artifact") {
+      this.renderArtifactPanel(buf);
       return;
     }
     const rows = this.rows();
@@ -307,6 +341,21 @@ export class PanelController {
     }));
   }
 
+
+  private renderArtifactPanel(buf: Buffer): void {
+    this.refreshArtifacts();
+    const frame = this.drawPanelFrame(
+      buf,
+      "Artifacts",
+      "↑↓ move  ↵ open  g generate  esc close",
+    );
+    renderArtifactPanelView(buf, frame, buildArtifactPanelData({
+      items: this.artifacts,
+      selection: this.artifactSelection,
+      status: this.status,
+      formatRelativeAge,
+    }));
+  }
   private renderHelpPanel(buf: Buffer): void {
     const frame = this.drawPanelFrame(buf, "Help", "↑↓ select  ↵ run  esc close");
     const total = COMMAND_CATALOG.length;
@@ -425,10 +474,14 @@ export class PanelController {
   private currentPortfolioLabel(): string {
     const fileName = this.cfg?.preferences.currentPortfolioFile || "holdings.json";
     const match = this.localPortfolios.find((item) => item.fileName === fileName);
-    return match ? currentPortfolioOption(match.fileName, match.name) : fileName;
+    if (match) return currentPortfolioOption(match.fileName, match.name);
+    const panelPortfolio = loadPanelPortfolio();
+    if (panelPortfolio.groups.length === 1 && panelPortfolio.groups[0]?.name) return panelPortfolio.groups[0].name;
+    return fileName;
   }
 
   private currentPortfolioOptions(): string[] {
+    if (this.localPortfolios.length === 0) this.refreshLocalPortfolios();
     if (this.localPortfolios.length === 0) return [this.currentPortfolioLabel()];
     return this.localPortfolios.map((item) => currentPortfolioOption(item.fileName, item.name));
   }
@@ -436,7 +489,10 @@ export class PanelController {
   private currentPortfolioName(): string {
     const fileName = this.cfg?.preferences.currentPortfolioFile || "holdings.json";
     const match = this.localPortfolios.find((item) => item.fileName === fileName);
-    return match?.name || fileName;
+    if (match) return match.name;
+    const panelPortfolio = loadPanelPortfolio();
+    if (panelPortfolio.groups.length === 1 && panelPortfolio.groups[0]?.name) return panelPortfolio.groups[0].name;
+    return fileName;
   }
 
   private setCurrentPortfolio(value: string): void {
@@ -585,6 +641,11 @@ export class PanelController {
     this.portfolioSelection = Math.max(0, Math.min(this.portfolioSelection, items.length - 1));
   }
 
+
+  private refreshArtifacts(): void {
+    this.artifacts = listArtifacts();
+    this.artifactSelection = Math.max(0, Math.min(this.artifactSelection, this.artifacts.length - 1));
+  }
   private refreshLocalPortfolios(): void {
     const portfolios = listLocalPortfolios();
     this.localPortfolios = portfolios.sort((a, b) => {

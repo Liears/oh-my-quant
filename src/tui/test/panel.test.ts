@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from "node:f
 import { join } from "node:path";
 import { Buffer } from "../src/buffer.ts";
 import { PanelController } from "../src/panel.ts";
-import { savePanelPortfolio, loadSettings, saveSettings } from "../../storage/index.ts";
+import { saveArtifact, savePanelPortfolio, loadSettings, saveSettings } from "../../storage/index.ts";
 
 const OHQ = join(process.cwd(), ".ohquant-test-panel-ctrl");
 
@@ -48,7 +48,7 @@ describe("PanelController portfolio UI", () => {
     configPanel.open("config");
     const configBuf = new Buffer(120, 28);
     configPanel.render(configBuf);
-    expect(configBuf.toPlain().join("\n")).toContain("Active portfolio: 当前主组合");
+    expect(configBuf.toPlain().join("\n")).toContain("Active portfolio: holdings.json");
     expect(configBuf.toPlain().join("\n")).toContain("Portfolio");
     expect(configBuf.toPlain().join("\n")).toContain("Source");
     expect(configBuf.toPlain().join("\n")).toContain("Token");
@@ -58,7 +58,7 @@ describe("PanelController portfolio UI", () => {
     expect(configBuf.toPlain().join("\n")).not.toContain("-- Basic --");
     expect(configBuf.toPlain().join("\n")).toContain("↑↓ move  ↵ toggle/edit  esc close");
     expect(configBuf.toPlain().join("\n")).not.toContain("Use slash commands for data");
-    expect(configBuf.toPlain().join("\n")).toContain("当前主组合 · holdi");
+    expect(configBuf.toPlain().join("\n")).toContain("holdings.json");
     configPanel.handleKey("", key("down"));
     configPanel.handleKey("", key("down"));
     configPanel.handleKey("", key("return"));
@@ -320,6 +320,26 @@ describe("PanelController portfolio UI", () => {
     panel.close();
   });
 
+
+  it("renders a dedicated artifact panel and returns artifact commands", () => {
+    saveArtifact("sess-artifact-1", "<html><body>artifact</body></html>", { title: "Analysis artifact", messageCount: 3 });
+
+    const panel = new PanelController();
+    panel.open("artifact");
+    const buf = new Buffer(120, 28);
+    panel.render(buf);
+    const plain = buf.toPlain().join("\n");
+    expect(plain).toContain("Artifacts");
+    expect(plain).toContain("Analysis artifact");
+    expect(plain).not.toContain("Hotkeys");
+
+    const open = panel.handleKey("", key("return"));
+    expect(open).toEqual({ command: "/artifact --open sess-artifact-1", close: true });
+
+    const generate = panel.handleKey("g", key("g", "g"));
+    expect(generate).toEqual({ command: "/artifact --generate", close: true });
+    panel.close();
+  });
   it("uses the same panel frame size for config, resume, and portfolio", () => {
     const configPanel = new PanelController();
     configPanel.open("config");

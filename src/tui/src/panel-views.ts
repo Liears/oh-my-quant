@@ -162,6 +162,64 @@ export function renderPortfolioPanelView(
   buf.text(inner.x, frame.footerY, truncate(data.footer, inner.w), S.dim);
 }
 
+
+export interface ArtifactItemView {
+  age: string;
+  title: string;
+  stats: string;
+  selected: boolean;
+}
+
+export interface ArtifactMetaView {
+  title: string;
+  details: string;
+  subdetails: string;
+}
+
+export function renderArtifactPanelView(
+  buf: Buffer,
+  frame: PanelFrame,
+  data: {
+    meta?: ArtifactMetaView;
+    items: ArtifactItemView[];
+    footer: string;
+  },
+): void {
+  const { inner } = frame;
+  let y = inner.y;
+  let metaRows = 0;
+
+  if (data.meta) {
+    buf.text(inner.x, y, truncate(data.meta.title, inner.w), S.code);
+    y++; metaRows++;
+    buf.text(inner.x, y, truncate(data.meta.details, inner.w), S.dim);
+    y++; metaRows++;
+    buf.text(inner.x, y, truncate(data.meta.subdetails, inner.w), S.dim);
+    y++; metaRows++;
+    y++;
+    metaRows++;
+  }
+
+  if (data.items.length === 0) {
+    buf.text(inner.x, frame.contentY, "No artifacts yet.", S.dim);
+    buf.text(inner.x, frame.footerY, truncate(data.footer, inner.w), S.dim);
+    return;
+  }
+
+  const listHeight = Math.max(1, frame.contentH - metaRows);
+  const selectedIndex = Math.max(0, data.items.findIndex((item) => item.selected));
+  const start = Math.max(0, Math.min(selectedIndex - Math.floor(listHeight / 2), data.items.length - listHeight));
+  y = Math.max(frame.contentY, y);
+  for (const item of data.items.slice(start, start + listHeight)) {
+    const prefix = item.selected ? "❯ " : "  ";
+    const left = `${prefix}${item.age}  ${item.title}`;
+    const right = truncate(item.stats, 18);
+    buf.text(inner.x, y, truncate(left, Math.max(1, inner.w - right.length - 2)), item.selected ? S.goldB : S.cream);
+    buf.textRight(inner.x + inner.w, y++, right, item.selected ? S.goldB : S.dim);
+  }
+
+  buf.text(inner.x, frame.footerY, truncate(data.footer, inner.w), S.dim);
+}
 export function renderHelpPanelView(
   buf: Buffer,
   frame: PanelFrame,

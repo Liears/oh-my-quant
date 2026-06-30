@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildHelpPanelData, buildPortfolioPanelData, buildResumePanelData } from "../src/panel-models.ts";
+import { buildArtifactPanelData, buildHelpPanelData, buildPortfolioPanelData, buildResumePanelData } from "../src/panel-models.ts";
 
 describe("panel models", () => {
   it("builds resume panel data with current-session usage and legacy archive markers", () => {
@@ -141,6 +141,28 @@ describe("panel models", () => {
     expect(data.footer).toContain(".ohquant/portfolio/");
   });
 
+
+  it("builds artifact panel data with selected metadata", () => {
+    const data = buildArtifactPanelData({
+      items: [
+        {
+          sessionId: "sess-artifact-1",
+          title: "Analysis artifact",
+          createdAt: "2026-06-18T00:00:00.000Z",
+          messageCount: 3,
+          bytes: 2048,
+        },
+      ],
+      selection: 0,
+      status: "",
+      formatRelativeAge: () => "2h ago",
+    });
+
+    expect(data.meta?.title).toContain("Analysis artifact");
+    expect(data.meta?.details).toContain("sess-artifact-1");
+    expect(data.items[0]?.stats).toContain("2KB");
+    expect(data.footer).toContain("1 artifact");
+  });
   it("builds help panel data with a selected command", () => {
     const data = buildHelpPanelData(0);
     expect(data.commands.some((cmd) => cmd.selected)).toBe(true);

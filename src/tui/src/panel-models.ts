@@ -1,6 +1,6 @@
 import type { CurrentSessionMeta } from "./panel.ts";
-import type { ConfigRowView, PortfolioItemView, PortfolioMetaView, ResumeListItemView, ResumeMetaView } from "./panel-views.ts";
-import type { LocalPortfolioSummary, StoredSessionContextUsage, StoredSessionSummary } from "../../storage/index.ts";
+import type { ArtifactItemView, ArtifactMetaView, ConfigRowView, PortfolioItemView, PortfolioMetaView, ResumeListItemView, ResumeMetaView } from "./panel-views.ts";
+import type { ArtifactMeta, LocalPortfolioSummary, StoredSessionContextUsage, StoredSessionSummary } from "../../storage/index.ts";
 import { COMMAND_CATALOG } from "../../cli/catalog.ts";
 
 export function buildConfigRowViews(
@@ -136,6 +136,43 @@ export function buildPortfolioPanelData(args: {
   };
 }
 
+
+export function buildArtifactPanelData(args: {
+  items: ArtifactMeta[];
+  selection: number;
+  status: string;
+  formatRelativeAge: (value: string) => string;
+}): {
+  meta?: ArtifactMetaView;
+  items: ArtifactItemView[];
+  footer: string;
+} {
+  const { items, selection, status, formatRelativeAge } = args;
+  const selected = items[selection];
+  return {
+    meta: selected ? {
+      title: `Selected: ${selected.title}`,
+      details: `${selected.sessionId}  ·  ${selected.messageCount} messages  ·  ${formatBytes(selected.bytes)}`,
+      subdetails: selected.createdAt ? formatRelativeAge(selected.createdAt) : "-",
+    } : undefined,
+    items: items.map((item, index) => ({
+      age: item.createdAt ? formatRelativeAge(item.createdAt).padEnd(8) : "-".padEnd(8),
+      title: item.title || item.sessionId,
+      stats: `${item.messageCount} msg · ${formatBytes(item.bytes)}`,
+      selected: index === selection,
+    })),
+    footer: items.length === 0
+      ? "No artifacts yet. Press g to generate one from the current session."
+      : (status || `↑↓ select  ↵ open  g generate  esc close  ·  ${items.length} artifact${items.length === 1 ? "" : "s"}`),
+  };
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0B";
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
 export function buildHelpPanelData(selection: number): {
   commands: { name: string; desc: string; selected: boolean }[];
   hotkeys: { key: string; desc: string }[];

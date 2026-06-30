@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Buffer } from "../src/buffer.ts";
 import { drawPanelFrame } from "../src/panel-chrome.ts";
-import { renderHelpPanelView, renderPortfolioPanelView, renderResumePanelView } from "../src/panel-views.ts";
+import { renderArtifactPanelView, renderHelpPanelView, renderPortfolioPanelView, renderResumePanelView } from "../src/panel-views.ts";
 
 describe("panel views", () => {
   it("renders resume metadata and legacy archive markers through the shared resume view", () => {
@@ -53,6 +53,28 @@ describe("panel views", () => {
     expect(plain).toContain("Ctrl+P");
   });
 
+
+  it("renders artifact metadata through the shared artifact view", () => {
+    const buf = new Buffer(120, 20);
+    const frame = drawPanelFrame(buf, "Artifacts", "↑↓ move  ↵ open  g generate  esc close");
+
+    renderArtifactPanelView(buf, frame, {
+      meta: {
+        title: "Selected: Analysis artifact",
+        details: "sess-artifact-1 · 3 messages · 2KB",
+        subdetails: "2h ago",
+      },
+      items: [
+        { age: "2h ago  ", title: "Analysis artifact", stats: "3 msg · 2KB", selected: true },
+      ],
+      footer: "↑↓ select  ↵ open  g generate  esc close  ·  1 artifact",
+    });
+
+    const plain = buf.toPlain().join("\n");
+    expect(plain).toContain("Selected: Analysis artifact");
+    expect(plain).toContain("sess-artifact-1");
+    expect(plain).toContain("3 msg");
+  });
   it("renders actionable portfolio empty state text", () => {
     const buf = new Buffer(120, 20);
     const frame = drawPanelFrame(buf, "Portfolio", "Add portfolio JSON files under .ohquant/portfolio/");
