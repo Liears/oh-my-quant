@@ -3,21 +3,10 @@ import { SYSTEM_TOOLS } from "./bash-tool.ts";
 import { AKSHARE_FUND_TOOL_REGISTRATIONS } from "./akshare-fund-tools.ts";
 import { DATA_TOOLS } from "./data-tools.ts";
 import { COMPUTE_TOOLS } from "./quant-tools.ts";
-import { shellDisplayName } from "./shell.ts";
+import { builtinToolDisplay, type BuiltinToolDomain, type ToolDisplay } from "./display.ts";
 
-export type BuiltinToolDomain = "data" | "quant" | "system";
-
-export type DataProvider =
-  | "akshare"
-  | "tushare"
-  | "llmquant"
-  | "financial-datasets"
-  | "joinquant";
-
-export interface ToolDisplay {
-  label: string;
-  provider?: DataProvider;
-}
+export { builtinToolDisplay } from "./display.ts";
+export type { BuiltinToolDomain, DataProvider, ToolDisplay } from "./display.ts";
 
 export interface BuiltinToolRegistration {
   tool: AgentTool;
@@ -42,28 +31,34 @@ function mustTool(tools: AgentTool[], name: string): AgentTool {
   return tool;
 }
 
+function mustDisplay(name: string): ToolDisplay {
+  const display = builtinToolDisplay(name);
+  if (!display) throw new Error(`Missing built-in tool display metadata: ${name}`);
+  return display;
+}
+
 const DEFAULT_BUILTIN_TOOL_REGISTRATIONS: BuiltinToolRegistration[] = [
-  { tool: mustTool(DATA_TOOLS, "fetch_bars"), domain: "data", display: { label: "AKShare · Daily Bars", provider: "akshare" } },
-  { tool: mustTool(DATA_TOOLS, "search_symbols"), domain: "data", display: { label: "Tushare · Search", provider: "joinquant" } },
-  { tool: mustTool(DATA_TOOLS, "fetch_snapshot"), domain: "data", display: { label: "Direct · Snapshot" } },
-  { tool: mustTool(DATA_TOOLS, "fetch_index_spot"), domain: "data", display: { label: "AKShare · Index Spot", provider: "akshare" } },
-  { tool: mustTool(DATA_TOOLS, "fetch_index_info"), domain: "data", display: { label: "AKShare · Index Info", provider: "akshare" } },
-  { tool: mustTool(DATA_TOOLS, "fetch_index_constituents"), domain: "data", display: { label: "AKShare · Index Constituents", provider: "akshare" } },
-  { tool: mustTool(DATA_TOOLS, "fetch_index_rows"), domain: "data", display: { label: "AKShare · Index Rows", provider: "akshare" } },
+  { tool: mustTool(DATA_TOOLS, "fetch_bars"), domain: "data", display: mustDisplay("fetch_bars") },
+  { tool: mustTool(DATA_TOOLS, "search_symbols"), domain: "data", display: mustDisplay("search_symbols") },
+  { tool: mustTool(DATA_TOOLS, "fetch_snapshot"), domain: "data", display: mustDisplay("fetch_snapshot") },
+  { tool: mustTool(DATA_TOOLS, "fetch_index_spot"), domain: "data", display: mustDisplay("fetch_index_spot") },
+  { tool: mustTool(DATA_TOOLS, "fetch_index_info"), domain: "data", display: mustDisplay("fetch_index_info") },
+  { tool: mustTool(DATA_TOOLS, "fetch_index_constituents"), domain: "data", display: mustDisplay("fetch_index_constituents") },
+  { tool: mustTool(DATA_TOOLS, "fetch_index_rows"), domain: "data", display: mustDisplay("fetch_index_rows") },
   ...AKSHARE_FUND_TOOL_REGISTRATIONS.map((entry) => ({
     tool: mustTool(DATA_TOOLS, entry.name),
     domain: "data" as const,
-    display: { label: entry.label, provider: "akshare" as const },
+    display: mustDisplay(entry.name),
   })),
 
-  { tool: mustTool(COMPUTE_TOOLS, "compute_factor"), domain: "quant", display: { label: "Quant.Factor" } },
-  { tool: mustTool(COMPUTE_TOOLS, "run_backtest"), domain: "quant", display: { label: "Quant.Backtest" } },
-  { tool: mustTool(COMPUTE_TOOLS, "check_risk"), domain: "quant", display: { label: "Quant.Risk" } },
-  { tool: mustTool(COMPUTE_TOOLS, "fund_dca_backtest"), domain: "quant", display: { label: "Tool.quant.fund.dca" } },
-  { tool: mustTool(COMPUTE_TOOLS, "score_benchmark"), domain: "quant", display: { label: "Quant.Benchmark" } },
-  { tool: mustTool(COMPUTE_TOOLS, "show_dashboard"), domain: "quant", display: { label: "Quant.Dashboard" } },
+  { tool: mustTool(COMPUTE_TOOLS, "compute_factor"), domain: "quant", display: mustDisplay("compute_factor") },
+  { tool: mustTool(COMPUTE_TOOLS, "run_backtest"), domain: "quant", display: mustDisplay("run_backtest") },
+  { tool: mustTool(COMPUTE_TOOLS, "check_risk"), domain: "quant", display: mustDisplay("check_risk") },
+  { tool: mustTool(COMPUTE_TOOLS, "fund_dca_backtest"), domain: "quant", display: mustDisplay("fund_dca_backtest") },
+  { tool: mustTool(COMPUTE_TOOLS, "score_benchmark"), domain: "quant", display: mustDisplay("score_benchmark") },
+  { tool: mustTool(COMPUTE_TOOLS, "show_dashboard"), domain: "quant", display: mustDisplay("show_dashboard") },
 
-  { tool: mustTool(SYSTEM_TOOLS, "bash"), domain: "system", display: { label: shellDisplayName() } },
+  { tool: mustTool(SYSTEM_TOOLS, "bash"), domain: "system", display: mustDisplay("bash") },
 ];
 
 export const BUILTIN_TOOL_REGISTRY = defineBuiltinTools(
@@ -80,8 +75,4 @@ export function listBuiltinToolRegistrations(domain?: BuiltinToolDomain): Builti
 
 export function findBuiltinTool(name: string): AgentTool | undefined {
   return BUILTIN_TOOL_REGISTRY.find((registration) => registration.tool.name === name)?.tool;
-}
-
-export function builtinToolDisplay(name: string): ToolDisplay | undefined {
-  return BUILTIN_TOOL_REGISTRY.find((registration) => registration.tool.name === name)?.display;
 }

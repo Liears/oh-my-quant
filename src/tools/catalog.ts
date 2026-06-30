@@ -1,8 +1,8 @@
 /** Tool labels shown in Conversation + session transcripts. */
 
-import { builtinToolDisplay } from "./registry.ts";
+import { builtinToolDisplay } from "./display.ts";
 import { shellDisplayName } from "./shell.ts";
-export type { DataProvider, ToolDisplay } from "./registry.ts";
+export type { DataProvider, ToolDisplay } from "./display.ts";
 export { shellDisplayName } from "./shell.ts";
 
 export const DATA_SOURCE_PROMPTS: ReadonlyArray<{
