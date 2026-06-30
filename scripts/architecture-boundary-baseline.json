@@ -17,38 +17,6 @@
       "key": "quant-core-is-pure|src/quant/fund-dca.ts|src/source/index.ts|../source/index.ts"
     },
     {
-      "rule": "storage-owns-ohquant-paths",
-      "from": "src/quant/insight.ts:105",
-      "to": ".ohquant",
-      "specifier": ".ohquant/insights.json",
-      "reason": "Only storage should construct .ohquant filesystem paths.",
-      "key": "storage-owns-ohquant-paths|src/quant/insight.ts:105|.ohquant|.ohquant/insights.json"
-    },
-    {
-      "rule": "storage-owns-ohquant-paths",
-      "from": "src/tools/quant-tools.ts:294",
-      "to": ".ohquant",
-      "specifier": ".ohquant",
-      "reason": "Only storage should construct .ohquant filesystem paths.",
-      "key": "storage-owns-ohquant-paths|src/tools/quant-tools.ts:294|.ohquant|.ohquant"
-    },
-    {
-      "rule": "storage-owns-ohquant-paths",
-      "from": "src/tools/quant-tools.ts:344",
-      "to": ".ohquant",
-      "specifier": ".ohquant",
-      "reason": "Only storage should construct .ohquant filesystem paths.",
-      "key": "storage-owns-ohquant-paths|src/tools/quant-tools.ts:344|.ohquant|.ohquant"
-    },
-    {
-      "rule": "storage-owns-ohquant-paths",
-      "from": "src/tui/src/watchlist.ts:6",
-      "to": ".ohquant",
-      "specifier": ".ohquant",
-      "reason": "Only storage should construct .ohquant filesystem paths.",
-      "key": "storage-owns-ohquant-paths|src/tui/src/watchlist.ts:6|.ohquant|.ohquant"
-    },
-    {
       "rule": "storage-owns-persistence-only",
       "from": "src/storage/src/comparison.ts",
       "to": "src/quant/group-comparison.ts",
@@ -143,14 +111,6 @@
       "specifier": "../../tools/catalog.ts",
       "reason": "tui should consume runtime view models instead of calling business modules directly.",
       "key": "tui-is-render-adapter|src/tui/src/render-lines.ts|src/tools/catalog.ts|../../tools/catalog.ts"
-    },
-    {
-      "rule": "tui-is-render-adapter",
-      "from": "src/tui/src/render.ts",
-      "to": "src/quant/insight.ts",
-      "specifier": "../../quant/insight.ts",
-      "reason": "tui should consume runtime view models instead of calling business modules directly.",
-      "key": "tui-is-render-adapter|src/tui/src/render.ts|src/quant/insight.ts|../../quant/insight.ts"
     },
     {
       "rule": "tui-is-render-adapter",

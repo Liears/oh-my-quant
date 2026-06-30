@@ -88,7 +88,7 @@ describe("panel-portfolio storage", () => {
     expect(await loadPortfolioSymbols()).toEqual([]);
   });
 
-  it("auto-imports legacy holdings when panel has only invalid codes", () => {
+  it("does not auto-import legacy holdings during default panel load", () => {
     mkdirSync(join(OHQ, "portfolio"), { recursive: true });
     writeFileSync(
       join(OHQ, "portfolio", "holdings.json"),
@@ -105,9 +105,10 @@ describe("panel-portfolio storage", () => {
       groups: [],
     });
     const loaded = loadPanelPortfolio();
-    expect(loaded.symbols.map((s) => s.code)).toEqual(["022364", "016372"]);
+    expect(loaded.symbols).toEqual([]);
     expect(isValidPanelSymbol("51")).toBe(false);
     expect(isValidPanelSymbol("022364")).toBe(true);
+    expect(importLegacyHoldings().symbols.map((s) => s.code)).toEqual(["022364", "016372"]);
   });
 
   it("strips invalid symbols while keeping valid panel entries", () => {

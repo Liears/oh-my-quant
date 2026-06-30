@@ -5,7 +5,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DATA_DIR } from "../../storage/index.ts";
+import { resolveDataDir } from "../../storage/index.ts";
 import { formatSkillsForSystemPrompt, type Skill } from "./pi/index.ts";
 
 // ── Base system prompt ──
@@ -180,7 +180,7 @@ function listCachedSymbols(): CachedInfo[] {
   const result: CachedInfo[] = [];
   const sources = ["tushare", "akshare", "llmquant-data"];
   for (const src of sources) {
-    const dir = join(DATA_DIR, src);
+    const dir = join(resolveDataDir(), src);
     if (!existsSync(dir)) continue;
     try {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {

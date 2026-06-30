@@ -2,7 +2,7 @@ import { describe, expect, it, mock } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadPanelPortfolio, loadSettings } from "../../storage/index.ts";
+import { loadPanelPortfolio, loadSettings, savePanelPortfolio } from "../../storage/index.ts";
 import { compactHandler, configHandler, doctorHandler, portfolioHandler, resumeHandler, sessionHandler } from "./system.ts";
 import { skillHandler } from "../../skill/handler.ts";
 import type { QuantAgentSession } from "../../agent/src/session.ts";
@@ -230,12 +230,11 @@ describe("portfolioHandler", () => {
 
   it("renders a compact config summary outside TUI", async () => {
     await withTempOhq(async () => {
-      mkdirSync(join(OHQ, "portfolio"), { recursive: true });
-      await Bun.write(join(OHQ, "portfolio", "holdings.json"), JSON.stringify({
-        name: "当前主组合",
-        updated: "2026-05-30T00:00:00+08:00",
-        funds: [{ code: "011613", name: "华夏科创50ETF联接C" }],
-      }, null, 2));
+      savePanelPortfolio({
+        updated: "",
+        symbols: [{ code: "011613", name: "华夏科创50ETF联接C", added: "2026-05-30" }],
+        groups: [{ id: "default", name: "当前主组合", symbolCodes: ["011613"] }],
+      });
       const result = await configHandler({}, [], {});
       expect(result.success).toBe(true);
       expect(result.message).toContain("Config");

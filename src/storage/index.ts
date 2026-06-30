@@ -1,4 +1,22 @@
-export { DATA_DIR, OHQUANT_DIR, SETTINGS_PATH, ensureDirs, resolveOhquantDir, resolveSessionsDir } from "./src/dirs.ts";
+export {
+  ensureDirs,
+  resolveArtifactsDir,
+  resolveBenchmarkComparisonsDir,
+  resolveBenchmarkDir,
+  resolveBenchmarkResultsDir,
+  resolveCacheDir,
+  resolveDataDir,
+  resolveInsightCachePath,
+  resolveLegacyConfigPath,
+  resolveLegacyHoldingsPath,
+  resolveLegacyPortfolioDir,
+  resolveOhquantDir,
+  resolvePanelPortfolioPath,
+  resolveSessionsDir,
+  resolveSettingsPath,
+  resolveSkillsDir,
+  resolveWatchlistPath,
+} from "./src/dirs.ts";
 export {
   canonicalizeWhyjEnv,
   hasWhyjEnvValue,
@@ -26,7 +44,7 @@ export {
   importLegacyHoldings,
   isValidPanelSymbol,
   loadPanelPortfolio,
-  PANEL_PORTFOLIO_PATH,
+  panelPortfolioPath,
   removeSymbol,
   removeSymbolFromGroup,
   renameGroup,
@@ -51,3 +69,6 @@ export {
   saveArtifact,
 } from "./src/artifacts.ts";
 export type { ArtifactMeta } from "./src/artifacts.ts";
+export { listBenchmarkResults, saveBenchmarkResult } from "./src/benchmark-results.ts";
+export type { SavedBenchmarkResult } from "./src/benchmark-results.ts";
+export { insightCacheMtimeMs, loadInsightCache, saveInsightCache } from "./src/insights.ts";

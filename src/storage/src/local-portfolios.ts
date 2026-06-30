@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { OHQUANT_DIR } from "./dirs.ts";
+import { resolveLegacyPortfolioDir } from "./dirs.ts";
 import { loadSettings } from "./settings.ts";
 import type { FundHolding } from "../../types/data.ts";
 
@@ -19,7 +19,7 @@ export interface LocalPortfolioSummary {
 type RawHolding = FundHolding & Record<string, unknown>;
 
 function portfolioDir(): string {
-  return join(process.env.OHQUANT_DIR || OHQUANT_DIR, "portfolio");
+  return resolveLegacyPortfolioDir();
 }
 
 export function listLocalPortfolios(): LocalPortfolioSummary[] {

@@ -5,12 +5,12 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { OHQUANT_DIR } from "./dirs.ts";
+import { resolveDataDir } from "./dirs.ts";
 import { emitFileEvent } from "./fs-events.ts";
 import type { Bar, SymbolMeta } from "../../types/data.ts";
 
 function dataDir(): string {
-  return join(process.env.OHQUANT_DIR || OHQUANT_DIR, "data");
+  return resolveDataDir();
 }
 
 /** Load cached bars for a symbol. Returns empty array if not cached. */

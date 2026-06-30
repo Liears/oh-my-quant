@@ -1,9 +1,10 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { OHQUANT_DIR } from "../storage/index.ts";
+import { resolveOhquantDir, resolveSkillsDir } from "../storage/index.ts";
 
-export const SKILLS_DIR = process.env.OHQUANT_SKILLS_DIR || join(OHQUANT_DIR, "skills");
+export const SKILLS_DIR = resolveSkillsDir();
+const skillsDir = () => resolveSkillsDir();
 
 const DEFAULT_REPOS = [
   "LLMQuant/skills",
@@ -26,12 +27,12 @@ export const CORE_SKILL_NAMES = [
 ];
 
 export function skillPaths(): string[] {
-  if (!existsSync(SKILLS_DIR)) return [];
+  if (!existsSync(skillsDir())) return [];
   const paths: string[] = [];
-  for (const entry of readdirSync(SKILLS_DIR, { withFileTypes: true })) {
+  for (const entry of readdirSync(skillsDir(), { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     if (DEFAULT_REPO_DIRS.has(entry.name)) {
-      const repoPath = join(SKILLS_DIR, entry.name);
+      const repoPath = join(skillsDir(), entry.name);
       const nestedSkills = join(repoPath, "skills");
       for (const skillName of CORE_SKILL_NAMES) {
         const skillPath = join(nestedSkills, skillName);
@@ -39,7 +40,7 @@ export function skillPaths(): string[] {
       }
       continue;
     }
-    const repoPath = join(SKILLS_DIR, entry.name);
+    const repoPath = join(skillsDir(), entry.name);
     const nestedSkills = join(repoPath, "skills");
     paths.push(existsSync(nestedSkills) ? nestedSkills : repoPath);
   }
@@ -53,7 +54,7 @@ export function installSkills(repo: string): { success: boolean; message: string
       message: "Use a GitHub repo in owner/repo format, for example: /skill install LLMQuant/skills",
     };
   }
-  const target = join(SKILLS_DIR, repo.replace("/", "-"));
+  const target = join(skillsDir(), repo.replace("/", "-"));
   const url = `https://github.com/${repo}.git`;
 
   if (existsSync(target)) {
@@ -65,7 +66,7 @@ export function installSkills(repo: string): { success: boolean; message: string
     }
   }
 
-  mkdirSync(SKILLS_DIR, { recursive: true });
+  mkdirSync(skillsDir(), { recursive: true });
   try {
     execFileSync("git", ["clone", "--depth", "1", "--filter=blob:none", url, target], { stdio: "pipe", timeout: 60_000 });
     return { success: true, message: `Installed ${repo}\nLocation  ${target}\nNext      Run /skill to see new skills.` };
@@ -80,11 +81,11 @@ export function installSkills(repo: string): { success: boolean; message: string
 
 /** Install default skill repos on first run (idempotent). */
 export function ensureDefaultSkills(): void {
-  mkdirSync(OHQUANT_DIR, { recursive: true });
-  mkdirSync(SKILLS_DIR, { recursive: true });
+  mkdirSync(resolveOhquantDir(), { recursive: true });
+  mkdirSync(skillsDir(), { recursive: true });
 
   for (const repo of DEFAULT_REPOS) {
-    const target = join(SKILLS_DIR, repo.replace("/", "-"));
+    const target = join(skillsDir(), repo.replace("/", "-"));
     if (existsSync(target)) continue;
 
     const url = `https://github.com/${repo}.git`;

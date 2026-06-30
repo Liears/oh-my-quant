@@ -248,9 +248,7 @@ export const scoreBenchmarkTool: AgentTool<typeof S.ScoreBenchmark> = {
     const { evaluate } = await import("../quant/benchmark.ts");
     const { smaSignals, vectorizedBacktest } = await import("../quant/backtest.ts");
     const { fetchBars } = await import("../source/index.ts");
-    const { emitFileEvent } = await import("../storage/index.ts");
-    const { writeFileSync, mkdirSync } = await import("node:fs");
-    const { join } = await import("node:path");
+    const { saveBenchmarkResult } = await import("../storage/index.ts");
 
     const fetchPrices = async (symbol: string) => {
       const cached = await loadCachedBars(symbol);
@@ -291,17 +289,10 @@ export const scoreBenchmarkTool: AgentTool<typeof S.ScoreBenchmark> = {
       { returns: testR.slice(1) },
     );
 
-    const root = process.env.OHQUANT_DIR || join(process.cwd(), ".ohquant");
-    const dir = join(root, "benchmark", "results");
-    try {
-      mkdirSync(dir, { recursive: true });
-      emitFileEvent({ operation: "MKDIR", path: dir, detail: "benchmark results" });
-    } catch { /* ok */ }
     const now = new Date().toISOString().slice(0, 10);
     const name = args.label || `sma_${args.fast}_${args.slow}`;
     const filename = `${name}_${now}.json`;
-    const outPath = join(dir, filename);
-    const outText = JSON.stringify({
+    saveBenchmarkResult(filename, {
       strategy: name, date: now, symbol: args.symbol, benchmark_symbol: args.benchmark_symbol,
       window: { fast: args.fast, slow: args.slow },
       source: {
@@ -309,9 +300,7 @@ export const scoreBenchmarkTool: AgentTool<typeof S.ScoreBenchmark> = {
         benchmark: { market: inferMarket(args.benchmark_symbol), fetcher: "local" },
       },
       ...score,
-    }, null, 2);
-    writeFileSync(outPath, outText, "utf-8");
-    emitFileEvent({ operation: "WRITE", path: outPath, bytes: outText.length, detail: "benchmark result" });
+    });
 
     return ok([
       `Benchmark  ${name}`,
@@ -336,28 +325,11 @@ export const showDashboardTool: AgentTool<typeof S.ShowDashboard> = {
   parameters: S.ShowDashboard,
   executionMode: "sequential",
   async execute(_id: string, _args: ShowDashboardArgs): Promise<AgentToolResult<unknown>> {
-    const { readdirSync, readFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
     const { collectResults, dashboardSummary } = await import("../quant/dashboard.ts");
-    const { emitFileEvent } = await import("../storage/index.ts");
+    const { listBenchmarkResults } = await import("../storage/index.ts");
 
-    const root = process.env.OHQUANT_DIR || join(process.cwd(), ".ohquant");
-    const dir = join(root, "benchmark", "results");
-    let files: string[] = [];
-    try {
-      files = readdirSync(dir).filter((f: string) => f.endsWith(".json"));
-      emitFileEvent({ operation: "READ", path: dir, detail: "benchmark index" });
-    } catch { files = []; }
-    if (files.length === 0) return ok("No benchmark results yet. Try: 'Run SMA 20/60 backtest on 000001.SZ'");
-
-    const results = files.map((f) => {
-      const path = join(dir, f);
-      try {
-        const text = readFileSync(path, "utf-8");
-        emitFileEvent({ operation: "READ", path, bytes: text.length, detail: "benchmark result" });
-        return JSON.parse(text);
-      } catch { return null; }
-    }).filter(Boolean) as Record<string, unknown>[];
+    const results = listBenchmarkResults();
+    if (results.length === 0) return ok("No benchmark results yet. Try: 'Run SMA 20/60 backtest on 000001.SZ'");
     const rows = collectResults(results);
     const s = dashboardSummary(rows);
     const sorted = [...rows].sort((a, b) => b.totalScore - a.totalScore).slice(0, 10);

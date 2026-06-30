@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { getModels } from "../../agent/src/pi/llm-index.ts";
-import { OHQUANT_DIR } from "./dirs.ts";
+import { resolveSessionsDir } from "./dirs.ts";
 import { estimateContextTokens, type AgentMessage, type JsonlSessionMetadata, type SessionTreeEntry } from "../../agent/src/pi/index.ts";
 import { buildSessionContext } from "../../agent/src/pi/harness/session/session.ts";
 
@@ -32,7 +32,7 @@ type SessionScope = "cwd" | "all";
 type SessionSort = "created" | "updated";
 
 function getSessionsDir(): string {
-  return join(process.env.OHQUANT_DIR || OHQUANT_DIR, "sessions");
+  return resolveSessionsDir();
 }
 
 function encodeCwd(cwd: string): string {

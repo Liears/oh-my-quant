@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { emitFileEvent } from "./fs-events.ts";
-import { OHQUANT_DIR, ensureDirs } from "./dirs.ts";
+import { ensureDirs, resolveBenchmarkComparisonsDir } from "./dirs.ts";
 import type { GroupComparisonResult } from "../../quant/group-comparison.ts";
 
 export interface ComparisonArtifact {
@@ -15,10 +15,8 @@ export interface ComparisonArtifact {
   groups: GroupComparisonResult[];
 }
 
-const COMPARISONS_DIR = "benchmark/comparisons";
-
 function comparisonsDir(): string {
-  return join(process.env.OHQUANT_DIR || OHQUANT_DIR, COMPARISONS_DIR);
+  return resolveBenchmarkComparisonsDir();
 }
 
 export function ensureComparisonsDir(): void {

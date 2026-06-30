@@ -2,7 +2,8 @@ import { describe, expect, it } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { skillHandler } from "../../skill/handler.ts";
-import { installSkills, SKILLS_DIR, skillPaths } from "../../skill/store.ts";
+import { installSkills, skillPaths } from "../../skill/store.ts";
+import { resolveSkillsDir } from "../../storage/index.ts";
 
 describe("skillHandler", () => {
   it("lists skills (or reports none found)", async () => {
@@ -57,7 +58,7 @@ describe("skillHandler", () => {
   });
 
   it("discovers installed repo skills from nested skills directories", () => {
-    const repoDir = join(SKILLS_DIR, "__skillpaths-test-repo__");
+    const repoDir = join(resolveSkillsDir(), "__skillpaths-test-repo__");
     mkdirSync(join(repoDir, "skills"), { recursive: true });
     mkdirSync(join(repoDir, "examples", "skills"), { recursive: true });
     try {

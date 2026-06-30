@@ -3,9 +3,8 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { JsonlSessionRepo } from "./agent/src/pi/index.ts";
 import { NodeExecutionEnv } from "./agent/src/pi/node.ts";
-import { loadPanelPortfolio, savePanelPortfolio, saveSettings } from "./storage/index.ts";
+import { loadPanelPortfolio, resolveSkillsDir, savePanelPortfolio, saveSettings } from "./storage/index.ts";
 import { AppRuntime, createInitialAppState, createRuntimeAgent } from "./app-runtime.ts";
-import { SKILLS_DIR } from "./skill/index.ts";
 import { shellDisplayName } from "./tools/catalog.ts";
 import type { AppState, PanelSection, UIMessage } from "./tui/src/types.ts";
 
@@ -134,7 +133,7 @@ function makeFakeAgent(promptImpl: (agent: any, input: string) => Promise<void>)
 
 describe("AppRuntime.submit", () => {
   it("builds the default runtime agent with installed project skill paths", async () => {
-    const skillsDir = join(SKILLS_DIR, "__runtime-test-repo__", "llmquant-crypto");
+    const skillsDir = join(resolveSkillsDir(), "__runtime-test-repo__", "llmquant-crypto");
     mkdirSync(skillsDir, { recursive: true });
     try {
       writeFileSync(join(skillsDir, "SKILL.md"), `---
@@ -151,7 +150,7 @@ description: Use for crypto market analysis.
       const skills = await agent.getSkills();
       expect(skills.some((skill) => skill.name === "llmquant-crypto")).toBe(true);
     } finally {
-      rmSync(join(SKILLS_DIR, "__runtime-test-repo__"), { recursive: true, force: true });
+      rmSync(join(resolveSkillsDir(), "__runtime-test-repo__"), { recursive: true, force: true });
     }
   });
 

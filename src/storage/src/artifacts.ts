@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { emitFileEvent } from "./fs-events.ts";
-import { OHQUANT_DIR, ensureDirs } from "./dirs.ts";
+import { ensureDirs, resolveArtifactsDir } from "./dirs.ts";
 
 export interface ArtifactMeta {
   sessionId: string;
@@ -19,7 +19,7 @@ export interface ArtifactMeta {
 }
 
 function artifactsDir(): string {
-  return join(process.env.OHQUANT_DIR || OHQUANT_DIR, "artifacts");
+  return resolveArtifactsDir();
 }
 
 function ensureArtifactsDir(): void {

@@ -8,7 +8,7 @@ import { S, HEADER_H, COMPOSER_H, STATUS_H, DIVIDER_CHAR, CANVAS } from "./style
 import { fmtElapsed } from "./format.ts";
 import { drawHeader as drawHeaderChrome, drawComposer as drawComposerChrome, drawStatus as drawStatusChrome } from "./chrome.ts";
 import type { AppState, Layout, UIMessage, PanelSection } from "./types.ts";
-import { getQuotes } from "../../quant/insight.ts";
+import { getQuotes } from "../../insight/index.ts";
 import { buildConversationLines, type RenderLine } from "./render-lines.ts";
 import { buildOverviewLines, buildOverviewView, overviewContentHeight, overviewMaxScrollTop } from "./overview-render.ts";
 import { drawLoadingOverlay, thinkingBannerStyle } from "./loading-overlay.ts";

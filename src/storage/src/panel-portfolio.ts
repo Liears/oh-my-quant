@@ -4,9 +4,8 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { emitFileEvent } from "./fs-events.ts";
-import { OHQUANT_DIR, ensureDirs } from "./dirs.ts";
+import { ensureDirs, resolveLegacyHoldingsPath, resolvePanelPortfolioPath } from "./dirs.ts";
 import type { HoldingsFile } from "../../types/data.ts";
 
 export interface PanelPortfolioEntry {
@@ -27,13 +26,8 @@ export interface PanelPortfolioFile {
   groups: PortfolioGroup[];
 }
 
-export const PANEL_PORTFOLIO_PATH = join(OHQUANT_DIR, "panel-portfolio.json");
-
-const panelPortfolioPath = () =>
-  join(process.env.OHQUANT_DIR || OHQUANT_DIR, "panel-portfolio.json");
-
-const legacyHoldingsPath = () =>
-  join(process.env.OHQUANT_DIR || OHQUANT_DIR, "portfolio", "holdings.json");
+export const panelPortfolioPath = resolvePanelPortfolioPath;
+export const legacyHoldingsPath = resolveLegacyHoldingsPath;
 
 function readPanelFile(path: string): PanelPortfolioFile {
   if (!existsSync(path)) return { updated: "", symbols: [], groups: [] };
@@ -103,11 +97,6 @@ export function loadPanelPortfolio(): PanelPortfolioFile {
       savePanelPortfolio(repaired);
       return repaired;
     }
-    const legacy = importLegacyHoldings();
-    if (legacy.symbols.length > 0) {
-      savePanelPortfolio(legacy);
-      return legacy;
-    }
     if (existing.symbols.length > 0 || existing.groups.length > 0) {
       savePanelPortfolio({ updated: existing.updated, symbols: [], groups: [] });
     }
@@ -125,7 +114,6 @@ export function loadPanelPortfolio(): PanelPortfolioFile {
 
   return existing;
 }
-
 
 export function savePanelPortfolio(data: PanelPortfolioFile): void {
   ensureDirs();

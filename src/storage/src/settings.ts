@@ -1,14 +1,13 @@
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
 import type { OhQuantSettings } from "../../types/config.ts";
 import { DEFAULT_SETTINGS } from "../../types/config.ts";
 import { emitFileEvent } from "./fs-events.ts";
 import { canonicalizeWhyjEnv } from "./env-keys.ts";
-import { OHQUANT_DIR, ensureDirs } from "./dirs.ts";
+import { ensureDirs, resolveLegacyConfigPath, resolveSettingsPath } from "./dirs.ts";
 
 export function loadSettings(): OhQuantSettings {
   ensureDirs();
-  const sp = join(process.env.OHQUANT_DIR || OHQUANT_DIR, "settings.json");
+  const sp = resolveSettingsPath();
   if (!existsSync(sp)) {
     const text = JSON.stringify(DEFAULT_SETTINGS, null, 2);
     writeFileSync(sp, text, "utf-8");
@@ -32,13 +31,13 @@ export function loadSettings(): OhQuantSettings {
 export function saveSettings(s: OhQuantSettings): void {
   ensureDirs();
   const text = JSON.stringify(normalizeSettings(s), null, 2);
-  const sp = join(process.env.OHQUANT_DIR || OHQUANT_DIR, "settings.json");
+  const sp = resolveSettingsPath();
   writeFileSync(sp, text, "utf-8");
   emitFileEvent({ operation: "WRITE", path: sp, bytes: text.length, detail: "settings" });
 }
 
 export function migrateOldConfig(): void {
-  const old = join(OHQUANT_DIR, "config.json");
+  const old = resolveLegacyConfigPath();
   if (existsSync(old)) {
     try {
       const oldText = readFileSync(old, "utf-8");

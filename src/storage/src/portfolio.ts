@@ -16,7 +16,7 @@ export interface PortfolioSymbol {
   name: string;
 }
 
-export { loadPanelPortfolio, savePanelPortfolio, PANEL_PORTFOLIO_PATH } from "./panel-portfolio.ts";
+export { loadPanelPortfolio, savePanelPortfolio, panelPortfolioPath } from "./panel-portfolio.ts";
 export type { PanelPortfolioEntry, PanelPortfolioFile, PortfolioGroup } from "./panel-portfolio.ts";
 export {
   createGroup, renameGroup, deleteGroup,

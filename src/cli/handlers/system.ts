@@ -218,11 +218,13 @@ export const configHandler: CommandHandler = async (_flags, _positional, ctx) =>
   if (ctx.openConfig) {
     return { success: true, message: "", effects: [{ type: "openConfig" }] };
   }
-  const { loadSettings, SETTINGS_PATH } = await import("../../storage/index.ts");
-  const { listLocalPortfolios } = await import("../../storage/index.ts");
+  const { loadPanelPortfolio, loadSettings, resolveSettingsPath } = await import("../../storage/index.ts");
   const cfg = loadSettings();
   const activeFile = cfg.preferences.currentPortfolioFile;
-  const activeName = listLocalPortfolios().find((item) => item.fileName === activeFile)?.name || activeFile;
+  const panelPortfolio = loadPanelPortfolio();
+  const activeName = panelPortfolio.groups.length === 1 && panelPortfolio.groups[0]?.name
+    ? panelPortfolio.groups[0].name
+    : activeFile;
   return {
     success: true,
     message: [
@@ -233,7 +235,7 @@ export const configHandler: CommandHandler = async (_flags, _positional, ctx) =>
       `  API Key    ${mark(hasWhyjEnvValue(cfg.env, "apiKey"))} WHYJ_QUANT_API_KEY`,
       `  Base URL   ${cfg.env.WHYJ_QUANT_BASE_URL || "(default)"}  ·  ${describeEndpointMode(cfg.env.WHYJ_QUANT_BASE_URL || "")}`,
       `  Data       ${mark(hasWhyjEnvValue(cfg.env, "tushareToken"))} Tushare  ${mark(hasWhyjEnvValue(cfg.env, "financialDatasetsKey"))} Financial Datasets  ${mark(hasWhyjEnvValue(cfg.env, "llmquantApiKey"))} LLMQuant`,
-      `  Path       ${SETTINGS_PATH}`,
+      `  Path       ${resolveSettingsPath()}`,
       "  Ctrl+P opens the settings panel",
     ].join("\n"),
   };

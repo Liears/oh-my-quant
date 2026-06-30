@@ -6,7 +6,7 @@ import { fetchAkshareAIndexSpot, fetchLiveBars, formatRefreshMinute, formatSourc
 import { dispatchUserMessage, isAgentTurnActive } from "./agent/src/dispatch.ts";
 import { createAgent, updateSessionCtx, type QuantAgentSession } from "./agent/src/session.ts";
 import { skillPaths } from "./skill/index.ts";
-import { ensureDirs, loadSettings, listLocalPortfolios, loadPanelPortfolio, loadPortfolioSymbols } from "./storage/index.ts";
+import { ensureDirs, loadSettings, loadPanelPortfolio, loadPortfolioSymbols } from "./storage/index.ts";
 import type { AppState, PanelSection, UIMessage } from "./tui/src/types.ts";
 import type { CodeEntry } from "./tui/src/watchlist.ts";
 import type { Bar, Market } from "./types/data.ts";
@@ -52,6 +52,13 @@ const SHORT_MODEL: Record<string, string> = {
   "deepseek-v4-pro": "deepseek",
 };
 
+function activePanelPortfolioName(fallback: string): string {
+  const portfolio = loadPanelPortfolio();
+  if (portfolio.groups.length === 1 && portfolio.groups[0]?.name) return portfolio.groups[0].name;
+  if (portfolio.groups.length > 1) return `${portfolio.groups.length} groups`;
+  if (portfolio.symbols.length > 0) return `${portfolio.symbols.length} symbols`;
+  return fallback;
+}
 /** Fixed market indicators that should always lead the Overview panel. */
 const MARKET_INDICES: CodeEntry[] = [
   { code: "000001.SH", name: "上证指数" },
@@ -387,10 +394,8 @@ export class AppRuntime {
   private emitLocalStorageState(): void {
     const settings = loadSettings();
     const portfolioFile = settings.preferences.currentPortfolioFile || "holdings.json";
-    const portfolios = listLocalPortfolios();
-    const activePortfolio = portfolios.find((p) => p.fileName === portfolioFile)?.name || portfolioFile;
     this.callbacks.onLocalState?.({
-      activePortfolio,
+      activePortfolio: activePanelPortfolioName(portfolioFile),
       source: settings.preferences.source || "llmquant-data",
       showPortfolioPanel: settings.showPortfolioPanel !== false,
     });
@@ -714,8 +719,6 @@ export function createInitialAppState(version: string): AppState {
   const settings = loadSettings();
   const model = readModel(settings.env);
   const portfolioFile = settings.preferences.currentPortfolioFile || "holdings.json";
-  const portfolios = listLocalPortfolios();
-  const activePortfolio = portfolios.find((p) => p.fileName === portfolioFile)?.name || portfolioFile;
   return {
     model,
     modelLabel: readModelLabel(settings.env),
@@ -730,7 +733,7 @@ export function createInitialAppState(version: string): AppState {
     input: "",
     composerQueue: [],
     composerStatus: null,
-    activePortfolio,
+    activePortfolio: activePanelPortfolioName(portfolioFile),
     source: settings.preferences.source || "llmquant-data",
     showPortfolioPanel: settings.showPortfolioPanel !== false,
   };
