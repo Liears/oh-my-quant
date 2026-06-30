@@ -37,15 +37,16 @@
 - Command contract 下沉到 `src/types/commands.ts`；`src/cli/types.ts` 只做 re-export，`src/types/messages.ts`、`src/skill/handler.ts`、`src/app-runtime.ts` 不再依赖 CLI 类型实现。
 - Tool display metadata 拆到 `src/tools/display.ts`；`src/tools/catalog.ts` 可为 TUI/runtime 提供展示格式化而不加载完整 `src/tools/registry.ts`。
 - Artifact 文本提取 helper 拆到 `src/artifact/src/message-text.ts`；`trajectory.ts` 不再从 `generator.ts` 导入，消除 generator/trajectory 循环依赖。
-- 验证已跑：`bun run typecheck`、`bun test src/`。
+- Architecture boundary gate 新增 `scripts/check-architecture.ts`、`scripts/architecture-boundary-baseline.json` 和 `bun run check:architecture`；当前 baseline 只允许既有违规，新增跨层 import 或 storage 外 `.ohquant` 路径构造会失败。
+- 首批代码验证已跑：`bun run typecheck`、`bun test src/`；boundary gate 本轮验证已跑：`bun run check:architecture`、`bun run typecheck`。
 
-剩余 P0：architecture boundary gate、public API surface 收口、storage ownership/path resolver。完成这些后再进入 runtime/TUI/agent/quant/source 的 P1 core/service 抽取。
+剩余 P0：public API surface 收口、storage ownership/path resolver。完成这些后再进入 runtime/TUI/agent/quant/source 的 P1 core/service 抽取。
 
 ## P0 路线
 
 | 模块 | 状态 | 问题 | 建议 | 验收标准 |
 | --- | --- | --- | --- | --- |
-| 架构约束 | 待做 | 没有自动边界检查；后续拆模块时很容易新增反向依赖。 | 新增 `check:architecture`，按 layer 定义 allowlist baseline，只阻止新增违规；每个 PR 删除自己修掉的 allowlist。 | CI/test gate 能报告新增违规导入；P0/P1 PR 不新增 allowlist。 |
+| 架构约束 | 已完成 | 没有自动边界检查；后续拆模块时很容易新增反向依赖。 | 已新增 `bun run check:architecture`，按 layer 定义 baseline，只阻止新增违规；每个 PR 删除自己修掉的 baseline 项。 | gate 能报告新增违规导入和 storage 外 `.ohquant` 路径构造；P0/P1 PR 不新增 baseline。 |
 | Public API 收口 | 进行中 | `storage/index.ts`、`quant/index.ts`、`source/index.ts`、`tools/catalog.ts` 暴露或加载过多内部实现。 | 先定义 public/internal export 规则；barrel 只显式导出稳定 API，internal helper 只能被本模块引用。 | UI/tool/CLI 不能通过 barrel 拿到底层 path helper、deprecated portfolio API 或带 IO 的 quant 模块。 |
 | 命令契约 | 已完成 | `types -> cli`、`skill -> cli`、`cli/types -> agent` 让低层契约依赖上层实现。 | 将 `CommandResult`、`CommandContext` 的纯 DTO 下沉到 `src/types/commands.ts`；agent session 只留在 runtime/CLI adapter。 | `src/types/**` 不导入 `src/cli/**`；`src/skill/**` 不导入 `src/cli/types.ts`；command DTO 不导入 agent 实现。 |
 | Storage 边界 | 待做 | `.ohquant` 路径、portfolio legacy 读取、benchmark persistence 分散在 tools/TUI/quant/runtime。 | 统一 resolver；storage 提供 benchmark/panel/watchlist/artifact API；legacy portfolio 只允许显式迁移流程。 | `OHQUANT_DIR` 测试不受 import 顺序影响；默认流程不读取 `.ohquant/portfolio/`；tools 不手工拼 `.ohquant`。 |
@@ -350,14 +351,14 @@ src/storage/test/
 - 每个 PR 必须声明 module ownership：允许修改的模块 public API、内部文件、禁止碰的共享入口、需要删除的 architecture allowlist 项。
 - 共享入口包括 `src/storage/index.ts`、`src/quant/index.ts`、`src/source/index.ts`、`src/tools/registry.ts`、`src/tools/catalog.ts`、`src/cli/registry.ts`、`src/app-runtime.ts`。修改这些文件必须在 PR 说明中列出原因、受影响调用方和新的 public API。
 - 新增工具前先稳定 registry/display metadata contract；工具实现只能通过 service/core 调用业务逻辑，避免 `tools/quant`、`tools/data`、`alpha-tools` 在同一入口冲突。
-- 每个 PR 至少运行 focused tests、`bun run typecheck` 和 architecture check。大规模拆分完成后再跑完整 `bun test src/`。
+- 每个 PR 至少运行 focused tests、`bun run typecheck` 和 `bun run check:architecture`。大规模拆分完成后再跑完整 `bun test src/`。
 - 对现有违规使用 allowlist baseline；PR 只能减少 allowlist 或保持不变，不能新增违规边。
 
 ## 建议 PR 切分
 
 | 顺序 | 状态 | PR | Write scope | 主要验收 |
 | --- | --- | --- | --- | --- |
-| 1 | 待做 | Boundary gate skeleton | `scripts/` 或 `src/*architecture*.test.ts`、`package.json`、`docs/roadmap.md` | 新增 `check:architecture`，带 baseline allowlist，只阻止新增违规。 |
+| 1 | 已完成 | Boundary gate skeleton | `scripts/check-architecture.ts`、`scripts/architecture-boundary-baseline.json`、`package.json`、`docs/roadmap.md` | 新增 `check:architecture`，带 baseline allowlist，只阻止新增违规和 storage 外 `.ohquant` 路径构造。 |
 | 2 | 部分完成 | Public API surface | `src/storage/index.ts`、`src/quant/index.ts`、`src/source/index.ts`、`src/tools/catalog.ts` | barrel 显式 export；display metadata 不加载 registry；禁止 UI/tool/CLI 引用 internal helper。 |
 | 3 | 已完成 | Command contract | `src/types/commands.ts`、`src/cli/types.ts`、`src/skill/handler.ts`、`src/types/messages.ts`、`src/app-runtime.ts` | 修复 `types->cli`、`skill->cli`、`cli/types->agent`；focused tests 通过。 |
 | 4 | 待做 | Storage ownership | `src/storage/src/dirs.ts`、benchmark storage、panel/watchlist/legacy portfolio 调用点 | resolver 不受 import order 影响；默认流程不读 `.ohquant/portfolio/`；benchmark 读写走 storage API。 |
