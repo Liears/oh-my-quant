@@ -1,7 +1,7 @@
 import { formatCompletedToolLine, formatToolArgs, formatToolLine, toolDisplayLabel } from "./tools/catalog.ts";
 import { buildCommandHelpText } from "./cli/catalog.ts";
 import { executeCommand, isLocalSlashCommand, parseCommand } from "./cli/registry.ts";
-import type { CommandEffect, CommandResult } from "./cli/types.ts";
+import type { CommandEffect, CommandResult } from "./types/commands.ts";
 import { fetchAkshareAIndexSpot, fetchLiveBars, formatRefreshMinute, formatSourceLabels, type PullSource } from "./source/index.ts";
 import { dispatchUserMessage, isAgentTurnActive } from "./agent/src/dispatch.ts";
 import { createAgent, updateSessionCtx, type QuantAgentSession } from "./agent/src/session.ts";

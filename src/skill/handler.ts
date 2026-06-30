@@ -1,14 +1,14 @@
-import { discoverSkills, type QuantSkill } from "../agent/src/skills.ts";
+import { discoverSkills } from "../agent/src/skills.ts";
 import { NodeExecutionEnv } from "../agent/src/pi/node.ts";
-import type { CommandHandler } from "../cli/types.ts";
+import type { CommandHandler, CommandSkill } from "../types/commands.ts";
 import { loadSettings } from "../storage/index.ts";
 import { skillPaths, installSkills } from "./store.ts";
 
-function sourceLabel(skill: QuantSkill): string {
+function sourceLabel(skill: CommandSkill): string {
   return `${skill.scope}/${skill.source}`;
 }
 
-async function loadSkillsFromContext(ctx: Parameters<CommandHandler>[2]): Promise<QuantSkill[]> {
+async function loadSkillsFromContext(ctx: Parameters<CommandHandler>[2]): Promise<CommandSkill[]> {
   if (ctx.agentSession) return await ctx.agentSession.getSkills();
   const env = new NodeExecutionEnv({ cwd: process.cwd() });
   const settings = loadSettings();

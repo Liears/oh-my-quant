@@ -1,6 +1,6 @@
 import type { Bar } from "./data.ts";
 
-export type { CommandResult } from "../cli/types.ts";
+export type { CommandResult } from "./commands.ts";
 
 /** Bar data with source tracking */
 export interface BarsResult {
