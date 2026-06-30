@@ -1,4 +1,3 @@
-export * from "./insight.ts";
 export * from "./factor.ts";
 export * from "./backtest.ts";
 export * from "./risk.ts";
@@ -6,4 +5,3 @@ export * from "./benchmark.ts";
 export * from "./dashboard.ts";
 export * from "./auto-classify.ts";
 export * from "./group-comparison.ts";
-export * from "./comparison.ts";

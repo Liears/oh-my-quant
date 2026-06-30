@@ -38,6 +38,7 @@
 - Tool display metadata 拆到 `src/tools/display.ts`；`src/tools/catalog.ts` 可为 TUI/runtime 提供展示格式化而不加载完整 `src/tools/registry.ts`。
 - Artifact 文本提取 helper 拆到 `src/artifact/src/message-text.ts`；`trajectory.ts` 不再从 `generator.ts` 导入，消除 generator/trajectory 循环依赖。
 - Architecture boundary gate 新增 `scripts/check-architecture.ts`、`scripts/architecture-boundary-baseline.json` 和 `bun run check:architecture`；当前 baseline 只允许既有违规，新增跨层 import 或 storage 外 `.ohquant` 路径构造会失败。
+- Public API surface 继续收口：`src/quant/index.ts` 移除带 IO/storage 边界的 `insight`、`comparison` wildcard re-export；`src/source/index.ts`、`src/storage/index.ts` 改为显式 export，不再通过 barrel 暴露全部内部实现。
 - 首批代码验证已跑：`bun run typecheck`、`bun test src/`；boundary gate 本轮验证已跑：`bun run check:architecture`、`bun run typecheck`。
 
 剩余 P0：public API surface 收口、storage ownership/path resolver。完成这些后再进入 runtime/TUI/agent/quant/source 的 P1 core/service 抽取。
@@ -47,7 +48,7 @@
 | 模块 | 状态 | 问题 | 建议 | 验收标准 |
 | --- | --- | --- | --- | --- |
 | 架构约束 | 已完成 | 没有自动边界检查；后续拆模块时很容易新增反向依赖。 | 已新增 `bun run check:architecture`，按 layer 定义 baseline，只阻止新增违规；每个 PR 删除自己修掉的 baseline 项。 | gate 能报告新增违规导入和 storage 外 `.ohquant` 路径构造；P0/P1 PR 不新增 baseline。 |
-| Public API 收口 | 进行中 | `storage/index.ts`、`quant/index.ts`、`source/index.ts`、`tools/catalog.ts` 暴露或加载过多内部实现。 | 先定义 public/internal export 规则；barrel 只显式导出稳定 API，internal helper 只能被本模块引用。 | UI/tool/CLI 不能通过 barrel 拿到底层 path helper、deprecated portfolio API 或带 IO 的 quant 模块。 |
+| Public API 收口 | 部分完成 | `storage/index.ts`、`quant/index.ts`、`source/index.ts`、`tools/catalog.ts` 暴露或加载过多内部实现。 | 已将 quant/source/storage barrel 改为显式 export；下一步结合 storage ownership 移除路径常量和 deprecated portfolio API 的外部消费。 | `quant/index.ts` 不再 re-export 带 IO/storage 边界模块；`source/index.ts` 不再 re-export `http.ts`；后续 UI/tool/CLI 不能通过 barrel 拿到底层 path helper。 |
 | 命令契约 | 已完成 | `types -> cli`、`skill -> cli`、`cli/types -> agent` 让低层契约依赖上层实现。 | 将 `CommandResult`、`CommandContext` 的纯 DTO 下沉到 `src/types/commands.ts`；agent session 只留在 runtime/CLI adapter。 | `src/types/**` 不导入 `src/cli/**`；`src/skill/**` 不导入 `src/cli/types.ts`；command DTO 不导入 agent 实现。 |
 | Storage 边界 | 待做 | `.ohquant` 路径、portfolio legacy 读取、benchmark persistence 分散在 tools/TUI/quant/runtime。 | 统一 resolver；storage 提供 benchmark/panel/watchlist/artifact API；legacy portfolio 只允许显式迁移流程。 | `OHQUANT_DIR` 测试不受 import 顺序影响；默认流程不读取 `.ohquant/portfolio/`；tools 不手工拼 `.ohquant`。 |
 | Tool display metadata | 已完成 | TUI/render-lines 为显示工具 label 通过 `tools/catalog.ts` 间接加载完整 registry。 | 拆出纯 `src/tools/display.ts`，registry 消费 metadata，渲染层只消费 metadata。 | `src/tui/src/**` 和 runtime 展示格式化不加载 `src/tools/registry.ts`。 |
