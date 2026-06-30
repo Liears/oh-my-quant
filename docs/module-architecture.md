@@ -9,10 +9,12 @@
 | `src/cli/` | slash 命令解析、本地命令处理、JSON one-shot 模式 | 仅限本地 UI/session 控制 |
 | `src/tui/` | 终端渲染、面板、输入、布局、显示组件 | 消费运行时事件；不应持有业务状态 |
 | `src/app-runtime.ts` | TUI/CLI 到 agent session 和本地面板的桥接 | 编排 UI 状态刷新 |
+| `src/app-watchlist.ts` | watchlist 应用服务 | 让 TUI 不直接访问 storage |
+| `src/insight/` | storage-backed insight/quote 服务 | 从 `quant/insight.ts` 迁出文件持久化 |
 | `src/agent/` | vendored pi harness wrapper、运行时上下文、session facade | 持有 prompt loop、compaction、resume |
 | `src/tools/` | 内置 agent 工具 | 数据工具、量化工具、shell 工具、注册表 |
 | `src/source/` | 行情数据 provider adapter 和回退编排 | 公共入口点为 `src/source/index.ts` |
-| `src/storage/` | `.ohquant` 持久化、缓存、session 摘要、portfolio 发现 | 本地持久化状态规则的唯一位置 |
+| `src/storage/` | `.ohquant` 持久化、缓存、session 摘要、显式 legacy portfolio 迁移 | 本地持久化状态规则的唯一位置；只暴露 resolver/API，不暴露 import-time path constants |
 | `src/types/` | 共享领域契约 | 保持与 provider 无关 |
 | `docs/` | 设计、架构、运维文档 | 将实现说明放在此处，而非埋在代码注释中 |
 
@@ -43,9 +45,10 @@
 ### `src/storage/`
 
 - 职责：
-  - 设置、bars 缓存、comparison 制品、sessions、本地 portfolio 发现
+  - 设置、bars 缓存、benchmark/comparison 制品、sessions、显式 legacy portfolio 迁移
   - 本地 portfolio 去重和精简摘要生成
   - `.ohquant` 策略执行
+  - runtime path resolver：`resolveOhquantDir()`、`resolveDataDir()`、`resolveBenchmarkResultsDir()` 等
 - 公共导入：
   - `src/storage/index.ts` 或依赖范围有意缩小时使用特定的 storage 模块
 
@@ -84,11 +87,15 @@ source
   -> storage
   -> types
 
+app services (`app-runtime`, `app-watchlist`, `insight`)
+  -> storage
+  -> source/tools/agent as needed
+
 storage
   -> types
 ```
 
-避免反向依赖：`storage` 不应依赖 `source`，`tui` 不应直接依赖 provider adapter。
+避免反向依赖：`storage` 不应依赖 `source`，`tui` 不应直接依赖 provider adapter，也不应手工拼 `.ohquant` 路径。当前剩余例外由 `scripts/architecture-boundary-baseline.json` 跟踪，新增违规由 `bun run check:architecture` 阻止。
 
 ## 测试布局
 

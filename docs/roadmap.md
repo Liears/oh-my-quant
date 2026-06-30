@@ -12,13 +12,13 @@
 ## 当前证据
 
 - 最大冲突文件集中在 `src/source/src/akshare.ts`、`src/app-runtime.ts`、`src/tools/akshare-fund-tools.ts`、`src/tools/data-tools.ts`、`src/tools/quant-tools.ts`、`src/tui/src/render-lines.ts`、`src/tui/src/panel.ts`。
-- 已有架构文档要求 `.ohquant` 文件系统规则由 `storage` 持有，但 `tools/quant-tools.ts`、`tui/watchlist.ts`、`quant/insight.ts` 仍有直接路径逻辑。
+- 已修复：`tools/quant-tools.ts`、`tui/watchlist.ts`、`quant/insight.ts` 不再手工拼 `.ohquant` 路径；benchmark、watchlist、insight cache 都走 storage API/resolver。
 - 当前导入图剩余反向依赖或高耦合边：`storage->agent`、`storage->quant`、`tui->cli/storage/tools/quant`；`types->cli` 和 `skill->cli` 的命令契约边已在首批收紧中修复。
 - 多处动态导入用于普通业务路径：`src/tools/quant-tools.ts`、`src/cli/params.ts`、`src/index.ts`、`src/cli/handlers/watchlist.ts`、`src/cli/handlers/system.ts`、`src/storage/src/bars.ts`。测试中的 cache-busting 动态导入可另行处理。
 - `src/storage/README.md` 把 `storage -> agent` 描述为 deliberate dependency，但 `docs/module-architecture.md` 的推荐方向是 `storage -> types`。roadmap 必须先解决这个契约冲突，再决定代码迁移。
 - `src/tui/src/tui.ts` 仍直接依赖 agent skill discovery、`NodeExecutionEnv`、`skillPaths` 和 `loadSettings`；`render-lines` 经 `tools/catalog.ts` 加载完整 registry 的问题已由 `src/tools/display.ts` 修复。
-- `src/artifact/src/generator.ts` 与 `src/artifact/src/trajectory.ts` 的循环依赖已修复；`src/quant/index.ts` wildcard re-export 带 storage/fs 边界模块的问题仍待收口。
-- `src/storage/src/dirs.ts` 的 import-time path constants 与 runtime resolver 混用，且 `.ohquant/portfolio/` 被 policy 标为 forbidden 后仍有 steady-state 读取路径。
+- `src/artifact/src/generator.ts` 与 `src/artifact/src/trajectory.ts` 的循环依赖已修复；`src/quant/index.ts` wildcard re-export 带 storage/fs 边界模块的问题已收口。
+- 已修复：`src/storage/src/dirs.ts` 只暴露 runtime resolver；默认 runtime/config/TUI 流程不再读取 `.ohquant/portfolio/`，legacy portfolio 只作为显式 `/portfolio` 迁移来源。
 - 仓库当前没有 `src/alpha` 或 `akquant` 接入点；alpha/akquant 是已确认的新需求，但应以 spike 和 adapter 边界进入，不应继续塞进 `tools/quant-tools.ts`。
 
 ## 模块收紧原则
@@ -37,20 +37,20 @@
 - Command contract 下沉到 `src/types/commands.ts`；`src/cli/types.ts` 只做 re-export，`src/types/messages.ts`、`src/skill/handler.ts`、`src/app-runtime.ts` 不再依赖 CLI 类型实现。
 - Tool display metadata 拆到 `src/tools/display.ts`；`src/tools/catalog.ts` 可为 TUI/runtime 提供展示格式化而不加载完整 `src/tools/registry.ts`。
 - Artifact 文本提取 helper 拆到 `src/artifact/src/message-text.ts`；`trajectory.ts` 不再从 `generator.ts` 导入，消除 generator/trajectory 循环依赖。
-- Architecture boundary gate 新增 `scripts/check-architecture.ts`、`scripts/architecture-boundary-baseline.json` 和 `bun run check:architecture`；当前 baseline 只允许既有违规，新增跨层 import 或 storage 外 `.ohquant` 路径构造会失败。
+- Architecture boundary gate 新增 `scripts/check-architecture.ts`、`scripts/architecture-boundary-baseline.json` 和 `bun run check:architecture`；当前 baseline 只允许既有违规，新增跨层 import 或 storage 外 `.ohquant` 路径构造会失败。本轮 baseline 从 24 降到 19。
 - Public API surface 继续收口：`src/quant/index.ts` 移除带 IO/storage 边界的 `insight`、`comparison` wildcard re-export；`src/source/index.ts`、`src/storage/index.ts` 改为显式 export，不再通过 barrel 暴露全部内部实现。
-- 首批代码验证已跑：`bun run typecheck`、`bun test src/`；boundary gate 本轮验证已跑：`bun run check:architecture`、`bun run typecheck`。
+- 本轮代码验证已跑：`bun run check:architecture`、`bun run typecheck`、`bun test src/`。
 
-剩余 P0：public API surface 收口、storage ownership/path resolver。完成这些后再进入 runtime/TUI/agent/quant/source 的 P1 core/service 抽取。
+P0 已完成：public API surface、storage ownership/path resolver、boundary gate、command contract、artifact cycle 和 tool display metadata 均已收口。下一步进入 runtime/TUI/agent/quant/source 的 P1 core/service 抽取。
 
 ## P0 路线
 
 | 模块 | 状态 | 问题 | 建议 | 验收标准 |
 | --- | --- | --- | --- | --- |
 | 架构约束 | 已完成 | 没有自动边界检查；后续拆模块时很容易新增反向依赖。 | 已新增 `bun run check:architecture`，按 layer 定义 baseline，只阻止新增违规；每个 PR 删除自己修掉的 baseline 项。 | gate 能报告新增违规导入和 storage 外 `.ohquant` 路径构造；P0/P1 PR 不新增 baseline。 |
-| Public API 收口 | 部分完成 | `storage/index.ts`、`quant/index.ts`、`source/index.ts`、`tools/catalog.ts` 暴露或加载过多内部实现。 | 已将 quant/source/storage barrel 改为显式 export；下一步结合 storage ownership 移除路径常量和 deprecated portfolio API 的外部消费。 | `quant/index.ts` 不再 re-export 带 IO/storage 边界模块；`source/index.ts` 不再 re-export `http.ts`；后续 UI/tool/CLI 不能通过 barrel 拿到底层 path helper。 |
+| Public API 收口 | 已完成 | `storage/index.ts`、`quant/index.ts`、`source/index.ts`、`tools/catalog.ts` 暴露或加载过多内部实现。 | quant/source/storage barrel 已改为显式 export；storage barrel 不再暴露低层路径常量，只暴露 resolver 和业务 API。 | `quant/index.ts` 不再 re-export 带 IO/storage 边界模块；`source/index.ts` 不再 re-export `http.ts`；UI/tool/CLI 不能通过 barrel 拿 import-time path constants。 |
 | 命令契约 | 已完成 | `types -> cli`、`skill -> cli`、`cli/types -> agent` 让低层契约依赖上层实现。 | 将 `CommandResult`、`CommandContext` 的纯 DTO 下沉到 `src/types/commands.ts`；agent session 只留在 runtime/CLI adapter。 | `src/types/**` 不导入 `src/cli/**`；`src/skill/**` 不导入 `src/cli/types.ts`；command DTO 不导入 agent 实现。 |
-| Storage 边界 | 待做 | `.ohquant` 路径、portfolio legacy 读取、benchmark persistence 分散在 tools/TUI/quant/runtime。 | 统一 resolver；storage 提供 benchmark/panel/watchlist/artifact API；legacy portfolio 只允许显式迁移流程。 | `OHQUANT_DIR` 测试不受 import 顺序影响；默认流程不读取 `.ohquant/portfolio/`；tools 不手工拼 `.ohquant`。 |
+| Storage 边界 | 已完成 | `.ohquant` 路径、portfolio legacy 读取、benchmark persistence 分散在 tools/TUI/quant/runtime。 | 已统一 runtime resolver；storage 提供 benchmark/watchlist/artifact/insight API；legacy portfolio 只允许显式 `/portfolio` 列表/选择/迁移流程。 | `OHQUANT_DIR` 测试不受 import 顺序影响；默认流程不读取 `.ohquant/portfolio/`；tools/TUI/quant 不手工拼 `.ohquant`。 |
 | Tool display metadata | 已完成 | TUI/render-lines 为显示工具 label 通过 `tools/catalog.ts` 间接加载完整 registry。 | 拆出纯 `src/tools/display.ts`，registry 消费 metadata，渲染层只消费 metadata。 | `src/tui/src/**` 和 runtime 展示格式化不加载 `src/tools/registry.ts`。 |
 | Artifact 循环依赖 | 已完成 | `generator.ts` 导入 `trajectory.ts`，`trajectory.ts` 又从 `generator.ts` 导入 `extractText`。 | 将 `extractText` 下沉到 `artifact/src/message-text.ts`，generator/trajectory 单向依赖 helper。 | import graph 无 generator/trajectory 循环；artifact focused tests 通过。 |
 
@@ -60,8 +60,8 @@
 | --- | --- | --- | --- |
 | Runtime core | `app-runtime.ts` 同时承担命令执行、agent event reducer、overview 刷新、行情拉取、错误文案和消息格式转换。 | 保留 `AppRuntime` 为薄 orchestrator；抽 `runtime/commands.ts`、`runtime/agent-events.ts`、`runtime/overview.ts`、`runtime/panel-service.ts`、`runtime/errors.ts`。 | 核心行为可脱离 TUI 单测；新增 overview/agent event/panel 逻辑不直接改大文件。 |
 | TUI adapter | `panel.ts`、`watchlist.ts`、`tui.ts` 直接访问 storage/path、settings、agent skill discovery。 | TUI 只接收 `AppState`、panel view model、skill suggestion view model；storage/skill 读写交给 runtime service。 | `src/tui/src/**` 不直接拼 `.ohquant`，不直接保存 settings/portfolio，不直接发现 agent skills。 |
-| Agent bootstrap | `session.ts` 绑定 tools、storage、skill discovery、model resolve、session repo；`context.ts` 读取 storage `DATA_DIR`。 | 引入 `AgentRuntimeDeps`；tools/settings/session repo/skill discovery 从外部注入；context 接收 snapshot。 | agent facade 可单测；创建 session 不强制触发 storage 或完整 tool registry。 |
-| Quant core | `comparison.ts` 做算法同时保存 artifact；`insight.ts` 写 `.ohquant/insights.json`；`fund-dca.ts` 依赖 source 类型。 | quant 保持纯计算；持久化移到 storage/workflow；`FundNavDaily` 下沉到 `types/data.ts`；insight cache 走 storage。 | `src/quant/**` 纯计算子模块不导入 `storage` 和 `source`。 |
+| Agent bootstrap | `session.ts` 绑定 tools、storage、skill discovery、model resolve、session repo；`context.ts` 仍通过 storage resolver 扫描本地 cache。 | 引入 `AgentRuntimeDeps`；tools/settings/session repo/skill discovery 从外部注入；context 接收 snapshot。 | agent facade 可单测；创建 session 不强制触发 storage 或完整 tool registry。 |
+| Quant core | `comparison.ts` 做算法同时保存 artifact；`fund-dca.ts` 依赖 source 类型；`insight.ts` 已降为兼容 re-export。 | quant 保持纯计算；comparison 持久化移到 workflow/storage；`FundNavDaily` 下沉到 `types/data.ts`。 | `src/quant/**` 纯计算子模块不导入 `storage` 和 `source`；legacy re-export 不再持有文件路径。 |
 | Source core | provider orchestration 同时处理 cache、settings 和 raw fetch；`akshare.ts` 过大。 | 定义 provider interface；raw provider 接收显式 config；`akshare` 拆 runner/scripts/endpoints/normalize/client。 | provider 文件可用 mock config 单测；修改 endpoint 不碰 provider orchestration。 |
 | Tools adapter | `quant-tools.ts`、`data-tools.ts`、`akshare-fund-tools.ts` 混合 schema、执行、格式化、持久化和 market 推断。 | tools 只做 schema、参数转换、调用 service、格式化；公共 `ok/err/schema/format` 放 `tools/shared`。 | 每个工具文件只暴露一个工具或小工具族；核心逻辑在 quant/source/runtime service 可单测。 |
 | CLI adapter | `system.ts` 混合 help、compact receipt、config、doctor、portfolio、resume、session 文案。 | 按 command family 拆 handler；表格/receipt 文案移到 `cli/formatters`；handler 调 service。 | 每个 handler 文件只负责一个命令族，测试按命令族隔离。 |
@@ -142,7 +142,7 @@
 问题：
 
 - `src/agent/src/session.ts:24` 导入 builtin tools，`src/agent/src/session.ts:26` 导入 storage settings/session dir，session facade 同时绑定工具和本地文件系统。
-- `src/agent/src/context.ts:8` 直接引用 storage `DATA_DIR`，system prompt 构造知道本地缓存布局。
+- 已修复：`src/agent/src/context.ts` 不再引用 import-time `DATA_DIR`；仍需在 P1 把本地 cache snapshot 从 agent context 中注入。
 - `src/agent/src/pi` 是大块 vendored/runtime harness 代码，局部改动风险高。
 
 建议：
@@ -262,17 +262,17 @@ src/storage/test/
 
 - `src/storage/README.md` 将 agent/pi dependency 描述为 deliberate，但 `docs/module-architecture.md` 推荐 `storage -> types`；roadmap 需要先统一契约。
 - `src/storage/src/sessions.ts:3`、`src/storage/src/sessions.ts:5` 依赖 agent/pi 类型、模型信息和 session context rebuild，这是 runtime dependency，不应和 `src/storage/src/comparison.ts:10` 的 type-only quant 依赖混为一谈。
-- `src/storage/index.ts` wildcard 暴露所有 storage 内部实现和低层路径常量。
-- `src/storage/src/dirs.ts` 同时导出 import-time constants 和 runtime resolver，测试 env 切换时容易混淆。
-- `src/storage/src/local-portfolios.ts` 不只是 legacy discovery，还包含持仓摘要、主题推断、去重策略；同时 `.ohquant/portfolio/` 已被 policy 标记为 forbidden。
+- 已修复：`src/storage/index.ts` 改为显式 export，不再暴露 import-time 路径常量。
+- 已修复：`src/storage/src/dirs.ts` 只导出 runtime resolver，`OHQUANT_DIR` 变更不受 import 顺序影响。
+- `src/storage/src/local-portfolios.ts` 仍包含 legacy discovery、主题推断和去重策略；`.ohquant/portfolio/` 已被限制为显式 `/portfolio` 迁移入口，默认 runtime/TUI/config 不再读取。
 
 建议：
 
 - P0: 先决定 session summary 属于 storage exception 还是 agent adapter，并同步 `module-architecture.md`、`src/storage/README.md`。
 - P1: 移除 storage 对 quant 的直接依赖；comparison/alpha run storage 都保存 plain DTO。
-- P0: 统一 path resolver，避免 import-time constants 绕过 runtime `OHQUANT_DIR`。
-- P0: runtime/TUI 默认流程不再读取 `.ohquant/portfolio/`；legacy portfolio discovery 只保留为显式迁移。
-- P0/P1: 收窄 barrel exports；低层 path helper 改成 resolver-only。
+- 已完成：统一 path resolver，避免 import-time constants 绕过 runtime `OHQUANT_DIR`。
+- 已完成：runtime/TUI 默认流程不再读取 `.ohquant/portfolio/`；legacy portfolio discovery 只保留为显式 `/portfolio` 迁移。
+- 已完成：收窄 barrel exports；低层 path helper 改成 resolver-only。
 - P2: legacy portfolio discovery 与 summary heuristic 拆开。
 
 ### `src/artifact`
@@ -360,9 +360,9 @@ src/storage/test/
 | 顺序 | 状态 | PR | Write scope | 主要验收 |
 | --- | --- | --- | --- | --- |
 | 1 | 已完成 | Boundary gate skeleton | `scripts/check-architecture.ts`、`scripts/architecture-boundary-baseline.json`、`package.json`、`docs/roadmap.md` | 新增 `check:architecture`，带 baseline allowlist，只阻止新增违规和 storage 外 `.ohquant` 路径构造。 |
-| 2 | 部分完成 | Public API surface | `src/storage/index.ts`、`src/quant/index.ts`、`src/source/index.ts`、`src/tools/catalog.ts` | barrel 显式 export；display metadata 不加载 registry；禁止 UI/tool/CLI 引用 internal helper。 |
+| 2 | 已完成 | Public API surface | `src/storage/index.ts`、`src/quant/index.ts`、`src/source/index.ts`、`src/tools/catalog.ts` | barrel 显式 export；display metadata 不加载 registry；storage barrel 不暴露 import-time path constants。 |
 | 3 | 已完成 | Command contract | `src/types/commands.ts`、`src/cli/types.ts`、`src/skill/handler.ts`、`src/types/messages.ts`、`src/app-runtime.ts` | 修复 `types->cli`、`skill->cli`、`cli/types->agent`；focused tests 通过。 |
-| 4 | 待做 | Storage ownership | `src/storage/src/dirs.ts`、benchmark storage、panel/watchlist/legacy portfolio 调用点 | resolver 不受 import order 影响；默认流程不读 `.ohquant/portfolio/`；benchmark 读写走 storage API。 |
+| 4 | 已完成 | Storage ownership | `src/storage/src/dirs.ts`、benchmark storage、panel/watchlist/legacy portfolio 调用点 | resolver 不受 import order 影响；默认流程不读 `.ohquant/portfolio/`；benchmark/watchlist/insight/artifact 读写走 storage API。 |
 | 5 | 已完成 | Artifact cycle break | `src/artifact/src/message-text.ts`、`generator.ts`、`trajectory.ts` | 消除 generator/trajectory 循环依赖，保持 artifact 输出兼容。 |
 | 6 | 待做 | Runtime core extraction | `src/runtime/`、`src/app-runtime.ts` | 抽 overview、agent event reducer、panel/watchlist service；核心逻辑可脱离 TUI 单测。 |
 | 7 | 待做 | TUI adapter cleanup | `src/tui/src/`，只消费 runtime view model | TUI 不直接读写 storage，不直接发现 skills，不直接拼 `.ohquant`。 |
