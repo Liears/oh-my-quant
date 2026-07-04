@@ -37,6 +37,25 @@ describe("filterBarsByDate", () => {
   });
 });
 
+describe("fetchBars dependency injection", () => {
+  it("uses injected cache/settings deps without touching storage", async () => {
+    const saveBars = mock(async () => {});
+    const deps = {
+      loadBars: mock(async () => SAMPLE_BARS),
+      saveBars,
+      isCacheFresh: mock(async () => true),
+      getPreferredSource: () => "akshare" as const,
+    };
+    const { fetchBars } = await import(`../src/sources.ts?case=deps-${Date.now()}`);
+    const result = await fetchBars("000300.SH", "A", "2026-06-07", "2026-06-08", "auto", { deps });
+    expect(result.source).toBe("akshare");
+    expect(result.bars.map((bar: Bar) => bar.date)).toEqual(["2026-06-07", "2026-06-08"]);
+    expect(deps.isCacheFresh.mock.calls.length).toBe(1);
+    expect(deps.loadBars.mock.calls.length).toBe(1);
+    expect(saveBars.mock.calls.length).toBe(0);
+  });
+});
+
 describe("pullBarsFromProviders", () => {
   it("prefers akshare for A-shares by default", async () => {
     const fetchFromAKShare = mock(() => Promise.resolve(SAMPLE_BARS));

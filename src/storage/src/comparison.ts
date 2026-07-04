@@ -7,13 +7,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFile
 import { join } from "node:path";
 import { emitFileEvent } from "./fs-events.ts";
 import { ensureDirs, resolveBenchmarkComparisonsDir } from "./dirs.ts";
-import type { GroupComparisonResult } from "../../quant/group-comparison.ts";
-
-export interface ComparisonArtifact {
-  id: string;
-  createdAt: string;
-  groups: GroupComparisonResult[];
-}
+import type { ComparisonArtifact } from "../../types/comparison.ts";
+export type { ComparisonArtifact } from "../../types/comparison.ts";
 
 function comparisonsDir(): string {
   return resolveBenchmarkComparisonsDir();

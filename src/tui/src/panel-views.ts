@@ -35,6 +35,93 @@ export function renderConfigPanelView(
   }
 }
 
+export interface DoctorPhaseView {
+  phase: string;
+  status: string;
+  detail: string;
+  action?: string;
+  warnings?: string[];
+}
+
+export interface DoctorPanelView {
+  title: string;
+  status: string;
+  mode: string;
+  model: string;
+  baseUrl: string;
+  endpointMode: string;
+  dataSource: string;
+  settingsPath: string;
+  phases: DoctorPhaseView[];
+  actions?: string[];
+  hints: string[];
+  logPath?: string;
+}
+
+export function renderDoctorPanelView(
+  buf: Buffer,
+  frame: PanelFrame,
+  data: DoctorPanelView,
+): void {
+  const { inner } = frame;
+  let y = inner.y;
+  buf.text(inner.x, y, truncate(data.title, inner.w), S.code);
+  y++;
+  buf.text(inner.x, y, truncate(`status  ${data.status}  ·  mode  ${data.mode}`, inner.w), S.cream);
+  y++;
+  buf.text(inner.x, y, truncate(`model   ${data.model}`, inner.w), S.dim);
+  y++;
+  buf.text(inner.x, y, truncate(`base    ${data.baseUrl || "(not set)"}${data.endpointMode ? ` · ${data.endpointMode}` : ""}`, inner.w), S.dim);
+  y++;
+  buf.text(inner.x, y, truncate(`data    ${data.dataSource}`, inner.w), S.dim);
+  y++;
+  buf.text(inner.x, y, truncate(`path    ${data.settingsPath}`, inner.w), S.dim);
+  y += 2;
+
+  for (const [index, phase] of data.phases.entries()) {
+    if (y >= frame.footerY) break;
+    const prefix = phase.status === "pass" ? "✓" : phase.status === "fail" ? "✗" : phase.status === "checking" ? "⟳" : "○";
+    buf.text(inner.x, y, truncate(`${prefix} ${phase.phase}`, inner.w), phase.status === "fail" ? S.negative : phase.status === "pass" ? S.positive : S.cream);
+    y++;
+    if (phase.detail && y < frame.footerY) {
+      buf.text(inner.x + 2, y, truncate(phase.detail, inner.w - 2), S.dim);
+      y++;
+    }
+    if (phase.warnings && phase.warnings.length > 0) {
+      for (const warning of phase.warnings) {
+        if (y >= frame.footerY) break;
+        buf.text(inner.x + 2, y, truncate(`Warn · ${warning}`, inner.w - 2), S.gold);
+        y++;
+      }
+    }
+    if (phase.action && y < frame.footerY) {
+      buf.text(inner.x + 2, y, truncate(`Fix · ${phase.action}`, inner.w - 2), S.gold);
+      y++;
+    }
+    if (index < data.phases.length - 1 && y < frame.footerY) y++;
+  }
+
+  if (data.actions && data.actions.length > 0 && y < frame.footerY) {
+    for (const action of data.actions) {
+      if (y >= frame.footerY) break;
+      buf.text(inner.x, y++, truncate(action, inner.w), S.gold);
+    }
+    if (y < frame.footerY) y++;
+  }
+
+  if (data.logPath && y < frame.footerY) {
+    buf.text(inner.x, y++, truncate(`Logs  ·  ${data.logPath}`, inner.w), S.dim);
+  }
+
+  if (data.hints.length > 0 && y < frame.footerY) {
+    buf.text(inner.x, y++, "Hints", S.creamB);
+    for (const hint of data.hints) {
+      if (y >= frame.footerY) break;
+      buf.text(inner.x, y++, truncate(`- ${hint}`, inner.w), S.dim);
+    }
+  }
+}
+
 export interface ResumeListItemView {
   age: string;
   preview: string;

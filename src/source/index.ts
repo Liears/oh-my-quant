@@ -42,5 +42,12 @@ export {
   pullBarsFromProviders,
   searchSymbols,
 } from "./src/sources.ts";
-export type { DataSource, LiveFetchResult, PullSource } from "./src/sources.ts";
+export type {
+  DataSource,
+  LiveFetchResult,
+  PullSource,
+  SourceFetchOptions,
+  SourceProviderOptions,
+  SourceRuntimeDeps,
+} from "./src/sources.ts";
 export { fetchFromTushare, fetchTushareSnapshot, searchTushareSymbols } from "./src/tushare.ts";

@@ -16,6 +16,7 @@ export async function startApp(): Promise<void> {
     onComposerStatus: (composerStatus) => tui?.update({ composerStatus }),
     onComposerQueue: (composerQueue) => tui?.update({ composerQueue }),
     onConfigRequest: () => tui?.openConfig(),
+    onDoctorRequest: (doctor) => tui?.openDoctor(doctor),
     onResumeRequest: (meta) => tui?.openResume(meta),
     onPortfolioRequest: () => tui?.openPortfolio(),
     onArtifactRequest: () => tui?.openArtifact(),

@@ -58,6 +58,16 @@ export interface DailyNav {
   navDate: string;
 }
 
+export interface FundNavDaily {
+  fundCode: string;
+  navDate: string;
+  unitNav: number;
+  accumulatedNav: number | null;
+  dailyReturnPct: number | null;
+  isOpenDay: boolean;
+  source: string;
+}
+
 export interface DailyFile {
   funds: Record<string, DailyNav[]>;
   dates: string[];

@@ -14,6 +14,7 @@
 | `src/agent/` | vendored pi harness wrapper、运行时上下文、session facade | 持有 prompt loop、compaction、resume |
 | `src/tools/` | 内置 agent 工具 | 数据工具、量化工具、shell 工具、注册表 |
 | `src/source/` | 行情数据 provider adapter 和回退编排 | 公共入口点为 `src/source/index.ts` |
+| `src/runtime/source-runtime.ts` | storage-backed source runtime adapter | 将 source 的可注入 cache/settings deps 绑定到 storage |
 | `src/storage/` | `.ohquant` 持久化、缓存、session 摘要、显式 legacy portfolio 迁移 | 本地持久化状态规则的唯一位置；只暴露 resolver/API，不暴露 import-time path constants |
 | `src/types/` | 共享领域契约 | 保持与 provider 无关 |
 | `docs/` | 设计、架构、运维文档 | 将实现说明放在此处，而非埋在代码注释中 |
@@ -26,6 +27,7 @@
 4. `tools` 是唯一可供 agent 调用的执行层。
 5. `source` 获取并标准化 provider 数据；不决定 portfolio 语义。
 6. `storage` 持有文件系统布局和去重/缓存规则；调用方不应手工拼接 `.ohquant` 路径。
+7. `runtime` 负责把 source 的依赖注入接口绑定到 storage/settings；`source` 本身不导入 storage。
 
 ## 模块契约
 
@@ -34,7 +36,7 @@
 - 职责：
   - 各 provider 特定的行情数据获取
   - 数据源回退顺序
-  - 带缓存感知的实时数据刷新
+  - 通过 `SourceRuntimeDeps` 接收可选缓存/settings hooks
   - Overview/TUI 的数据源归属文本
 - 公共导入：
   - `src/source/index.ts`
@@ -79,23 +81,26 @@ cli/tui
     -> tools
 
 tools
-  -> source
+  -> runtime/source-runtime
   -> storage
   -> types
 
 source
-  -> storage
   -> types
 
 app services (`app-runtime`, `app-watchlist`, `insight`)
   -> storage
   -> source/tools/agent as needed
 
+runtime/source-runtime
+  -> source
+  -> storage
+
 storage
   -> types
 ```
 
-避免反向依赖：`storage` 不应依赖 `source`，`tui` 不应直接依赖 provider adapter，也不应手工拼 `.ohquant` 路径。当前剩余例外由 `scripts/architecture-boundary-baseline.json` 跟踪，新增违规由 `bun run check:architecture` 阻止。
+避免反向依赖：`source` 和 `storage` 不应互相依赖，`tui` 不应直接依赖 provider adapter，也不应手工拼 `.ohquant` 路径。`scripts/architecture-boundary-baseline.json` 当前为空，新增违规由 `bun run check:architecture` 阻止。
 
 ## 测试布局
 

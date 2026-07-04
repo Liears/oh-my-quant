@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { Buffer } from "../src/buffer.ts";
 import { PanelController } from "../src/panel.ts";
 import { saveArtifact, savePanelPortfolio, loadSettings, saveSettings } from "../../storage/index.ts";
+import type { DoctorResult } from "../../cli/doctor.ts";
 
 const OHQ = join(process.cwd(), ".ohquant-test-panel-ctrl");
 
@@ -28,6 +29,302 @@ function encodeCwd(cwd: string): string {
 }
 
 describe("PanelController portfolio UI", () => {
+  it("renders a doctor panel with report data", () => {
+    const panel = new PanelController();
+    panel.open("doctor");
+    panel.setDoctor({
+      ready: true,
+      mode: "diagnostic",
+      overall: "partial_fail",
+      phases: [
+        { phase: "model", status: "pass", label: "Model", detail: "Anthropic Messages HTTP 200", warnings: ["Network probe skipped by WHYJ_DOCTOR_SKIP_NETWORK."] },
+        { phase: "tools", status: "pass", label: "Tools", detail: "schemas loaded" },
+        { phase: "data", status: "fail", label: "Data", detail: "Missing WHYJ_QUANT_LLMQUANT_API_KEY", error: "Missing WHYJ_QUANT_LLMQUANT_API_KEY", action: "Open /doctor Configure and set WHYJ_QUANT_LLMQUANT_API_KEY." },
+      ],
+      auth: {
+        WHYJ_QUANT_API_KEY: { available: true, source: "env", value: "test...1234 · fp:abcd1234" },
+        WHYJ_QUANT_AUTH_TOKEN: { available: false, source: "missing", value: "-" },
+        WHYJ_QUANT_BASE_URL: { available: true, source: "env", value: "https://api.deepseek.com/anthropic" },
+        WHYJ_QUANT_TUSHARE_TOKEN: { available: false, source: "missing", value: "-" },
+        WHYJ_QUANT_LLMQUANT_API_KEY: { available: false, source: "missing", value: "-" },
+        WHYJ_QUANT_FINANCIAL_DATASETS_KEY: { available: false, source: "missing", value: "-" },
+      },
+      config: {
+        settingsPath: ".ohquant/settings.json",
+        model: "deepseek-v4-pro",
+        baseUrl: "https://api.deepseek.com/anthropic",
+        endpointMode: "Anthropic Messages",
+        dataSource: "llmquant-data",
+      },
+      hints: ["Open /doctor Configure and set WHYJ_QUANT_LLMQUANT_API_KEY."],
+      logPath: ".ohquant/logs/doctor/latest.log",
+    } as DoctorResult);
+
+    const buf = new Buffer(120, 36);
+    panel.render(buf);
+    const plain = buf.toPlain().join("\n");
+    expect(plain).toContain("WhyJ Doctor");
+    expect(plain).toContain("partial_fail");
+    expect(plain).toContain("Missing WHYJ_QUANT_LLMQUANT_API_KEY");
+    expect(plain).toContain("Warn · Network probe skipped by WHYJ_DOCTOR_SKIP_NETWORK.");
+    expect(plain).toContain("[Retry All]  press Enter or r");
+    expect(plain).toContain("[Retry Model] press m");
+    expect(panel.handleKey("", key("escape"))).toEqual({ close: true });
+    panel.close();
+  });
+
+  it("retries doctor directly from the diagnostic panel", () => {
+    const panel = new PanelController();
+    panel.open("doctor");
+    panel.setDoctor({
+      ready: false,
+      mode: "diagnostic",
+      overall: "partial_fail",
+      phases: [
+        { phase: "model", status: "fail", label: "Model", detail: "Missing WHYJ_QUANT_API_KEY" },
+        { phase: "tools", status: "pass", label: "Tools", detail: "schemas loaded" },
+        { phase: "data", status: "fail", label: "Data", detail: "Missing WHYJ_QUANT_LLMQUANT_API_KEY" },
+      ],
+      auth: {},
+      config: {
+        settingsPath: ".ohquant/settings.json",
+        model: "sonnet",
+        baseUrl: "",
+        endpointMode: "Custom",
+        dataSource: "llmquant-data",
+      },
+      hints: [],
+    } as DoctorResult);
+
+    expect(panel.handleKey("r", key("", "r"))).toEqual({ command: "/doctor" });
+  });
+
+  it("retries tools and data phases from the diagnostic panel", () => {
+    const panel = new PanelController();
+    panel.open("doctor");
+    panel.setDoctor({
+      ready: false,
+      mode: "diagnostic",
+      overall: "partial_fail",
+      phases: [
+        { phase: "model", status: "pass", label: "Model", detail: "model ok" },
+        { phase: "tools", status: "fail", label: "Tools", detail: "Python missing" },
+        { phase: "data", status: "fail", label: "Data", detail: "Missing WHYJ_QUANT_LLMQUANT_API_KEY" },
+      ],
+      auth: {},
+      config: {
+        settingsPath: ".ohquant/settings.json",
+        model: "sonnet",
+        baseUrl: "",
+        endpointMode: "Custom",
+        dataSource: "llmquant-data",
+      },
+      hints: [],
+    } as DoctorResult);
+
+    expect(panel.handleKey("t", key("", "t"))).toEqual({ command: "/doctor --phase tools" });
+    panel.setDoctor({
+      ready: false,
+      mode: "diagnostic",
+      overall: "partial_fail",
+      phases: [
+        { phase: "model", status: "pass", label: "Model", detail: "model ok" },
+        { phase: "tools", status: "fail", label: "Tools", detail: "Python missing" },
+        { phase: "data", status: "fail", label: "Data", detail: "Missing WHYJ_QUANT_LLMQUANT_API_KEY" },
+      ],
+      auth: {},
+      config: {
+        settingsPath: ".ohquant/settings.json",
+        model: "sonnet",
+        baseUrl: "",
+        endpointMode: "Custom",
+        dataSource: "llmquant-data",
+      },
+      hints: [],
+    } as DoctorResult);
+    expect(panel.handleKey("d", key("", "d"))).toEqual({ command: "/doctor --phase data" });
+  });
+
+  it("enters configure mode from the diagnostic panel", () => {
+    const panel = new PanelController();
+    panel.open("doctor");
+    panel.setDoctor({
+      ready: false,
+      mode: "diagnostic",
+      overall: "partial_fail",
+      phases: [
+        { phase: "model", status: "fail", label: "Model", detail: "Missing WHYJ_QUANT_API_KEY" },
+        { phase: "tools", status: "pass", label: "Tools", detail: "schemas loaded" },
+        { phase: "data", status: "fail", label: "Data", detail: "Missing WHYJ_QUANT_LLMQUANT_API_KEY" },
+      ],
+      auth: {},
+      config: {
+        settingsPath: ".ohquant/settings.json",
+        model: "sonnet",
+        baseUrl: "",
+        endpointMode: "Custom",
+        dataSource: "llmquant-data",
+      },
+      hints: [],
+    } as DoctorResult);
+
+    panel.handleKey("c", key("", "c"));
+    const buf = new Buffer(120, 28);
+    panel.render(buf);
+    const plain = buf.toPlain().join("\n");
+    expect(plain).toContain("Doctor · Configure");
+    expect(plain).toContain("Provider");
+    expect(plain).toContain("Save & Verify");
+  });
+
+  it("keeps doctor first-setup edits in draft until save", () => {
+    const panel = new PanelController();
+    panel.open("doctor");
+    panel.setDoctor({
+      ready: false,
+      mode: "first_setup",
+      overall: "unconfigured",
+      phases: [
+        { phase: "model", status: "fail", label: "Model", detail: "Missing WHYJ_QUANT_API_KEY" },
+        { phase: "tools", status: "pending", label: "Tools", detail: "" },
+        { phase: "data", status: "fail", label: "Data", detail: "Missing WHYJ_QUANT_LLMQUANT_API_KEY" },
+      ],
+      auth: {},
+      config: {
+        settingsPath: ".ohquant/settings.json",
+        model: "sonnet",
+        baseUrl: "",
+        endpointMode: "Custom",
+        dataSource: "llmquant-data",
+      },
+      hints: ["Configure API and data credentials."],
+    } as DoctorResult);
+
+    panel.handleKey("", key("down"));
+    panel.handleKey("", key("down"));
+    panel.handleKey("", key("down"));
+    panel.handleKey("", key("down"));
+    panel.handleKey("", key("return"));
+    for (const ch of "sk-draft-only") panel.handleKey(ch, key("", ch));
+    panel.handleKey("", key("return"));
+    expect(loadSettings().env.WHYJ_QUANT_API_KEY).toBeUndefined();
+
+    expect(panel.handleKey("", key("escape"))).toEqual({ close: true });
+    expect(loadSettings().env.WHYJ_QUANT_API_KEY).toBeUndefined();
+  });
+
+  it("saves doctor first-setup draft and reruns doctor on save", () => {
+    const panel = new PanelController();
+    panel.open("doctor");
+    panel.setDoctor({
+      ready: false,
+      mode: "first_setup",
+      overall: "unconfigured",
+      phases: [
+        { phase: "model", status: "fail", label: "Model", detail: "Missing WHYJ_QUANT_API_KEY" },
+        { phase: "tools", status: "pending", label: "Tools", detail: "" },
+        { phase: "data", status: "fail", label: "Data", detail: "Missing WHYJ_QUANT_LLMQUANT_API_KEY" },
+      ],
+      auth: {},
+      config: {
+        settingsPath: ".ohquant/settings.json",
+        model: "sonnet",
+        baseUrl: "",
+        endpointMode: "Custom",
+        dataSource: "llmquant-data",
+      },
+      hints: ["Configure API and data credentials."],
+    } as DoctorResult);
+
+    panel.handleKey("", key("down"));
+    panel.handleKey("", key("return"));
+    for (const ch of "sk-live-1234") panel.handleKey(ch, key("", ch));
+    panel.handleKey("", key("return"));
+
+    panel.handleKey("", key("down"));
+    panel.handleKey("", key("return"));
+    for (const ch of "https://api.deepseek.com/anthropic") panel.handleKey(ch, key("", ch));
+    panel.handleKey("", key("return"));
+
+    panel.handleKey("", key("down"));
+    panel.handleKey("", key("down"));
+    panel.handleKey("", key("return"));
+    for (const ch of "llmq-key-5678") panel.handleKey(ch, key("", ch));
+    panel.handleKey("", key("return"));
+
+    panel.handleKey("", key("down"));
+    const result = panel.handleKey("", key("return"));
+    expect(result).toEqual({ command: "/doctor" });
+
+    const settings = loadSettings();
+    expect(settings.env.WHYJ_QUANT_API_KEY).toBe("sk-live-1234");
+    expect(settings.env.WHYJ_QUANT_BASE_URL).toBe("https://api.deepseek.com/anthropic");
+    expect(settings.env.WHYJ_QUANT_LLMQUANT_API_KEY).toBe("llmq-key-5678");
+  });
+
+  it("maps the MiniMax doctor preset to the supported runtime endpoint", () => {
+    const panel = new PanelController();
+    panel.open("doctor");
+    panel.setDoctor({
+      ready: false,
+      mode: "first_setup",
+      overall: "unconfigured",
+      phases: [
+        { phase: "model", status: "fail", label: "Model", detail: "Missing WHYJ_QUANT_API_KEY" },
+        { phase: "tools", status: "pending", label: "Tools", detail: "" },
+        { phase: "data", status: "fail", label: "Data", detail: "Missing WHYJ_QUANT_LLMQUANT_API_KEY" },
+      ],
+      auth: {},
+      config: {
+        settingsPath: ".ohquant/settings.json",
+        model: "sonnet",
+        baseUrl: "",
+        endpointMode: "Custom",
+        dataSource: "llmquant-data",
+      },
+      hints: [],
+    } as DoctorResult);
+
+    (panel as any).setDoctorProviderPreset("MiniMax");
+    expect((panel as any).doctorDraft.env.WHYJ_QUANT_BASE_URL).toBe("https://api.minimaxi.com/anthropic");
+    expect((panel as any).doctorProviderPreset()).toBe("MiniMax");
+  });
+
+  it("accepts a legacy auth token when saving doctor configure flow", () => {
+    const settings = loadSettings();
+    settings.env.WHYJ_QUANT_AUTH_TOKEN = "legacy-provider-token";
+    settings.env.WHYJ_QUANT_BASE_URL = "https://api.deepseek.com/anthropic";
+    settings.env.WHYJ_QUANT_LLMQUANT_API_KEY = "llmq-key-5678";
+    saveSettings(settings);
+
+    const panel = new PanelController();
+    panel.open("doctor");
+    panel.setDoctor({
+      ready: true,
+      mode: "diagnostic",
+      overall: "partial_fail",
+      phases: [
+        { phase: "model", status: "pass", label: "Model", detail: "model ok" },
+        { phase: "tools", status: "pass", label: "Tools", detail: "tools ok" },
+        { phase: "data", status: "fail", label: "Data", detail: "data missing" },
+      ],
+      auth: {},
+      config: {
+        settingsPath: ".ohquant/settings.json",
+        model: "sonnet",
+        baseUrl: "https://api.deepseek.com/anthropic",
+        endpointMode: "Anthropic Messages",
+        dataSource: "llmquant-data",
+      },
+      hints: [],
+    } as DoctorResult);
+
+    panel.handleKey("c", key("", "c"));
+    for (let i = 0; i < 5; i++) panel.handleKey("", key("down"));
+    const result = panel.handleKey("", key("return"));
+    expect(result).toEqual({ command: "/doctor" });
+  });
+
   it("lets config switch the current portfolio file used by the portfolio panel", () => {
     const portfolioDir = join(OHQ, "portfolio");
     mkdirSync(portfolioDir, { recursive: true });

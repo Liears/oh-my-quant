@@ -1,7 +1,7 @@
 import type { Layout } from "./types.ts";
 import type { CodeEntry } from "./watchlist.ts";
-import { COMMAND_CATALOG } from "../../cli/catalog.ts";
-import type { SkillEntry } from "../../skill/types.ts";
+import { COMMAND_CATALOG } from "../../runtime/command-catalog.ts";
+import type { SkillEntry } from "../../types/skills.ts";
 
 export type ScrollRegion = "composer" | "conversation" | "overview";
 

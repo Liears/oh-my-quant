@@ -8,7 +8,7 @@
 import { migrateOldConfig, loadSettings } from "./storage/index.ts";
 import { parseCommand, executeCommand } from "./cli/registry.ts";
 import { COMMAND_CATALOG } from "./cli/catalog.ts";
-import { formatDoctorText, runDoctor } from "./cli/doctor.ts";
+import { collectDoctor, formatDoctorFirstSetupText, formatDoctorProgressLine, formatDoctorText } from "./cli/doctor.ts";
 import { printBanner } from "./tui/src/banner.ts";
 
 interface CliEnvelope {
@@ -37,9 +37,11 @@ const idxC = args.indexOf("-c");
 const idxCmd = args.indexOf("--command");
 const json = args.includes("--json");
 const cmdArg = idxC >= 0 ? args[idxC + 1] : idxCmd >= 0 ? args[idxCmd + 1] : null;
+const doctorPhase = stringFlag(args, "--phase");
 const positional = args.filter((arg, index) => {
-  if (arg === "--json" || arg === "-c" || arg === "--command") return false;
+  if (arg === "--json" || arg === "-c" || arg === "--command" || arg === "--phase") return false;
   if ((args[index - 1] === "-c" || args[index - 1] === "--command")) return false;
+  if (args[index - 1] === "--phase") return false;
   return !arg.startsWith("--");
 });
 
@@ -47,9 +49,11 @@ if (args.includes("--help") || args.includes("-h")) {
   writeHelp(json);
   process.exit(0);
 } else if (positional[0] === "doctor") {
-  const doctor = runDoctor(settings, process.env);
+  const doctor = await collectDoctor(settings, process.env, json
+    ? { phases: parseDoctorPhases(doctorPhase) }
+    : { phases: parseDoctorPhases(doctorPhase), onState: (state) => console.log(formatDoctorProgressLine(state)) });
   if (json) writeJson({ ok: true, command: "doctor", data: doctor });
-  else console.log(formatDoctorText(doctor));
+  else console.log(`\n${doctor.mode === "first_setup" && doctor.overall === "unconfigured" ? formatDoctorFirstSetupText(doctor) : formatDoctorText(doctor)}`);
   process.exit(doctor.ready ? 0 : 1);
 } else if (cmdArg) {
   // Fix MSYS2 path mangling: "/config" → "C:/.../git/.../config"
@@ -59,6 +63,20 @@ if (args.includes("--help") || args.includes("-h")) {
   // Frame-buffer TUI
   const { startApp } = await import("./app.ts");
   await startApp();
+}
+
+function parseDoctorPhases(value: string | undefined): ("model" | "tools" | "data")[] | undefined {
+  if (!value) return undefined;
+  const phases = value
+    .split(/[,\s]+/)
+    .map((part) => part.trim().toLowerCase())
+    .filter((part): part is "model" | "tools" | "data" => part === "model" || part === "tools" || part === "data");
+  return phases.length > 0 ? phases : undefined;
+}
+
+function stringFlag(args: string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
 }
 
 async function runOneShot(input: string, json: boolean) {

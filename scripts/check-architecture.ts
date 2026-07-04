@@ -43,8 +43,8 @@ const RULES: BoundaryRule[] = [
   {
     id: "source-provider-boundary",
     from: ["source"],
-    blockedTo: ["agent", "app", "artifact", "cli", "quant", "skill", "tools", "tui"],
-    reason: "source providers should not depend on UI, tools, agent, or quant workflows.",
+    blockedTo: ["agent", "app", "artifact", "cli", "quant", "skill", "storage", "tools", "tui"],
+    reason: "source providers should not depend on UI, tools, agent, storage, or quant workflows.",
   },
   {
     id: "tui-is-render-adapter",

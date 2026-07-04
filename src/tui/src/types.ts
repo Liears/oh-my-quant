@@ -14,7 +14,7 @@ export interface Quote {
   pct: number;
 }
 
-import type { SkillState } from "../../skill/types.ts";
+import type { SkillState } from "../../types/skills.ts";
 
 export type { SkillState };
 

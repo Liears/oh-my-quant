@@ -3,22 +3,11 @@
  * Ported from skills/risk/scripts/risk_metrics.py
  */
 
+import type { RiskMetrics } from "../types/risk.ts";
+export type { RiskMetrics } from "../types/risk.ts";
+
 const TRADING_DAYS = 252;
 const RF_ANNUAL = 0.02;
-
-export interface RiskMetrics {
-  annualVol: number;
-  downsideVol: number;
-  var95: number;
-  var99: number;
-  var95Parametric: number;
-  cvar95: number;
-  cvar99: number;
-  maxDrawdown: number;
-  maxDdDays: number;
-  skewness: number;
-  kurtosis: number;
-}
 
 export function metrics(returns: number[], rf = RF_ANNUAL): RiskMetrics {
   const valid = returns.filter((r) => !isNaN(r));

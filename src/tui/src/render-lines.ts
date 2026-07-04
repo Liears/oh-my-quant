@@ -2,7 +2,7 @@ import { charWidth, sanitizeTerminalText, strWidth, truncate, wrap } from "./buf
 import type { Style } from "./buffer.ts";
 import { S } from "./styles.ts";
 import type { UIMessage } from "./types.ts";
-import { formatToolLine } from "../../tools/catalog.ts";
+import { formatToolLine } from "../../runtime/tool-display.ts";
 
 export interface RenderLine {
   text: string;

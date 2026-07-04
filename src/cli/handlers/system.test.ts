@@ -190,7 +190,15 @@ describe("sessionHandler", () => {
 
 describe("doctorHandler", () => {
   it("renders doctor output with structured report data", async () => {
-    const result = await doctorHandler({}, [], {});
+    const previous = process.env.WHYJ_DOCTOR_SKIP_NETWORK;
+    process.env.WHYJ_DOCTOR_SKIP_NETWORK = "1";
+    let result;
+    try {
+      result = await doctorHandler({}, [], {});
+    } finally {
+      if (previous === undefined) delete process.env.WHYJ_DOCTOR_SKIP_NETWORK;
+      else process.env.WHYJ_DOCTOR_SKIP_NETWORK = previous;
+    }
     expect(result.success).toBe(true);
     expect(result.renderAs).toBe("text");
     expect(result.message).toContain("WhyJ Doctor");
@@ -202,6 +210,25 @@ describe("doctorHandler", () => {
       config: expect.any(Object),
       hints: expect.any(Array),
     }));
+  });
+
+  it("opens the doctor panel in TUI contexts", async () => {
+    const previous = process.env.WHYJ_DOCTOR_SKIP_NETWORK;
+    process.env.WHYJ_DOCTOR_SKIP_NETWORK = "1";
+    const seen: unknown[] = [];
+    let result;
+    try {
+      result = await doctorHandler({}, [], { openDoctor: (doctor) => { seen.push(doctor); } });
+    } finally {
+      if (previous === undefined) delete process.env.WHYJ_DOCTOR_SKIP_NETWORK;
+      else process.env.WHYJ_DOCTOR_SKIP_NETWORK = previous;
+    }
+    expect(result.success).toBe(true);
+    expect(result.message).toBe("");
+    expect(result.effects).toBeUndefined();
+    expect(seen.length).toBeGreaterThan(2);
+    expect(seen[0]).toBeUndefined();
+    expect(seen.at(-1)).toEqual(expect.objectContaining({ phases: expect.any(Array) }));
   });
 });
 

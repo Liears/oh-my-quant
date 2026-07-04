@@ -66,8 +66,8 @@ The barrel export is a compatibility boundary, not a convenience-only layer. Sha
 
 ## Cross-module dependencies
 
-- `sessions.ts` depends on `agent/src/pi/` for session tree model (`SessionTreeEntry`, `buildSessionContext`, `estimateContextTokens`) and model catalog (`getModels`). This is a deliberate one-way dependency: storage reads session files and needs agent-level primitives to compute context-usage summaries.
-- `bars.ts`, `comparison.ts`, `panel-portfolio.ts`, and `local-portfolios.ts` depend on shared data types (`Bar`, `SymbolMeta`, `HoldingsFile`, `FundHolding`, `GroupComparisonResult`). The remaining `storage -> quant` type dependency is tracked in the architecture baseline for P1 cleanup.
+- `sessions.ts` reads JSONL/legacy transcript files through plain storage-local summary parsing. It does not import agent/pi session primitives.
+- `bars.ts`, `comparison.ts`, `panel-portfolio.ts`, and `local-portfolios.ts` depend only on shared DTOs from `src/types` (`Bar`, `SymbolMeta`, `HoldingsFile`, `FundHolding`, `GroupComparisonResult`).
 
 ## Test rules
 

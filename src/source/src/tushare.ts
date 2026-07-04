@@ -1,8 +1,13 @@
 import type { Bar, SymbolInfo } from "../../types/data.ts";
 import { postJson } from "./http.ts";
-import { readWhyjEnvValue } from "../../storage/index.ts";
 
-const TUSHARE_BASE_URL = process.env.TUSHARE_BASE_URL || "https://api.tushare.pro";
+const DEFAULT_TUSHARE_BASE_URL = "https://api.tushare.pro";
+
+export interface TushareOptions {
+  token?: string;
+  baseUrl?: string;
+  env?: Record<string, string | undefined>;
+}
 
 interface TushareResponse<T> {
   code: number;
@@ -15,8 +20,9 @@ interface TushareResponse<T> {
 
 type TusharePrimitive = string | number | null;
 
-function token(): string {
-  const value = readWhyjEnvValue(process.env, "tushareToken");
+function token(options: TushareOptions = {}): string {
+  const env = options.env ?? process.env;
+  const value = options.token || env.WHYJ_QUANT_TUSHARE_TOKEN;
   if (!value) throw new Error("WHYJ_QUANT_TUSHARE_TOKEN is not configured");
   return value;
 }
@@ -25,10 +31,11 @@ async function callTushare<T extends TusharePrimitive[]>(
   apiName: string,
   params: Record<string, unknown>,
   fields: string[],
+  options: TushareOptions = {},
 ): Promise<Array<Record<string, TusharePrimitive>>> {
-  const result = await postJson<TushareResponse<T>>(TUSHARE_BASE_URL, {
+  const result = await postJson<TushareResponse<T>>(options.baseUrl || options.env?.TUSHARE_BASE_URL || process.env.TUSHARE_BASE_URL || DEFAULT_TUSHARE_BASE_URL, {
     api_name: apiName,
-    token: token(),
+    token: token(options),
     params,
     fields: fields.join(","),
   });
@@ -44,16 +51,16 @@ function formatDate(d: string): string {
   return d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : d;
 }
 
-export async function fetchFromTushare(symbol: string, start?: string, end?: string): Promise<Bar[]> {
+export async function fetchFromTushare(symbol: string, start?: string, end?: string, options: TushareOptions = {}): Promise<Bar[]> {
   const dateParams = {
     ...(start ? { start_date: start.replace(/-/g, "") } : {}),
     ...(end ? { end_date: end.replace(/-/g, "") } : {}),
   };
 
   // Try stock daily first; fall back to fund_daily for ETF/LOF symbols
-  let rows = await callTushare("daily", { ts_code: symbol, ...dateParams }, DAILY_FIELDS);
+  let rows = await callTushare("daily", { ts_code: symbol, ...dateParams }, DAILY_FIELDS, options);
   if (rows.length === 0) {
-    rows = await callTushare("fund_daily", { ts_code: symbol, ...dateParams }, DAILY_FIELDS);
+    rows = await callTushare("fund_daily", { ts_code: symbol, ...dateParams }, DAILY_FIELDS, options);
   }
 
   return rows.map((row) => ({
@@ -69,11 +76,12 @@ export async function fetchFromTushare(symbol: string, start?: string, end?: str
 
 const DAILY_FIELDS = ["ts_code", "trade_date", "open", "high", "low", "close", "vol", "amount"];
 
-export async function searchTushareSymbols(keyword: string): Promise<SymbolInfo[]> {
+export async function searchTushareSymbols(keyword: string, options: TushareOptions = {}): Promise<SymbolInfo[]> {
   const rows = await callTushare(
     "stock_basic",
     { name: keyword, list_status: "L" },
     ["ts_code", "name", "area", "industry", "market", "list_date"],
+    options,
   );
   return rows.map((row) => ({
     code: String(row.ts_code || ""),
@@ -85,11 +93,12 @@ export async function searchTushareSymbols(keyword: string): Promise<SymbolInfo[
   }));
 }
 
-export async function fetchTushareSnapshot(symbol: string): Promise<Record<string, unknown>> {
+export async function fetchTushareSnapshot(symbol: string, options: TushareOptions = {}): Promise<Record<string, unknown>> {
   const [basic] = await callTushare(
     "daily_basic",
     { ts_code: symbol },
     ["ts_code", "trade_date", "close", "pe", "pe_ttm", "pb", "total_mv", "circ_mv"],
+    options,
   );
   return basic || {};
 }

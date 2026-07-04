@@ -1,7 +1,7 @@
 import type { CurrentSessionMeta } from "./panel.ts";
 import type { ArtifactItemView, ArtifactMetaView, ConfigRowView, PortfolioItemView, PortfolioMetaView, ResumeListItemView, ResumeMetaView } from "./panel-views.ts";
-import type { ArtifactMeta, LocalPortfolioSummary, StoredSessionContextUsage, StoredSessionSummary } from "../../storage/index.ts";
-import { COMMAND_CATALOG } from "../../cli/catalog.ts";
+import type { ArtifactMeta, LocalPortfolioSummary, StoredSessionContextUsage, StoredSessionSummary } from "../../runtime/panel-data.ts";
+import { COMMAND_CATALOG } from "../../runtime/command-catalog.ts";
 
 export function buildConfigRowViews(
   rows: Array<{ section: string } | { field: { label: string; action?: string }; index: number }>,

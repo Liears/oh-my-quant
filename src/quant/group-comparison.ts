@@ -3,27 +3,10 @@
  * Pure functions, no I/O.
  */
 
-import { metrics, type RiskMetrics } from "./risk.ts";
-
-export interface NavPoint {
-  date: string;
-  nav: number;
-}
-
-export interface GroupNav {
-  groupId: string;
-  groupName: string;
-  navSeries: NavPoint[];
-}
-
-export interface GroupComparisonResult {
-  groupId: string;
-  groupName: string;
-  symbolCount: number;
-  risk: RiskMetrics;
-  totalReturn: number;
-  navSeries: NavPoint[];
-}
+import { metrics } from "./risk.ts";
+import type { GroupComparisonResult, GroupNav, NavPoint } from "../types/comparison.ts";
+import type { RiskMetrics } from "../types/risk.ts";
+export type { GroupComparisonResult, GroupNav, NavPoint } from "../types/comparison.ts";
 
 /**
  * Synthesize an equal-weight portfolio NAV from per-symbol daily returns.

@@ -1,18 +1,24 @@
 import type { Bar } from "../../types/data.ts";
 import { getJson } from "./http.ts";
-import { readWhyjEnvValue } from "../../storage/index.ts";
 
-const FD_BASE_URL = process.env.FINANCIAL_DATASETS_BASE_URL || "https://api.financialdatasets.ai";
+const DEFAULT_FD_BASE_URL = "https://api.financialdatasets.ai";
 const FD_RECENT_DAYS = 60;
 
-function apiKey(): string {
-  const value = readWhyjEnvValue(process.env, "financialDatasetsKey");
+export interface FinancialDatasetsOptions {
+  apiKey?: string;
+  baseUrl?: string;
+  env?: Record<string, string | undefined>;
+}
+
+function apiKey(options: FinancialDatasetsOptions = {}): string {
+  const env = options.env ?? process.env;
+  const value = options.apiKey || env.WHYJ_QUANT_FINANCIAL_DATASETS_KEY;
   if (!value) throw new Error("WHYJ_QUANT_FINANCIAL_DATASETS_KEY is not configured");
   return value;
 }
 
-function authHeaders(): Record<string, string> {
-  return { "X-API-KEY": apiKey() };
+function authHeaders(options: FinancialDatasetsOptions = {}): Record<string, string> {
+  return { "X-API-KEY": apiKey(options) };
 }
 
 type FDPriceRow = {
@@ -35,7 +41,7 @@ function rowsFromPayload(payload: unknown): FDPriceRow[] {
   return [];
 }
 
-export async function fetchFromFinancialDatasets(symbol: string, start?: string, end?: string): Promise<Bar[]> {
+export async function fetchFromFinancialDatasets(symbol: string, start?: string, end?: string, options: FinancialDatasetsOptions = {}): Promise<Bar[]> {
   const hasRange = Boolean(start || end);
   const recentEnd = new Date();
   const recentStart = new Date(recentEnd);
@@ -46,7 +52,8 @@ export async function fetchFromFinancialDatasets(symbol: string, start?: string,
     ...(hasRange ? { start_date: start || recentStart.toISOString().slice(0, 10) } : { start_date: recentStart.toISOString().slice(0, 10) }),
     ...(hasRange ? { end_date: end || recentEnd.toISOString().slice(0, 10) } : { end_date: recentEnd.toISOString().slice(0, 10) }),
   });
-  const payload = await getJson<unknown>(`${FD_BASE_URL}/prices/?${query.toString()}`, authHeaders());
+  const baseUrl = options.baseUrl || options.env?.FINANCIAL_DATASETS_BASE_URL || process.env.FINANCIAL_DATASETS_BASE_URL || DEFAULT_FD_BASE_URL;
+  const payload = await getJson<unknown>(`${baseUrl}/prices/?${query.toString()}`, authHeaders(options));
   const rows = rowsFromPayload(payload);
   const mapped = rows.map((row) => ({
     date: String((row as { time?: string; date?: string }).time || row.date || ""),
@@ -63,11 +70,12 @@ export async function fetchFromFinancialDatasets(symbol: string, start?: string,
   return hasRange ? mapped : mapped.slice(-30);
 }
 
-export async function fetchFinancialDatasetsSnapshot(symbol: string): Promise<Record<string, unknown>> {
+export async function fetchFinancialDatasetsSnapshot(symbol: string, options: FinancialDatasetsOptions = {}): Promise<Record<string, unknown>> {
   const query = new URLSearchParams({ ticker: symbol });
+  const baseUrl = options.baseUrl || options.env?.FINANCIAL_DATASETS_BASE_URL || process.env.FINANCIAL_DATASETS_BASE_URL || DEFAULT_FD_BASE_URL;
   const snapshot = await getJson<Record<string, unknown>>(
-    `${FD_BASE_URL}/prices/snapshot?${query.toString()}`,
-    authHeaders(),
+    `${baseUrl}/prices/snapshot?${query.toString()}`,
+    authHeaders(options),
   );
   return (snapshot.snapshot && typeof snapshot.snapshot === "object") ? snapshot.snapshot as Record<string, unknown> : snapshot;
 }

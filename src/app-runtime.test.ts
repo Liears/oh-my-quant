@@ -60,9 +60,8 @@ describe("initial app state", () => {
 
 function harness(
   quoteFetcher: ConstructorParameters<typeof AppRuntime>[1] = async () => [],
-  symbolProvider: ConstructorParameters<typeof AppRuntime>[2] = async () => [],
-  holdingFetcher: ConstructorParameters<typeof AppRuntime>[3] = async () => [],
-  agentFactory: ConstructorParameters<typeof AppRuntime>[4] | undefined = undefined,
+  holdingFetcher: ConstructorParameters<typeof AppRuntime>[2] = async () => [],
+  agentFactory: ConstructorParameters<typeof AppRuntime>[3] | undefined = undefined,
 ) {
   const messages: UIMessage[][] = [];
   const activities: AppState["activity"][] = [];
@@ -86,7 +85,6 @@ function harness(
       onPanel: (panel, loading = false) => panels.push({ panel, loading }),
     },
     quoteFetcher,
-    symbolProvider,
     holdingFetcher,
     agentFactory,
   );
@@ -226,7 +224,7 @@ description: Use for crypto market analysis.
         nextTurn: [],
       });
     };
-    const h = harness(async () => [], async () => [], async () => [], () => fakeAgent as never);
+    const h = harness(async () => [], async () => [], () => fakeAgent as never);
 
     await h.runtime.bootstrap();
     (fakeAgent.state as { isStreaming: boolean }).isStreaming = true;
@@ -356,7 +354,7 @@ description: Use for crypto market analysis.
       agent.state.isStreaming = false;
       await agent.emit({ type: "agent_end", messages: [] });
     });
-    const h = harness(async () => [], async () => [], async () => [], () => fakeAgent as never);
+    const h = harness(async () => [], async () => [], () => fakeAgent as never);
 
     await h.runtime.bootstrap();
     await h.runtime.submit("read the runtime bridge");
@@ -415,7 +413,7 @@ description: Use for crypto market analysis.
       agent.state.isStreaming = false;
       await agent.emit({ type: "agent_end", messages: [] });
     });
-    const h = harness(async () => [], async () => [], async () => [], () => fakeAgent as never);
+    const h = harness(async () => [], async () => [], () => fakeAgent as never);
 
     await h.runtime.bootstrap();
     await h.runtime.submit("check 000300 risk");
@@ -467,7 +465,7 @@ description: Use for crypto market analysis.
       agent.state.isStreaming = false;
       await agent.emit({ type: "agent_end", messages: [] });
     });
-    const h = harness(async () => [], async () => [], async () => [], () => fakeAgent as never);
+    const h = harness(async () => [], async () => [], () => fakeAgent as never);
 
     await h.runtime.bootstrap();
     await h.runtime.submit("update the catalog");
@@ -488,7 +486,7 @@ description: Use for crypto market analysis.
     const fakeAgent = makeFakeAgent(async () => {
       throw new Error("fetch failed: connect ECONNREFUSED 127.0.0.1:11434");
     });
-    const h = harness(async () => [], async () => [], async () => [], () => fakeAgent as never);
+    const h = harness(async () => [], async () => [], () => fakeAgent as never);
 
     await h.runtime.bootstrap();
     await h.runtime.submit("hello");
@@ -520,7 +518,7 @@ description: Use for crypto market analysis.
       agent.state.isStreaming = false;
       await agent.emit({ type: "agent_end", messages: [] });
     });
-    const h = harness(async () => [], async () => [], async () => [], () => fakeAgent as never);
+    const h = harness(async () => [], async () => [], () => fakeAgent as never);
 
     await h.runtime.bootstrap();
     await h.runtime.submit("你是谁");
@@ -551,7 +549,7 @@ description: Use for crypto market analysis.
         message: { role: "assistant", content: [{ type: "text", text: "Done." }] },
       });
     });
-    const h = harness(async () => [], async () => [], async () => [], () => fakeAgent as never);
+    const h = harness(async () => [], async () => [], () => fakeAgent as never);
 
     await h.runtime.bootstrap();
     await h.runtime.submit("finish without agent_end");
@@ -573,7 +571,6 @@ description: Use for crypto market analysis.
         marketSeen.push(entries.map((entry) => entry.code));
         return [{ code: "000001", name: "上证指数", price: 3000, pct: 1 }];
       },
-      async () => [{ code: "510300.SH", name: "沪深300ETF" }],
       async (entries, _meta) => {
         portfolioSeen.push(entries.map((entry) => entry.code));
         return [{ code: "510300", name: "沪深300ETF", price: 4.2, pct: -0.5 }];
@@ -846,7 +843,7 @@ description: Use for crypto market analysis.
       groups: [{ id: "group-1", name: "核心组合", symbolCodes: ["510300.SH"] }],
     });
     const holdingSeen: string[][] = [];
-    const h = harness(async () => [], async () => [], async (entries) => {
+    const h = harness(async () => [], async (entries) => {
       holdingSeen.push(entries.map((entry) => entry.code));
       return [];
     });
@@ -865,7 +862,6 @@ description: Use for crypto market analysis.
       funds: [{ code: "510300", name: "沪深300ETF" }],
     }, null, 2));
     const h = harness(
-      async () => [],
       async () => [],
       async (entries) => entries.map((entry) => ({ code: entry.code, name: entry.name, price: 1, pct: 0 })),
     );

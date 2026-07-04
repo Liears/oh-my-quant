@@ -2,7 +2,11 @@ import { describe, expect, it } from "bun:test";
 import {
   AKSHARE_PUBLIC_FUND_ENDPOINTS,
   AKSHARE_PUBLIC_INDEX_ENDPOINTS,
+} from "../src/akshare-endpoints.ts";
+import {
   fetchAkshareAIndexSpot,
+} from "../src/akshare.ts";
+import {
   normalizeAkshareIndexConstituentRows,
   normalizeAkshareIndexInfoRows,
   normalizeAkshareIndexQuote,
@@ -10,7 +14,7 @@ import {
   parseAkshareIndexRowsJson,
   parseAkshareJson,
   parseAkshareRowsJson,
-} from "../src/akshare.ts";
+} from "../src/akshare-normalize.ts";
 
 describe("parseAkshareJson", () => {
   it("maps AKShare records to Bar rows", () => {

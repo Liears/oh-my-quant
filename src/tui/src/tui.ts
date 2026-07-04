@@ -10,10 +10,7 @@ import type { AppState } from "./types.ts";
 import { loadWatchlistEntries, type CodeEntry } from "./watchlist.ts";
 import { PanelController, type CurrentSessionMeta } from "./panel.ts";
 import { buildSuggestions, hitTestScrollRegion, nextInputAction, type InputAction, type MouseEvent, type ScrollRegion, type SkillEntry } from "./input.ts";
-import { discoverSkills } from "../../agent/src/skills.ts";
-import { NodeExecutionEnv } from "../../agent/src/pi/node.ts";
-import { skillPaths } from "../../skill/index.ts";
-import { loadSettings } from "../../storage/index.ts";
+import { loadRuntimeSkillSuggestions } from "../../runtime/skill-suggestions.ts";
 import { copyToClipboard } from "./clipboard.ts";
 import { resolveCopyText } from "./tui-copy.ts";
 import {
@@ -99,6 +96,11 @@ export class QuantTui {
   onSubmit(handler: (text: string) => void): void { this.submitHandler = handler; }
   onPanelRefresh(handler: () => void): void { this.panelRefreshHandler = handler; }
   openConfig(): void { this.panel.open("config"); this.paint(); }
+  openDoctor(doctor?: unknown): void {
+    if (!this.panel.isDoctorMode()) this.panel.open("doctor");
+    this.panel.setDoctor(doctor as any);
+    this.paint();
+  }
   openResume(meta?: CurrentSessionMeta): void { if (meta) this.panel.setCurrentSessionMeta(meta); this.panel.open("resume"); this.paint(); }
   syncCurrentSessionMeta(meta?: CurrentSessionMeta): void { if (meta) this.panel.setCurrentSessionMeta(meta); this.paint(); }
   openPortfolio(): void { this.panel.open("portfolio"); this.paint(); }
@@ -462,15 +464,7 @@ export class QuantTui {
 
   private async loadSkills(): Promise<void> {
     try {
-      const env = new NodeExecutionEnv({ cwd: process.cwd() });
-      const settings = loadSettings();
-      const discovered = await discoverSkills({
-        cwd: process.cwd(),
-        env,
-        extraPaths: skillPaths(),
-        integrations: settings.skillIntegrations,
-      });
-      this.skills = discovered.skills.map((s) => ({ name: s.name, description: s.description, scope: s.scope }));
+      this.skills = await loadRuntimeSkillSuggestions();
     } catch { /* skills are optional */ }
   }
 

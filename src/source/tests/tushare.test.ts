@@ -132,4 +132,23 @@ describe("tushare adapter", () => {
       circ_mv: 900000,
     });
   });
+
+  it("accepts an explicit token without reading process env", async () => {
+    delete process.env.WHYJ_QUANT_TUSHARE_TOKEN;
+    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}");
+      expect(body.token).toBe("explicit-token");
+      return new Response(JSON.stringify({
+        code: 0,
+        data: {
+          fields: ["ts_code", "trade_date", "open", "high", "low", "close", "vol", "amount"],
+          items: [["000001.SZ", "20260618", 10, 11, 9, 10.5, 100, 1000]],
+        },
+      }));
+    }) as unknown as typeof fetch;
+
+    const { fetchFromTushare } = await import(`../src/tushare.ts?case=explicit-${Date.now()}`);
+    const rows = await fetchFromTushare("000001.SZ", undefined, undefined, { token: "explicit-token" });
+    expect(rows[0]?.close).toBe(10.5);
+  });
 });

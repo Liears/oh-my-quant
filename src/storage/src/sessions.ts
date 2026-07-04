@@ -1,9 +1,51 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
-import { getModels } from "../../agent/src/pi/llm-index.ts";
 import { resolveSessionsDir } from "./dirs.ts";
-import { estimateContextTokens, type AgentMessage, type JsonlSessionMetadata, type SessionTreeEntry } from "../../agent/src/pi/index.ts";
-import { buildSessionContext } from "../../agent/src/pi/harness/session/session.ts";
+
+interface StoredJsonlSessionMetadata {
+  id: string;
+  createdAt: string;
+  cwd: string;
+  path: string;
+  parentSessionPath?: string;
+}
+
+interface StoredUsage {
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  totalTokens?: number;
+}
+
+type StoredAgentMessage = Record<string, unknown> & {
+  role?: string;
+  content?: unknown;
+  provider?: string;
+  model?: string;
+  usage?: StoredUsage;
+  stopReason?: string;
+  summary?: string;
+  command?: string;
+  output?: string;
+};
+
+type StoredSessionTreeEntry = Record<string, unknown> & {
+  type: string;
+  id: string;
+  parentId: string | null;
+  timestamp: string;
+  targetId?: string | null;
+  message?: StoredAgentMessage;
+  provider?: string;
+  modelId?: string;
+  summary?: string;
+  firstKeptEntryId?: string;
+  fromId?: string;
+  content?: unknown;
+  display?: boolean;
+  customType?: string;
+};
 
 export interface StoredSessionContextUsage {
   tokens: number;
@@ -17,7 +59,7 @@ export interface StoredSessionEntryCount {
   branches: number;
 }
 
-export interface StoredSessionSummary extends JsonlSessionMetadata {
+export interface StoredSessionSummary extends StoredJsonlSessionMetadata {
   format: "jsonl" | "markdown";
   updatedAt: string;
   preview: string;
@@ -66,11 +108,15 @@ function pushRecentMessage(
   if (recentMessages.length > 4) recentMessages.shift();
 }
 
-function leafIdAfterEntry(entry: SessionTreeEntry): string | null {
-  return entry.type === "leaf" ? entry.targetId : entry.id;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object";
 }
 
-function normalizeSessionEntry(parsed: Record<string, unknown>, currentLeafId: string | null): SessionTreeEntry | null {
+function leafIdAfterEntry(entry: StoredSessionTreeEntry): string | null {
+  return entry.type === "leaf" ? entry.targetId ?? null : entry.id;
+}
+
+function normalizeSessionEntry(parsed: Record<string, unknown>, currentLeafId: string | null): StoredSessionTreeEntry | null {
   if (typeof parsed.type !== "string" || typeof parsed.id !== "string" || typeof parsed.timestamp !== "string") {
     return null;
   }
@@ -81,13 +127,13 @@ function normalizeSessionEntry(parsed: Record<string, unknown>, currentLeafId: s
   if (entry.type === "leaf" && entry.targetId !== null && typeof entry.targetId !== "string") {
     entry.targetId = null;
   }
-  return entry as unknown as SessionTreeEntry;
+  return entry as StoredSessionTreeEntry;
 }
 
-function buildCurrentBranch(entries: SessionTreeEntry[], leafId: string | null): SessionTreeEntry[] {
+function buildCurrentBranch(entries: StoredSessionTreeEntry[], leafId: string | null): StoredSessionTreeEntry[] {
   if (leafId === null) return [];
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
-  const path: SessionTreeEntry[] = [];
+  const path: StoredSessionTreeEntry[] = [];
   let current = byId.get(leafId);
   while (current) {
     path.unshift(current);
@@ -100,6 +146,12 @@ function buildCurrentBranch(entries: SessionTreeEntry[], leafId: string | null):
 function normalizeModelLookupId(modelId: string): string {
   return modelId.replace(/\[\d+m\]$/u, "");
 }
+
+const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  "deepseek:deepseek-v4-flash": 1_000_000,
+  "deepseek:deepseek-v4-pro": 1_000_000,
+  "openrouter:openai/gpt-5.5": 1_050_000,
+};
 
 function inferContextProviderCandidates(provider: string, modelId: string): string[] {
   const lookupId = normalizeModelLookupId(modelId);
@@ -116,19 +168,71 @@ function inferContextWindow(model: { provider: string; modelId: string } | null)
   if (!model) return 200_000;
   const lookupId = normalizeModelLookupId(model.modelId);
   for (const provider of inferContextProviderCandidates(model.provider, lookupId)) {
-    const exact = getModels(provider).find((candidate) => candidate.id === lookupId);
-    if (exact?.contextWindow) return exact.contextWindow;
-    const prefix = getModels(provider).find((candidate) => lookupId.startsWith(candidate.id));
-    if (prefix?.contextWindow) return prefix.contextWindow;
+    const exact = MODEL_CONTEXT_WINDOWS[`${provider}:${lookupId}`];
+    if (exact) return exact;
+    const prefix = Object.entries(MODEL_CONTEXT_WINDOWS)
+      .find(([key]) => key.startsWith(`${provider}:`) && lookupId.startsWith(key.slice(provider.length + 1)));
+    if (prefix) return prefix[1];
   }
   if (model.provider === "zai" || model.provider === "minimax" || model.provider === "minimax-cn") return 128_000;
   return 200_000;
 }
 
-function buildContextUsage(entries: SessionTreeEntry[], leafId: string | null): StoredSessionContextUsage {
+function buildStoredSessionContext(entries: StoredSessionTreeEntry[], leafId: string | null): {
+  messages: StoredAgentMessage[];
+  model: { provider: string; modelId: string } | null;
+} {
   const branch = buildCurrentBranch(entries, leafId);
-  const context = buildSessionContext(branch);
-  const estimatedTokens = estimateContextTokens(context.messages as AgentMessage[]).tokens;
+  let model: { provider: string; modelId: string } | null = null;
+  let compaction: StoredSessionTreeEntry | null = null;
+
+  for (const entry of branch) {
+    if (entry.type === "model_change" && typeof entry.provider === "string" && typeof entry.modelId === "string") {
+      model = { provider: entry.provider, modelId: entry.modelId };
+    } else if (entry.type === "message" && entry.message?.role === "assistant") {
+      const provider = entry.message.provider;
+      const modelId = entry.message.model;
+      if (typeof provider === "string" && typeof modelId === "string") {
+        model = { provider, modelId };
+      }
+    } else if (entry.type === "compaction") {
+      compaction = entry;
+    }
+  }
+
+  const messages: StoredAgentMessage[] = [];
+  const appendMessage = (entry: StoredSessionTreeEntry) => {
+    if (entry.type === "message" && isRecord(entry.message)) {
+      messages.push(entry.message);
+    } else if (entry.type === "custom_message" && entry.display !== false) {
+      messages.push({ role: "custom", content: entry.content ?? "" });
+    } else if (entry.type === "branch_summary" && typeof entry.summary === "string") {
+      messages.push({ role: "branchSummary", summary: entry.summary });
+    }
+  };
+
+  if (compaction) {
+    messages.push({ role: "compactionSummary", summary: compaction.summary ?? "" });
+    const compactionIndex = branch.findIndex((entry) => entry.type === "compaction" && entry.id === compaction!.id);
+    let foundFirstKept = false;
+    for (let i = 0; i < compactionIndex; i++) {
+      const entry = branch[i]!;
+      if (entry.id === compaction.firstKeptEntryId) foundFirstKept = true;
+      if (foundFirstKept) appendMessage(entry);
+    }
+    for (let i = compactionIndex + 1; i < branch.length; i++) {
+      appendMessage(branch[i]!);
+    }
+  } else {
+    for (const entry of branch) appendMessage(entry);
+  }
+
+  return { messages, model };
+}
+
+function buildContextUsage(entries: StoredSessionTreeEntry[], leafId: string | null): StoredSessionContextUsage {
+  const context = buildStoredSessionContext(entries, leafId);
+  const estimatedTokens = estimateStoredContextTokens(context.messages);
   const tokens = Number.isFinite(estimatedTokens) ? estimatedTokens : 0;
   const contextWindow = inferContextWindow(context.model);
   return {
@@ -136,6 +240,84 @@ function buildContextUsage(entries: SessionTreeEntry[], leafId: string | null): 
     contextWindow,
     percent: contextWindow > 0 ? tokens / contextWindow * 100 : null,
   };
+}
+
+function estimateStoredContextTokens(messages: StoredAgentMessage[]): number {
+  const usageInfo = findLastAssistantUsage(messages);
+  if (!usageInfo) return messages.reduce((sum, message) => sum + estimateStoredMessageTokens(message), 0);
+  let trailingTokens = 0;
+  for (let i = usageInfo.index + 1; i < messages.length; i++) {
+    trailingTokens += estimateStoredMessageTokens(messages[i]!);
+  }
+  return usageInfo.tokens + trailingTokens;
+}
+
+function findLastAssistantUsage(messages: StoredAgentMessage[]): { tokens: number; index: number } | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]!;
+    if (message.role !== "assistant" || message.stopReason === "aborted" || message.stopReason === "error") continue;
+    const usage = message.usage;
+    if (!usage) continue;
+    const tokens = usage.totalTokens
+      || (usage.input ?? 0) + (usage.output ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0);
+    if (tokens > 0) return { tokens, index: i };
+  }
+  return null;
+}
+
+function estimateStoredMessageTokens(message: StoredAgentMessage): number {
+  let chars = 0;
+  switch (message.role) {
+    case "user":
+    case "displayUser":
+    case "toolResult":
+    case "custom":
+      chars = estimateContentChars(message.content);
+      break;
+    case "assistant":
+      chars = estimateAssistantContentChars(message.content);
+      break;
+    case "bashExecution":
+      chars = String(message.command ?? "").length + String(message.output ?? "").length;
+      break;
+    case "branchSummary":
+    case "compactionSummary":
+      chars = String(message.summary ?? "").length;
+      break;
+    default:
+      chars = estimateContentChars(message.content ?? message.summary ?? "");
+  }
+  return Math.ceil(chars / 4);
+}
+
+function estimateContentChars(content: unknown): number {
+  if (typeof content === "string") return content.length;
+  if (!Array.isArray(content)) return 0;
+  return content.reduce((sum, block) => {
+    if (!isRecord(block)) return sum;
+    if (block.type === "text" && typeof block.text === "string") return sum + block.text.length;
+    if (block.type === "image") return sum + 4_800;
+    return sum;
+  }, 0);
+}
+
+function estimateAssistantContentChars(content: unknown): number {
+  if (!Array.isArray(content)) return estimateContentChars(content);
+  return content.reduce((sum, block) => {
+    if (!isRecord(block)) return sum;
+    if (block.type === "text" && typeof block.text === "string") return sum + block.text.length;
+    if (block.type === "thinking" && typeof block.thinking === "string") return sum + block.thinking.length;
+    if (block.type === "toolCall") return sum + String(block.name ?? "").length + safeJsonStringify(block.arguments).length;
+    return sum;
+  }, 0);
+}
+
+function safeJsonStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? "";
+  } catch {
+    return "";
+  }
 }
 
 function parseSessionFile(filePath: string): StoredSessionSummary | null {
@@ -155,7 +337,7 @@ function parseSessionFile(filePath: string): StoredSessionSummary | null {
     let sessionName: string | undefined;
     let messageCount = 0;
     const recentMessages: StoredSessionSummary["recentMessages"] = [];
-    const entries: SessionTreeEntry[] = [];
+    const entries: StoredSessionTreeEntry[] = [];
     let leafId: string | null = null;
 
     for (const line of lines.slice(1)) {

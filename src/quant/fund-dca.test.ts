@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { FundNavDaily } from "../source/index.ts";
+import type { FundNavDaily } from "../types/data.ts";
 import { buildDcaSchedule, calculateXirr, runDcaBacktest } from "./fund-dca.ts";
 
 describe("fund DCA backtest", () => {

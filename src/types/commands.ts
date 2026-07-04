@@ -1,3 +1,5 @@
+import type { DoctorResult } from "../runtime/doctor-contract.ts";
+
 export interface ParsedCommand {
   command: string;
   raw: string;
@@ -9,6 +11,7 @@ export type CommandEffect =
   | { type: "clearConversation" }
   | { type: "resetAgent" }
   | { type: "openConfig" }
+  | { type: "openDoctor"; doctor?: unknown }
   | { type: "openResume" }
   | { type: "openSession" }
   | { type: "openPortfolio" }
@@ -74,6 +77,10 @@ export interface CommandAgentSession {
 export interface CommandContext {
   /** When set, /config opens the settings panel. */
   openConfig?: () => void;
+  /** When set, /doctor opens the doctor panel. */
+  openDoctor?: (doctor?: unknown) => void;
+  /** Current doctor snapshot for partial retries inside TUI. */
+  currentDoctor?: DoctorResult | null;
   /** When set, /resume opens the resume panel. */
   openResume?: () => void;
   /** When set, /portfolio opens the portfolio panel. */

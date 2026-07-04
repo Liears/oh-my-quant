@@ -58,4 +58,16 @@ describe("financial datasets adapter", () => {
       close: 182.9,
     });
   });
+
+  it("accepts an explicit API key without reading process env", async () => {
+    delete process.env.WHYJ_QUANT_FINANCIAL_DATASETS_KEY;
+    globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+      expect((init?.headers as Record<string, string>)["X-API-KEY"]).toBe("explicit-fd-key");
+      return new Response(JSON.stringify({ prices: [{ date: "2026-06-18", close: 102 }] }));
+    }) as unknown as typeof fetch;
+
+    const { fetchFromFinancialDatasets } = await import(`../src/financial-datasets.ts?case=explicit-${Date.now()}`);
+    const rows = await fetchFromFinancialDatasets("AAPL", undefined, undefined, { apiKey: "explicit-fd-key" });
+    expect(rows[0]?.close).toBe(102);
+  });
 });

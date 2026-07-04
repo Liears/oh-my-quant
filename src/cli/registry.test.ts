@@ -226,7 +226,15 @@ describe("executeCommand", () => {
   });
 
   it("runs doctor as a local slash command", async () => {
-    const result = await executeCommand(parseCommand("/doctor")!);
+    const previous = process.env.WHYJ_DOCTOR_SKIP_NETWORK;
+    process.env.WHYJ_DOCTOR_SKIP_NETWORK = "1";
+    let result: Awaited<ReturnType<typeof executeCommand>>;
+    try {
+      result = await executeCommand(parseCommand("/doctor")!);
+    } finally {
+      if (previous === undefined) delete process.env.WHYJ_DOCTOR_SKIP_NETWORK;
+      else process.env.WHYJ_DOCTOR_SKIP_NETWORK = previous;
+    }
     expect(result.success).toBe(true);
     expect(result.message).toContain("whyj doctor");
     expect(result.message).toContain("Credentials");

@@ -1,11 +1,17 @@
 import type { Bar } from "../../types/data.ts";
 import { getJson } from "./http.ts";
-import { readWhyjEnvValue } from "../../storage/index.ts";
 
-const LLMQUANT_BASE_URL = process.env.LLMQUANT_BASE_URL || "https://api.llmquantdata.com";
+const DEFAULT_LLMQUANT_BASE_URL = "https://api.llmquantdata.com";
 
-function apiKey(): string {
-  const value = readWhyjEnvValue(process.env, "llmquantApiKey");
+export interface LlmQuantOptions {
+  apiKey?: string;
+  baseUrl?: string;
+  env?: Record<string, string | undefined>;
+}
+
+function apiKey(options: LlmQuantOptions = {}): string {
+  const env = options.env ?? process.env;
+  const value = options.apiKey || env.WHYJ_QUANT_LLMQUANT_API_KEY;
   if (!value) throw new Error("WHYJ_QUANT_LLMQUANT_API_KEY is not configured");
   return value;
 }
@@ -35,15 +41,16 @@ function rowsFromPayload(payload: unknown): LlmQuantRow[] {
   return [];
 }
 
-export async function fetchFromLlmQuant(symbol: string, start?: string, end?: string): Promise<Bar[]> {
+export async function fetchFromLlmQuant(symbol: string, start?: string, end?: string, options: LlmQuantOptions = {}): Promise<Bar[]> {
   const query = new URLSearchParams({
     ticker: symbol,
     ...(start || end ? {} : { limit: "30" }),
     ...(start ? { start_date: start } : {}),
     ...(end ? { end_date: end } : {}),
   });
-  const payload = await getJson<unknown>(`${LLMQUANT_BASE_URL}/api/equity/historical?${query.toString()}`, {
-    authorization: `Bearer ${apiKey()}`,
+  const baseUrl = options.baseUrl || options.env?.LLMQUANT_BASE_URL || process.env.LLMQUANT_BASE_URL || DEFAULT_LLMQUANT_BASE_URL;
+  const payload = await getJson<unknown>(`${baseUrl}/api/equity/historical?${query.toString()}`, {
+    authorization: `Bearer ${apiKey(options)}`,
   });
   const rows = rowsFromPayload(payload);
   return rows.map((row) => ({

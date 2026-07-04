@@ -46,4 +46,16 @@ describe("llmquant adapter", () => {
       },
     ]);
   });
+
+  it("accepts an explicit API key without reading process env", async () => {
+    delete process.env.WHYJ_QUANT_LLMQUANT_API_KEY;
+    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      expect((init?.headers as Record<string, string>).authorization).toBe("Bearer explicit-key");
+      return new Response(JSON.stringify({ data: [{ trade_date: "2026-06-18", close: 51.2 }] }));
+    }) as unknown as typeof fetch;
+
+    const { fetchFromLlmQuant } = await import(`../src/llmquant.ts?case=explicit-${Date.now()}`);
+    const rows = await fetchFromLlmQuant("AAPL", undefined, undefined, { apiKey: "explicit-key" });
+    expect(rows[0]?.close).toBe(51.2);
+  });
 });

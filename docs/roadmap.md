@@ -11,12 +11,12 @@
 
 ## 当前证据
 
-- 最大冲突文件集中在 `src/source/src/akshare.ts`、`src/app-runtime.ts`、`src/tools/akshare-fund-tools.ts`、`src/tools/data-tools.ts`、`src/tools/quant-tools.ts`、`src/tui/src/render-lines.ts`、`src/tui/src/panel.ts`。
+- 最大冲突文件集中在 `src/source/src/akshare.ts`、`src/app-runtime.ts`、`src/tools/akshare-fund-tools.ts`、`src/tui/src/render-lines.ts`、`src/tui/src/panel.ts`。
 - 已修复：`tools/quant-tools.ts`、`tui/watchlist.ts`、`quant/insight.ts` 不再手工拼 `.ohquant` 路径；benchmark、watchlist、insight cache 都走 storage API/resolver。
-- 当前导入图剩余反向依赖或高耦合边：`storage->agent`、`storage->quant`、`tui->cli/storage/tools/quant`；`types->cli` 和 `skill->cli` 的命令契约边已在首批收紧中修复。
-- 多处动态导入用于普通业务路径：`src/tools/quant-tools.ts`、`src/cli/params.ts`、`src/index.ts`、`src/cli/handlers/watchlist.ts`、`src/cli/handlers/system.ts`、`src/storage/src/bars.ts`。测试中的 cache-busting 动态导入可另行处理。
-- `src/storage/README.md` 把 `storage -> agent` 描述为 deliberate dependency，但 `docs/module-architecture.md` 的推荐方向是 `storage -> types`。roadmap 必须先解决这个契约冲突，再决定代码迁移。
-- `src/tui/src/tui.ts` 仍直接依赖 agent skill discovery、`NodeExecutionEnv`、`skillPaths` 和 `loadSettings`；`render-lines` 经 `tools/catalog.ts` 加载完整 registry 的问题已由 `src/tools/display.ts` 修复。
+- 当前导入图无 baseline 允许项；`types->cli`、`skill->cli`、`tui->cli/tools/storage/agent/skill`、`storage->agent/quant`、`quant->storage/source` 的边界已收紧。
+- 多处动态导入仍用于普通业务路径：`src/cli/params.ts`、`src/index.ts`、`src/cli/handlers/watchlist.ts`、`src/cli/handlers/system.ts`、`src/storage/src/bars.ts`。测试中的 cache-busting 动态导入可另行处理。
+- 已修复：`src/storage/README.md` 不再把 `storage -> agent` 描述为 deliberate dependency；session summary 改为 storage 本地 JSONL summary/parser，不再导入 agent/pi。
+- 已修复：`src/tui/src/tui.ts` 不再直接依赖 agent skill discovery、`NodeExecutionEnv`、`skillPaths` 和 `loadSettings`；skill suggestion 统一走 runtime service。`render-lines` 经 `tools/catalog.ts` 加载完整 registry 的问题已由 `src/tools/display.ts` 修复。
 - `src/artifact/src/generator.ts` 与 `src/artifact/src/trajectory.ts` 的循环依赖已修复；`src/quant/index.ts` wildcard re-export 带 storage/fs 边界模块的问题已收口。
 - 已修复：`src/storage/src/dirs.ts` 只暴露 runtime resolver；默认 runtime/config/TUI 流程不再读取 `.ohquant/portfolio/`，legacy portfolio 只作为显式 `/portfolio` 迁移来源。
 - 仓库当前没有 `src/alpha` 或 `akquant` 接入点；alpha/akquant 是已确认的新需求，但应以 spike 和 adapter 边界进入，不应继续塞进 `tools/quant-tools.ts`。
@@ -37,11 +37,66 @@
 - Command contract 下沉到 `src/types/commands.ts`；`src/cli/types.ts` 只做 re-export，`src/types/messages.ts`、`src/skill/handler.ts`、`src/app-runtime.ts` 不再依赖 CLI 类型实现。
 - Tool display metadata 拆到 `src/tools/display.ts`；`src/tools/catalog.ts` 可为 TUI/runtime 提供展示格式化而不加载完整 `src/tools/registry.ts`。
 - Artifact 文本提取 helper 拆到 `src/artifact/src/message-text.ts`；`trajectory.ts` 不再从 `generator.ts` 导入，消除 generator/trajectory 循环依赖。
-- Architecture boundary gate 新增 `scripts/check-architecture.ts`、`scripts/architecture-boundary-baseline.json` 和 `bun run check:architecture`；当前 baseline 只允许既有违规，新增跨层 import 或 storage 外 `.ohquant` 路径构造会失败。本轮 baseline 从 24 降到 19。
+- Architecture boundary gate 新增 `scripts/check-architecture.ts`、`scripts/architecture-boundary-baseline.json` 和 `bun run check:architecture`；当前 baseline 已清零，新增跨层 import 或 storage 外 `.ohquant` 路径构造会失败。
 - Public API surface 继续收口：`src/quant/index.ts` 移除带 IO/storage 边界的 `insight`、`comparison` wildcard re-export；`src/source/index.ts`、`src/storage/index.ts` 改为显式 export，不再通过 barrel 暴露全部内部实现。
 - 本轮代码验证已跑：`bun run check:architecture`、`bun run typecheck`、`bun test src/`。
 
 P0 已完成：public API surface、storage ownership/path resolver、boundary gate、command contract、artifact cycle 和 tool display metadata 均已收口。下一步进入 runtime/TUI/agent/quant/source 的 P1 core/service 抽取。
+
+2026-07-01 Runtime core extraction 已完成：
+
+- `src/app-runtime.ts` 从约 1000 行收敛到 427 行，保留为 agent/session、slash command、panel refresh 的薄 orchestrator。
+- 新增 `src/runtime/overview.ts`、`agent-events.ts`、`commands.ts`、`panel-service.ts`、`errors.ts`、`messages.ts`，把 overview、agent event reducer、command effect、local panel state、错误文案和消息转换拆成可单测 runtime service。
+- 新增 `src/market/symbols.ts` 和 `src/tools/shared/results.ts`，统一 tools/runtime 共享的 market 推断、base code 和 tool result helper。
+- 本轮验证已跑：focused runtime tests、`bun run typecheck`、`bun run check:architecture`、`bun test src/`。
+
+2026-07-01 Tools adapter extraction 已启动：
+
+- `src/tools/quant-tools.ts` 普通执行路径不再使用动态 import，quant/source/storage 依赖改为静态 import，便于后续 service 边界审计。
+- `src/tools/shared/source-runner.ts` 抽出 source-priority fallback runner；`akshare-fund-tools.ts` 删除本地候选源调度逻辑，文件从 900+ 行降到约 800 行。
+- `src/tools/shared/row-preview.ts` 抽出 row preview、cell formatting、limit clamp 和 param line helper；`data-tools.ts` 与 `akshare-fund-tools.ts` 共享 endpoint/preview 格式化，`akshare-fund-tools.ts` 继续降到 767 行。
+- `src/tools/akshare-fund-endpoint-tools.ts` 抽出通用 AKShare fund endpoint 工具族、endpoint registrations 和 fund row filter；`akshare-fund-tools.ts` 只保留高层基金工具和 source candidates，继续降到约 520 行。
+- `src/tools/shared/cached-bars.ts` 抽出本地 bars cache lookup；`src/tools/benchmark-tools.ts` 和 `src/tools/fund-dca-tools.ts` 从 `quant-tools.ts` 拆出 benchmark/dashboard 与 fund DCA 工具族，`quant-tools.ts` 降到约 128 行并保留兼容 re-export。
+- `src/tools/akshare-index-tools.ts` 抽出 `fetch_index_*` 工具族；`src/tools/shared/bars-preview.ts` 抽出 bars sparkline/K-line 展示 helper，`data-tools.ts` 降到约 150 行并保留兼容 re-export。
+- 本轮验证已跑：focused tools tests、`bun run typecheck`、`bun run check:architecture`、`bun test src/`。
+
+2026-07-03 TUI adapter cleanup 已完成：
+
+- `src/runtime/panel-data.ts` 抽出 TUI panel 需要的 settings、sessions、portfolio、artifact 和 env 访问；`PanelController` 通过 `PanelDataService` 消费，不再直接导入 storage。
+- `src/types/skills.ts` 下沉 `SkillEntry`/`SkillState` 纯 DTO；`src/runtime/skill-suggestions.ts` 统一封装 skill discovery/settings/env，`src/tui/src/tui.ts` 不再直接导入 agent skills、`NodeExecutionEnv`、`skillPaths` 或 storage settings。
+- `src/runtime/command-catalog.ts` 下沉 slash command metadata/help text；`src/cli/catalog.ts` 保留兼容 re-export，TUI 不再依赖 CLI catalog。
+- `src/runtime/doctor-contract.ts` 下沉 doctor result DTO 和 endpoint mode 描述；`src/tui/src/panel.ts` 不再依赖 CLI doctor 实现。
+- `src/runtime/tool-display.ts` 承接 tool line formatter；`src/tools/catalog.ts` 保留兼容 facade，`render-lines.ts` 和 runtime agent event reducer 直接消费 runtime display contract。
+- `scripts/architecture-boundary-baseline.json` 删除全部 TUI stale baseline 项，本轮 baseline 从 19 继续降到 6。
+- 本轮验证已跑：focused TUI/runtime tests、`bun run typecheck`、`bun run check:architecture`、`bun test src/`。
+
+2026-07-03 Storage/Quant boundary cleanup 已完成：
+
+- `src/types/risk.ts`、`src/types/comparison.ts` 下沉 `RiskMetrics`、`GroupComparisonResult`、`ComparisonArtifact`；storage comparison artifact 不再依赖 quant 类型。
+- `src/storage/src/sessions.ts` 不再导入 agent/pi 的 `SessionTreeEntry`、`buildSessionContext`、`estimateContextTokens` 或 model catalog；改用 storage 本地 JSONL summary/parser 保留 resume context usage。
+- `src/quant/comparison.ts` 移除 storage 依赖，comparison artifact persistence 通过 `ComparisonContext` 注入；CLI workflow 负责传入 `saveComparison` 和 `generateComparisonId`。
+- `src/types/data.ts` 下沉 `FundNavDaily`，`src/quant/fund-dca.ts` 不再依赖 source provider 类型。
+- `scripts/architecture-boundary-baseline.json` 已清零。
+- 本轮验证已跑：focused storage/quant/source tests、`bun run typecheck`、`bun run check:architecture`、`bun test src/`。
+
+2026-07-03 Source provider config decoupling 第一段已完成：
+
+- `src/source/src/tushare.ts`、`llmquant.ts`、`financial-datasets.ts` 不再 import storage；raw provider 支持显式注入 token/apiKey、baseUrl 和 env fallback。
+- `src/source/src/sources.ts` 新增 `SourceRuntimeDeps`、`SourceProviderOptions`、`SourceFetchOptions`，`fetchBars`/`fetchLiveBars` 可注入 cache/settings/provider credentials。
+- `src/source/src/akshare.ts` 已拆出 `akshare-python.ts`、`akshare-scripts.ts`、`akshare-endpoints.ts`、`akshare-types.ts`、`akshare-normalize.ts`、`sina-index-client.ts`；主 adapter 从 1422 行降到约 230 行，保留 fetch orchestration 和兼容 re-export。
+- 本轮验证已跑：focused source tests、`bun run typecheck`、`bun run check:architecture`、`bun test src/`。
+
+2026-07-03 Source runtime adapter split 已完成：
+
+- `src/source/src/sources.ts` 不再动态 import `storage/index.ts`；默认 deps 改为 no-op cache + market fallback，source core 保持 provider orchestration 和可注入 cache hooks。
+- 新增 `src/runtime/source-runtime.ts`，集中提供 storage-backed `SourceRuntimeDeps`，工具层和 Overview 通过 runtime adapter 保留 settings/cache 行为。
+- `scripts/check-architecture.ts` 将 `source -> storage` 纳入边界检查，防止默认 storage adapter 回流到 source。
+
+2026-07-03 Source provider interface split 已完成：
+
+- 新增 `src/source/src/source-contracts.ts`，集中 `DataSource`、`PullSource`、`SourceRuntimeDeps`、`SourceProviderOptions` 和 source attribution labels。
+- 新增 `src/source/src/source-providers.ts`，用 `BarProviderAdapter` registry 承载 provider fallback order、symbol normalization 和 symbol search。
+- `src/source/src/sources.ts` 收敛为 cache-aware fetch facade，不再持有 raw provider import 或 fallback chain 细节。
 
 ## P0 路线
 
@@ -58,11 +113,11 @@ P0 已完成：public API surface、storage ownership/path resolver、boundary g
 
 | 模块 | 问题 | 建议 | 验收标准 |
 | --- | --- | --- | --- |
-| Runtime core | `app-runtime.ts` 同时承担命令执行、agent event reducer、overview 刷新、行情拉取、错误文案和消息格式转换。 | 保留 `AppRuntime` 为薄 orchestrator；抽 `runtime/commands.ts`、`runtime/agent-events.ts`、`runtime/overview.ts`、`runtime/panel-service.ts`、`runtime/errors.ts`。 | 核心行为可脱离 TUI 单测；新增 overview/agent event/panel 逻辑不直接改大文件。 |
-| TUI adapter | `panel.ts`、`watchlist.ts`、`tui.ts` 直接访问 storage/path、settings、agent skill discovery。 | TUI 只接收 `AppState`、panel view model、skill suggestion view model；storage/skill 读写交给 runtime service。 | `src/tui/src/**` 不直接拼 `.ohquant`，不直接保存 settings/portfolio，不直接发现 agent skills。 |
+| Runtime core | 已完成。`app-runtime.ts` 已收敛为薄 orchestrator，核心行为拆到 runtime service。 | 已抽 `runtime/commands.ts`、`runtime/agent-events.ts`、`runtime/overview.ts`、`runtime/panel-service.ts`、`runtime/errors.ts`、`runtime/messages.ts`。 | 核心行为已脱离 TUI 单测；新增 overview/agent event/panel 逻辑不需要直接改大文件。 |
+| TUI adapter | 已完成。`panel.ts` storage/settings/session/portfolio/artifact、`tui.ts` skill discovery、command catalog、doctor contract 和 tool display 均已移到 runtime/shared contract。 | TUI 只接收 `AppState`、panel view model、skill suggestion view model；storage/skill 读写交给 runtime service。 | `src/tui/src/**` 不直接拼 `.ohquant`，不直接保存 settings/portfolio，不直接发现 agent skills；TUI architecture baseline 为 0。 |
 | Agent bootstrap | `session.ts` 绑定 tools、storage、skill discovery、model resolve、session repo；`context.ts` 仍通过 storage resolver 扫描本地 cache。 | 引入 `AgentRuntimeDeps`；tools/settings/session repo/skill discovery 从外部注入；context 接收 snapshot。 | agent facade 可单测；创建 session 不强制触发 storage 或完整 tool registry。 |
-| Quant core | `comparison.ts` 做算法同时保存 artifact；`fund-dca.ts` 依赖 source 类型；`insight.ts` 已降为兼容 re-export。 | quant 保持纯计算；comparison 持久化移到 workflow/storage；`FundNavDaily` 下沉到 `types/data.ts`。 | `src/quant/**` 纯计算子模块不导入 `storage` 和 `source`；legacy re-export 不再持有文件路径。 |
-| Source core | provider orchestration 同时处理 cache、settings 和 raw fetch；`akshare.ts` 过大。 | 定义 provider interface；raw provider 接收显式 config；`akshare` 拆 runner/scripts/endpoints/normalize/client。 | provider 文件可用 mock config 单测；修改 endpoint 不碰 provider orchestration。 |
+| Quant core | 已完成当前 baseline cleanup。`comparison.ts` artifact persistence 已注入到 workflow/storage；`fund-dca.ts` 使用 shared `FundNavDaily` DTO；`insight.ts` 已降为兼容 re-export。 | 继续保持 quant 纯计算；后续再把 workflow/compare 的 provider/storage 编排抽应用服务。 | `src/quant/**` 纯计算子模块不导入 `storage` 和 `source`；architecture baseline 为 0。 |
+| Source core | 进行中。raw direct providers 已接收显式 config，不再 import storage；storage-backed cache/settings adapter 已移到 runtime；provider fallback registry 已从 `sources.ts` 拆到 `source-providers.ts`；`akshare` 已拆 runner/scripts/endpoints/types/normalize/Sina client。 | 后续继续收窄 provider public API，并按需要拆 provider tests/fixtures。 | provider 文件可用 mock config 单测；修改 endpoint 不碰 fetch facade；source 不导入 storage。 |
 | Tools adapter | `quant-tools.ts`、`data-tools.ts`、`akshare-fund-tools.ts` 混合 schema、执行、格式化、持久化和 market 推断。 | tools 只做 schema、参数转换、调用 service、格式化；公共 `ok/err/schema/format` 放 `tools/shared`。 | 每个工具文件只暴露一个工具或小工具族；核心逻辑在 quant/source/runtime service 可单测。 |
 | CLI adapter | `system.ts` 混合 help、compact receipt、config、doctor、portfolio、resume、session 文案。 | 按 command family 拆 handler；表格/receipt 文案移到 `cli/formatters`；handler 调 service。 | 每个 handler 文件只负责一个命令族，测试按命令族隔离。 |
 | Artifact pipeline | `generator.ts` 同时读 JSONL、解析消息、检测图表、渲染轨迹、读取配置。 | 在 P0 cycle fix 后拆 `load-session.ts`、`normalize-session.ts`、`content-pipeline.ts`、`render-document.ts`；reference data 注入。 | artifact 生成器可接受 entries 作为输入；source reference data 不在 generator 中硬连。 |
@@ -123,9 +178,10 @@ P0 已完成：public API surface、storage ownership/path resolver、boundary g
 
 问题：
 
-- `src/tui/src/panel.ts:9` 直接导入 settings、sessions、portfolio storage API，TUI 不再是纯渲染层。
-- `src/tui/src/watchlist.ts:6` 手工拼 `.ohquant` 路径，违反 storage owns filesystem 的边界。
-- `src/tui/src/tui.ts:13` 直接依赖 `discoverSkills`、`NodeExecutionEnv`、`skillPaths`、`loadSettings`，把 skill discovery 和 settings 读写拉进 TUI。
+- 已修复：`src/tui/src/panel.ts` 不再直接导入 settings、sessions、portfolio storage API，统一通过 `src/runtime/panel-data.ts` 的 `PanelDataService`。
+- 已修复：`src/tui/src/watchlist.ts` 不再手工拼 `.ohquant` 路径。
+- 已修复：`src/tui/src/tui.ts` 不再直接依赖 `discoverSkills`、`NodeExecutionEnv`、`skillPaths`、`loadSettings`，skill discovery 和 settings 读写已移到 `src/runtime/skill-suggestions.ts`。
+- 已修复：`input.ts`、`panel.ts`、`panel-models.ts` 不再消费 `cli/catalog.ts`；`panel.ts` 不再消费 `cli/doctor.ts`；`render-lines.ts` 不再消费 `tools/catalog.ts`。
 - `src/tui/src/render.ts:11` 从 quant 读取 loading quotes，渲染层依赖业务内容来源。
 - 已修复：`src/tui/src/render-lines.ts` 经 `tools/catalog.ts` 消费纯 `src/tools/display.ts` metadata，不再触发完整 registry 加载。
 - `src/tui/src/render-lines.ts` 和 `src/tui/src/panel.ts` 文件过大，多个 agent 容易同时冲突。
@@ -155,10 +211,10 @@ P0 已完成：public API surface、storage ownership/path resolver、boundary g
 
 问题：
 
-- `src/tools/quant-tools.ts:72`、`src/tools/quant-tools.ts:92` 等普通执行路径使用动态 import。
-- `src/tools/quant-tools.ts:294` 和 `src/tools/quant-tools.ts:344` 直接解析 `.ohquant/benchmark/results`。
-- `src/tools/data-tools.ts:544` 和 `src/tools/quant-tools.ts:375` 重复 market 推断。
-- `src/tools/akshare-fund-tools.ts` 文件超过 1000 行，endpoint、候选源、格式化和工具注册混在一起。
+- 已修复：`src/tools/quant-tools.ts` 普通执行路径不再使用动态 import，benchmark/dashboard 和 fund DCA 已拆成独立小工具族。
+- `src/tools/benchmark-tools.ts` 仍同时处理 benchmark 参数转换、执行编排、制品保存和展示文案；后续可继续把 benchmark workflow 下沉到 quant/runtime service。
+- 已修复：`src/tools/data-tools.ts` 不再承载 AKShare index endpoint formatting；基础 data tools、AKShare index tools、AKShare fund tools 已按小工具族拆分。
+- 已修复：`src/tools/akshare-fund-tools.ts` 已拆出通用 AKShare fund endpoint 工具族，文件降到约 520 行；候选源和高层基金工具仍可继续按 service 边界收口。
 - `src/tools/registry.ts:1`、`src/tools/bash-tool.ts:9` 仍依赖 `agent/src/pi` 类型/实现；TUI 经 `tools/catalog.ts` 加载 registry 的问题已修复。
 
 建议：
@@ -173,16 +229,16 @@ P0 已完成：public API surface、storage ownership/path resolver、boundary g
 
 问题：
 
-- `src/quant/comparison.ts:7` 保存 comparison artifact，使 quant 算法层依赖 storage。
-- `src/quant/fund-dca.ts:1` 依赖 source 的 `FundNavDaily` 类型。
+- 已修复：`src/quant/comparison.ts` 不再保存 comparison artifact；persistence 由 `ComparisonContext` 注入，CLI workflow 接 storage。
+- 已修复：`src/quant/fund-dca.ts` 不再依赖 source 的 `FundNavDaily` 类型，DTO 已下沉到 `src/types/data.ts`。
 - `src/quant/insight.ts:105` 写 `.ohquant/insights.json`，把 insight 生成与 storage 路径耦合。
 - `src/quant/index.ts:1` wildcard re-export 了 `insight.ts` 和 `comparison.ts`，调用方容易无意拉入带 IO/storage 边界的模块。
 - `risk.ts`、`backtest.ts`、`benchmark.ts` 有部分指标计算重复，但当前还不需要大抽象。
 
 建议：
 
-- P1: quant 保持纯计算，workflow/storage 负责读写 artifact。
-- P1: `FundNavDaily` 下沉到 `types/data.ts`。
+- 已完成：quant 保持纯计算，workflow/storage 负责读写 artifact。
+- 已完成：`FundNavDaily` 下沉到 `types/data.ts`。
 - P1: 收窄 `src/quant/index.ts`，不要默认 re-export 带 IO/storage 的模块。
 - P2: insight cache 走 storage API。
 - P3: 只有当指标继续扩展时再提取 `quant/stats.ts`。
@@ -245,31 +301,34 @@ src/storage/test/
 
 问题：
 
-- `src/source/src/akshare.ts` 同时包含内嵌 Python 脚本、public endpoint 列表、parser、normalizer、fetch wrapper、Sina fallback。
+- 已修复：`src/source/src/akshare.ts` 不再承载 Python runner、内嵌 Python scripts、public endpoint 列表、parser/normalizer 或 Sina fallback；保留为 AKShare fetch 编排和兼容 facade。
 - `src/source/src/sources.ts:9` 同时处理 provider orchestration、cache load/save、settings load。
 - `src/source/index.ts` wildcard export 所有 provider internals，使调用方容易绕过 orchestrator。
-- provider 凭证由 storage 读取，raw provider 难以独立测试。
+- 已修复：Tushare、LLMQuant、Financial Datasets raw provider 不再从 storage 读取凭证，支持显式 config/options 注入。
+- `sources.ts` 不再通过默认 storage adapter 接入 cache/settings；storage-backed deps 已上移到 `src/runtime/source-runtime.ts`，source 只保留可注入 `SourceRuntimeDeps`。
+- `source-providers.ts` 已承接 provider registry、fallback order 和 symbol normalization，`sources.ts` 只保留 cache-aware fetch facade。
 
 建议：
 
-- P1: 拆 `akshare` 子模块，保持 endpoint 和 parser 可独立测试。
-- P1: raw provider 接受显式 config；`sources.ts` 或更高层负责 settings/cache。
+- 已完成：拆 `akshare` 子模块，endpoint、parser/normalizer 和 Sina fallback 可独立测试。
+- 已完成：raw provider 接受显式 config。
+- P1: 继续收窄 provider public API；按风险把 provider fixture/helper 从聚合测试中拆出。
 - P2: public export 改为显式 API。
 
 ### `src/storage`
 
 问题：
 
-- `src/storage/README.md` 将 agent/pi dependency 描述为 deliberate，但 `docs/module-architecture.md` 推荐 `storage -> types`；roadmap 需要先统一契约。
-- `src/storage/src/sessions.ts:3`、`src/storage/src/sessions.ts:5` 依赖 agent/pi 类型、模型信息和 session context rebuild，这是 runtime dependency，不应和 `src/storage/src/comparison.ts:10` 的 type-only quant 依赖混为一谈。
+- 已修复：`src/storage/README.md` 不再将 agent/pi dependency 描述为 deliberate；storage session summary 保持本地 JSONL summary/parser。
+- 已修复：`src/storage/src/sessions.ts` 不再依赖 agent/pi 类型、模型信息和 session context rebuild。
 - 已修复：`src/storage/index.ts` 改为显式 export，不再暴露 import-time 路径常量。
 - 已修复：`src/storage/src/dirs.ts` 只导出 runtime resolver，`OHQUANT_DIR` 变更不受 import 顺序影响。
 - `src/storage/src/local-portfolios.ts` 仍包含 legacy discovery、主题推断和去重策略；`.ohquant/portfolio/` 已被限制为显式 `/portfolio` 迁移入口，默认 runtime/TUI/config 不再读取。
 
 建议：
 
-- P0: 先决定 session summary 属于 storage exception 还是 agent adapter，并同步 `module-architecture.md`、`src/storage/README.md`。
-- P1: 移除 storage 对 quant 的直接依赖；comparison/alpha run storage 都保存 plain DTO。
+- 已完成：session summary 保留在 storage，但只消费 plain JSONL records，不依赖 agent/pi。
+- 已完成：移除 storage 对 quant 的直接依赖；comparison storage 保存 shared plain DTO。
 - 已完成：统一 path resolver，避免 import-time constants 绕过 runtime `OHQUANT_DIR`。
 - 已完成：runtime/TUI 默认流程不再读取 `.ohquant/portfolio/`；legacy portfolio discovery 只保留为显式 `/portfolio` 迁移。
 - 已完成：收窄 barrel exports；低层 path helper 改成 resolver-only。
@@ -313,7 +372,7 @@ src/storage/test/
 - 已修复：`src/types/messages.ts` 从 `src/types/commands.ts` re-export `CommandResult`，不再反向依赖 CLI。
 - `src/types/errors.ts:18` 和 `src/types/errors.ts:112` 包含 runtime catalog 和 formatter。
 - `src/types/config.ts:42` 包含默认值；目前可接受，但不应继续加入 IO/migration。
-- source-specific 类型如 `FundNavDaily` 还留在 provider 模块。
+- 已修复：`FundNavDaily` 已下沉到 `src/types/data.ts`。
 
 建议：
 
@@ -364,10 +423,10 @@ src/storage/test/
 | 3 | 已完成 | Command contract | `src/types/commands.ts`、`src/cli/types.ts`、`src/skill/handler.ts`、`src/types/messages.ts`、`src/app-runtime.ts` | 修复 `types->cli`、`skill->cli`、`cli/types->agent`；focused tests 通过。 |
 | 4 | 已完成 | Storage ownership | `src/storage/src/dirs.ts`、benchmark storage、panel/watchlist/legacy portfolio 调用点 | resolver 不受 import order 影响；默认流程不读 `.ohquant/portfolio/`；benchmark/watchlist/insight/artifact 读写走 storage API。 |
 | 5 | 已完成 | Artifact cycle break | `src/artifact/src/message-text.ts`、`generator.ts`、`trajectory.ts` | 消除 generator/trajectory 循环依赖，保持 artifact 输出兼容。 |
-| 6 | 待做 | Runtime core extraction | `src/runtime/`、`src/app-runtime.ts` | 抽 overview、agent event reducer、panel/watchlist service；核心逻辑可脱离 TUI 单测。 |
-| 7 | 待做 | TUI adapter cleanup | `src/tui/src/`，只消费 runtime view model | TUI 不直接读写 storage，不直接发现 skills，不直接拼 `.ohquant`。 |
+| 6 | 已完成 | Runtime core extraction | `src/runtime/`、`src/app-runtime.ts` | 已抽 overview、agent event reducer、command effect、panel local-state service；核心逻辑可脱离 TUI 单测。 |
+| 7 | 已完成 | TUI adapter cleanup | `src/tui/src/`，只消费 runtime view model | storage、skill discovery、command catalog、doctor contract 和 tool display 均已移到 runtime/shared contract；TUI baseline 清零。 |
 | 8 | 待做 | Agent dependency injection | `src/agent/src/session.ts`、`context.ts`、runtime create-agent 调用点 | agent 创建不强制加载完整 tools registry/storage；context 使用 snapshot。 |
-| 9 | 待做 | Quant/source core split | `src/quant/`、`src/source/`、`src/types/data.ts` | quant 纯计算不导入 source/storage；source raw providers 接收显式 config。 |
+| 9 | 进行中 | Quant/source core split | `src/quant/`、`src/source/`、`src/runtime/source-runtime.ts`、`src/types/data.ts` | quant 纯计算不导入 source/storage 已完成；source raw providers 接收显式 config 已完成；storage-backed source runtime 已上移；source provider interface split 已完成当前切片。 |
 | 10 | 待做 | Tool adapters | `src/tools/`、`src/tools/shared/` | tools 只做 schema/format/adapter；核心执行逻辑迁到 quant/source/runtime service。 |
 | 11 | 待做 | CLI adapters | `src/cli/handlers/`、`src/cli/formatters/` | handlers 按命令族拆分，只调用 service，不直接拼业务细节。 |
 | 12 | 待做 | Artifact pipeline | `src/artifact/src/` | generator 拆成 load/normalize/detect/render；reference data 可注入。 |

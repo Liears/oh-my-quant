@@ -2,15 +2,16 @@ import type * as readline from "node:readline";
 import { Buffer } from "./buffer.ts";
 import { S } from "./styles.ts";
 import { drawPanelFrame, renderConfigHeaderInfo, type PanelFrame } from "./panel-chrome.ts";
-import { renderArtifactPanelView, renderConfigPanelView, renderHelpPanelView, renderPortfolioPanelView, renderResumePanelView, type ConfigRowView } from "./panel-views.ts";
+import { renderArtifactPanelView, renderConfigPanelView, renderDoctorPanelView, renderHelpPanelView, renderPortfolioPanelView, renderResumePanelView, type ConfigRowView, type DoctorPanelView } from "./panel-views.ts";
 import { buildArtifactPanelData, buildConfigRowViews, buildHelpPanelData, buildPortfolioPanelData, buildResumePanelData } from "./panel-models.ts";
-import { COMMAND_CATALOG } from "../../cli/catalog.ts";
-import { describeEndpointMode } from "../../cli/doctor.ts";
-import { loadSettings, saveSettings, listStoredSessions, listLocalPortfolios, listArtifacts, loadPanelPortfolio, syncPanelPortfolioFromLocalPortfolio, hasWhyjEnvValue, stripTerminalControlCodes, type StoredSessionSummary, type LocalPortfolioSummary, type ArtifactMeta, type WhyjEnvAliasKey } from "../../storage/index.ts";
+import { COMMAND_CATALOG } from "../../runtime/command-catalog.ts";
+import { describeEndpointMode } from "../../runtime/doctor-contract.ts";
+import type { DoctorResult } from "../../runtime/doctor-contract.ts";
+import { createStoragePanelDataService, type ArtifactMeta, type LocalPortfolioSummary, type PanelDataService, type StoredSessionSummary, type WhyjEnvAliasKey } from "../../runtime/panel-data.ts";
 import type { DataSource, OhQuantSettings } from "../../types/config.ts";
 
 export type PanelResult = { command?: string; close?: boolean; refreshPanel?: boolean };
-type PanelMode = "config" | "resume" | "portfolio" | "help" | "artifact";
+type PanelMode = "config" | "doctor" | "resume" | "portfolio" | "help" | "artifact";
 
 export interface CurrentSessionMeta {
   id: string;
@@ -82,12 +83,20 @@ const THINKING_OPTIONS = ["off", "minimal", "low", "medium", "high", "xhigh"];
 const ENABLE_OPTIONS = ["on", "off"];
 const SOURCE_OPTIONS: DataSource[] = ["akshare", "tushare", "llmquant-data", "financial-datasets"];
 
+function cloneSettings(settings: OhQuantSettings): OhQuantSettings {
+  return JSON.parse(JSON.stringify(settings)) as OhQuantSettings;
+}
+
 export class PanelController {
+  private readonly data: PanelDataService;
   private mode: PanelMode = "config";
   private cfg: OhQuantSettings | null = null;
   private recentSessions: StoredSessionSummary[] = [];
   private localPortfolios: LocalPortfolioSummary[] = [];
   private artifacts: ArtifactMeta[] = [];
+  private doctor: DoctorResult | null = null;
+  private doctorDraft: OhQuantSettings | null = null;
+  private doctorEditing = false;
   private resumeQuery = "";
   private resumeFilter: ResumeFilter = "cwd";
   private resumeSort: ResumeSort = "updated";
@@ -104,9 +113,16 @@ export class PanelController {
   private helpSelection = 0;
   private artifactSelection = 0;
 
+  constructor(data: PanelDataService = createStoragePanelDataService()) {
+    this.data = data;
+  }
+
   open(mode: PanelMode = "config"): void {
     this.mode = mode;
-    this.cfg = loadSettings();
+    this.cfg = this.data.loadSettings();
+    this.doctor = null;
+    this.doctorDraft = null;
+    this.doctorEditing = false;
     this.cursor = 0;
     this.draft = null;
     this.status = "";
@@ -137,6 +153,13 @@ export class PanelController {
     this.draft = null;
     this.status = "";
     this.mode = "config";
+    this.doctor = null;
+    this.doctorDraft = null;
+    this.doctorEditing = false;
+  }
+
+  isDoctorMode(): boolean {
+    return this.cfg !== null && this.mode === "doctor";
   }
 
   handleKey(input: string, key: readline.Key): PanelResult | null {
@@ -154,6 +177,9 @@ export class PanelController {
         if (cmd) return { command: cmd.name, close: true };
       }
       return {};
+    }
+    if (this.mode === "doctor") {
+      return this.handleDoctorKey(input, key);
     }
 
     const fields = this.fields();
@@ -247,8 +273,8 @@ export class PanelController {
       const selected = this.filteredPortfolioItems()[this.portfolioSelection];
       if (!selected || !this.cfg) return {};
       this.cfg.preferences.currentPortfolioFile = selected.fileName;
-      saveSettings(this.cfg);
-      syncPanelPortfolioFromLocalPortfolio(selected.fileName);
+      this.data.saveSettings(this.cfg);
+      this.data.syncPanelPortfolioFromLocalPortfolio(selected.fileName);
       return { close: true, refreshPanel: true };
     }
     return {};
@@ -272,6 +298,10 @@ export class PanelController {
     if (!this.cfg) return;
     if (this.mode === "resume") {
       this.renderResumePanel(buf);
+      return;
+    }
+    if (this.mode === "doctor") {
+      this.renderDoctorPanel(buf);
       return;
     }
     if (this.mode === "portfolio") {
@@ -321,6 +351,55 @@ export class PanelController {
       innerWidth: frame.inner.w,
       formatRelativeAge,
     }));
+  }
+
+  private renderDoctorPanel(buf: Buffer): void {
+    if (this.doctor?.mode === "first_setup" || this.doctorEditing) {
+      this.renderDoctorWizard(buf);
+      return;
+    }
+    const frame = this.drawPanelFrame(
+      buf,
+      "Doctor",
+      this.doctor ? "↵/r retry  esc close" : "esc close",
+    );
+    if (!this.doctor) {
+      renderDoctorPanelView(buf, frame, {
+        title: "WhyJ Doctor",
+        status: "running",
+        mode: "diagnostic",
+        model: this.cfg?.model || "sonnet",
+        baseUrl: this.cfg?.env?.WHYJ_QUANT_BASE_URL || "",
+        endpointMode: describeEndpointMode(this.cfg?.env?.WHYJ_QUANT_BASE_URL || ""),
+        dataSource: this.currentSource(),
+        settingsPath: "loading...",
+        phases: [
+          { phase: "model", status: "checking", detail: "Checking model..." },
+          { phase: "tools", status: "checking", detail: "Checking tools..." },
+          { phase: "data", status: "checking", detail: "Checking data..." },
+        ],
+        actions: [],
+        hints: [],
+      });
+      return;
+    }
+    renderDoctorPanelView(buf, frame, this.toDoctorPanelView(this.doctor));
+  }
+
+  private renderDoctorWizard(buf: Buffer): void {
+    const frame = this.drawPanelFrame(
+      buf,
+      this.doctor?.mode === "first_setup" ? "Doctor · First Setup" : "Doctor · Configure",
+      "↑↓ move  ↵ edit/save  esc discard",
+    );
+    const rows = this.doctorWizardRows();
+    const fields = this.doctorWizardFields();
+    const footer = this.status || "↑↓ move  ↵ edit/save  esc discard";
+    const rowViews: ConfigRowView[] = buildConfigRowViews(rows, this.cursor, this.draft, (field, active) => this.valueText(field as Field, active));
+    const draftLine = this.draft !== null && fields[this.cursor]
+      ? `${fields[this.cursor].label}: ${this.draft}|`
+      : undefined;
+    renderConfigPanelView(buf, frame, rowViews, footer, draftLine);
   }
 
   private renderPortfolioPanel(buf: Buffer): void {
@@ -397,7 +476,105 @@ export class PanelController {
         return { command, close: true };
       }
       field.set?.(value);
-      saveSettings(this.cfg!);
+      this.data.saveSettings(this.cfg!);
+      return {};
+    }
+    if (input && !key.ctrl && !key.meta) this.draft += input;
+    return {};
+  }
+
+  private handleDoctorKey(input: string, key: readline.Key): PanelResult {
+    if (this.doctor?.mode !== "first_setup" && !this.doctorEditing) {
+      if (key.name === "return" || input.toLowerCase() === "r") {
+        if (!this.doctor) return {};
+        this.status = "Re-running doctor...";
+        this.doctor = null;
+        return { command: "/doctor" };
+      }
+      if (input.toLowerCase() === "m") {
+        this.status = "Re-running model checks...";
+        this.doctor = null;
+        return { command: "/doctor --phase model" };
+      }
+      if (input.toLowerCase() === "t") {
+        this.status = "Re-running tools checks...";
+        this.doctor = null;
+        return { command: "/doctor --phase tools" };
+      }
+      if (input.toLowerCase() === "d") {
+        this.status = "Re-running data checks...";
+        this.doctor = null;
+        return { command: "/doctor --phase data" };
+      }
+      if (input.toLowerCase() === "c") {
+        this.doctorEditing = true;
+        this.doctorDraft = this.cfg ? cloneSettings(this.cfg) : null;
+        this.cursor = 0;
+        this.draft = null;
+        this.status = "Editing doctor settings draft.";
+        return {};
+      }
+      if (key.name === "escape") return { close: true };
+      return {};
+    }
+
+    const fields = this.doctorWizardFields();
+    const field = fields[this.cursor];
+
+    if (this.draft !== null) {
+      return this.handleDoctorDraft(input, key, field);
+    }
+
+    if (key.name === "escape") {
+      this.doctorDraft = this.cfg ? cloneSettings(this.cfg) : null;
+      if (this.doctor?.mode === "first_setup") return { close: true };
+      this.doctorEditing = false;
+      this.cursor = 0;
+      this.status = "";
+      return {};
+    }
+    if (key.name === "up" || key.name === "down") {
+      const delta = key.name === "up" ? -1 : 1;
+      this.cursor = (this.cursor + delta + fields.length) % fields.length;
+      return {};
+    }
+    if (key.name !== "return" || !field) return {};
+
+    if (field.onEnter) {
+      this.status = field.onEnter();
+      if (this.status.startsWith("Saved")) {
+        this.doctorEditing = false;
+        this.doctor = null;
+        return { command: "/doctor" };
+      }
+      return {};
+    }
+    if (this.fieldOptions(field).length > 0) {
+      this.cycleDoctorField(field, 1);
+      return {};
+    }
+    if (field.apply || field.set) this.draft = "";
+    return {};
+  }
+
+  private handleDoctorDraft(input: string, key: readline.Key, field: Field | undefined): PanelResult {
+    if (key.name === "escape") {
+      this.draft = null;
+      return {};
+    }
+    if (key.name === "backspace" || key.name === "delete") {
+      this.draft = this.draft!.slice(0, -1);
+      return {};
+    }
+    if (key.name === "return") {
+      const value = this.draft!.trim();
+      this.draft = null;
+      if (!field || !value) return {};
+      if (field.apply) {
+        this.status = field.apply(value);
+        return {};
+      }
+      field.set?.(value);
       return {};
     }
     if (input && !key.ctrl && !key.meta) this.draft += input;
@@ -426,11 +603,11 @@ export class PanelController {
   }
 
   private apiKeyLabel(): string {
-    return hasWhyjEnvValue(this.cfg?.env || {}, "apiKey") ? "✓ configured" : "○ enter key";
+    return this.data.hasWhyjEnvValue(this.cfg?.env || {}, "apiKey") ? "✓ configured" : "○ enter key";
   }
 
   private baseUrlLabel(): string {
-    const baseUrl = stripTerminalControlCodes(this.cfg?.env?.WHYJ_QUANT_BASE_URL || "");
+    const baseUrl = this.data.stripTerminalControlCodes(this.cfg?.env?.WHYJ_QUANT_BASE_URL || "");
     if (!baseUrl) return "○ enter url";
     return `${baseUrl} · ${describeEndpointMode(baseUrl)}`;
   }
@@ -464,18 +641,22 @@ export class PanelController {
   private dataSourceKeyLabel(source: DataSource): string {
     const envKey = this.dataSourceEnvKey(source);
     if (!envKey) return "○ no key needed";
-    return hasWhyjEnvValue(this.cfg?.env || {}, envKey) ? "✓ configured" : "○ enter key";
+    return this.data.hasWhyjEnvValue(this.cfg?.env || {}, envKey) ? "✓ configured" : "○ enter key";
   }
 
   private currentSource(): DataSource {
     return this.cfg?.preferences.source || "llmquant-data";
   }
 
+  private doctorSource(): DataSource {
+    return this.doctorDraft?.preferences.source || this.currentSource();
+  }
+
   private currentPortfolioLabel(): string {
     const fileName = this.cfg?.preferences.currentPortfolioFile || "holdings.json";
     const match = this.localPortfolios.find((item) => item.fileName === fileName);
     if (match) return currentPortfolioOption(match.fileName, match.name);
-    const panelPortfolio = loadPanelPortfolio();
+    const panelPortfolio = this.data.loadPanelPortfolio();
     if (panelPortfolio.groups.length === 1 && panelPortfolio.groups[0]?.name) return panelPortfolio.groups[0].name;
     return fileName;
   }
@@ -490,7 +671,7 @@ export class PanelController {
     const fileName = this.cfg?.preferences.currentPortfolioFile || "holdings.json";
     const match = this.localPortfolios.find((item) => item.fileName === fileName);
     if (match) return match.name;
-    const panelPortfolio = loadPanelPortfolio();
+    const panelPortfolio = this.data.loadPanelPortfolio();
     if (panelPortfolio.groups.length === 1 && panelPortfolio.groups[0]?.name) return panelPortfolio.groups[0].name;
     return fileName;
   }
@@ -499,7 +680,7 @@ export class PanelController {
     if (!this.cfg) return;
     const fileName = value.split(" · ")[1] || value;
     this.cfg.preferences.currentPortfolioFile = fileName;
-    syncPanelPortfolioFromLocalPortfolio(fileName);
+    this.data.syncPanelPortfolioFromLocalPortfolio(fileName);
     this.dirty = true;
   }
 
@@ -508,7 +689,7 @@ export class PanelController {
     if (!key) return "Enter an API key.";
     if (!this.cfg) return "Config not loaded.";
     this.cfg.env = { ...(this.cfg.env || {}), WHYJ_QUANT_API_KEY: key };
-    saveSettings(this.cfg);
+    this.data.saveSettings(this.cfg);
     return "Saved WHYJ_QUANT_API_KEY.";
   }
 
@@ -517,7 +698,7 @@ export class PanelController {
     if (!value) return "Enter a base URL.";
     if (!this.cfg) return "Config not loaded.";
     this.cfg.env = { ...(this.cfg.env || {}), WHYJ_QUANT_BASE_URL: value };
-    saveSettings(this.cfg);
+    this.data.saveSettings(this.cfg);
     return "Saved WHYJ_QUANT_BASE_URL.";
   }
 
@@ -528,8 +709,51 @@ export class PanelController {
     if (!key) return `Enter ${envVar}.`;
     if (!this.cfg) return "Config not loaded.";
     this.cfg.env = { ...(this.cfg.env || {}), [envVar]: key };
-    saveSettings(this.cfg);
+    this.data.saveSettings(this.cfg);
     return `Saved ${envVar}.`;
+  }
+
+  private saveDoctorProviderKey(raw: string): string {
+    const key = raw.trim();
+    if (!key) return "Enter an API key.";
+    if (!this.doctorDraft) return "Doctor config not loaded.";
+    this.doctorDraft.env = { ...(this.doctorDraft.env || {}), WHYJ_QUANT_API_KEY: key };
+    return "Added API key to draft.";
+  }
+
+  private saveDoctorBaseUrl(raw: string): string {
+    const value = raw.trim();
+    if (!value) return "Enter a base URL.";
+    if (!this.doctorDraft) return "Doctor config not loaded.";
+    this.doctorDraft.env = { ...(this.doctorDraft.env || {}), WHYJ_QUANT_BASE_URL: value };
+    return "Added base URL to draft.";
+  }
+
+  private saveDoctorDataSourceKey(raw: string): string {
+    const source = this.doctorSource();
+    const envVar = this.dataSourceEnvVar(source);
+    if (!envVar) return `${source} does not require a key.`;
+    const key = raw.trim();
+    if (!key) return `Enter ${envVar}.`;
+    if (!this.doctorDraft) return "Doctor config not loaded.";
+    this.doctorDraft.env = { ...(this.doctorDraft.env || {}), [envVar]: key };
+    return `Added ${envVar} to draft.`;
+  }
+
+  private saveDoctorDraft(): string {
+    if (!this.cfg || !this.doctorDraft) return "Doctor config not loaded.";
+    const apiKey = this.doctorDraft.env?.WHYJ_QUANT_API_KEY?.trim()
+      || this.doctorDraft.env?.WHYJ_QUANT_AUTH_TOKEN?.trim();
+    const baseUrl = this.doctorDraft.env?.WHYJ_QUANT_BASE_URL?.trim();
+    const source = this.doctorDraft.preferences.source;
+    const tokenKey = this.dataSourceEnvVar(source);
+    const sourceToken = tokenKey ? this.doctorDraft.env?.[tokenKey]?.trim() : "ok";
+    if (!apiKey) return "Enter WHYJ_QUANT_API_KEY before saving.";
+    if (!baseUrl) return "Enter WHYJ_QUANT_BASE_URL before saving.";
+    if (tokenKey && !sourceToken) return `Enter ${tokenKey} before saving.`;
+    this.cfg = cloneSettings(this.doctorDraft);
+    this.data.saveSettings(this.cfg);
+    return "Saved settings. Re-running doctor...";
   }
 
   private groups(): Array<{ label: string; fields: Field[] }> {
@@ -597,12 +821,89 @@ export class PanelController {
     if (opts.length === 0) return;
     const idx = opts.indexOf(field.get());
     field.set(opts[(idx + direction + opts.length) % opts.length]);
-    saveSettings(this.cfg);
+    this.data.saveSettings(this.cfg);
+  }
+
+  private doctorWizardRows(): Row[] {
+    return this.doctorWizardFields().map((field, index) => ({ field, index }) as Row);
+  }
+
+  private doctorWizardFields(): Field[] {
+    return [
+      {
+        label: "Provider",
+        get: () => this.doctorProviderPreset(),
+        set: (v) => this.setDoctorProviderPreset(v),
+        options: ["DeepSeek", "GLM", "MiniMax", "Custom"],
+      },
+      {
+        label: "API Key",
+        get: () => this.doctorApiKeyLabel(),
+        apply: (v) => this.saveDoctorProviderKey(v),
+      },
+      {
+        label: "Base URL",
+        get: () => this.doctorBaseUrlLabel(),
+        apply: (v) => this.saveDoctorBaseUrl(v),
+      },
+      {
+        label: "Source",
+        get: () => this.doctorSource(),
+        set: (v) => {
+          if (this.doctorDraft) this.doctorDraft.preferences.source = v as DataSource;
+        },
+        options: [...SOURCE_OPTIONS],
+      },
+      {
+        label: "Token",
+        get: () => this.doctorDataSourceKeyLabel(),
+        apply: (v) => this.saveDoctorDataSourceKey(v),
+      },
+      {
+        label: "Save & Verify",
+        get: () => "run /doctor",
+        onEnter: () => this.saveDoctorDraft(),
+      },
+    ];
+  }
+
+  private doctorApiKeyLabel(): string {
+    const value = this.doctorDraft?.env?.WHYJ_QUANT_API_KEY?.trim()
+      || this.doctorDraft?.env?.WHYJ_QUANT_AUTH_TOKEN?.trim();
+    return value ? `✓ ${this.maskSecret(value)}` : "○ enter key";
+  }
+
+  private doctorBaseUrlLabel(): string {
+    const value = this.doctorDraft?.env?.WHYJ_QUANT_BASE_URL?.trim();
+    if (!value) return "○ enter url";
+    return `${this.data.stripTerminalControlCodes(value)} · ${describeEndpointMode(value)}`;
+  }
+
+  private doctorDataSourceKeyLabel(): string {
+    const source = this.doctorSource();
+    const envVar = this.dataSourceEnvVar(source);
+    if (!envVar) return "○ no key needed";
+    const value = this.doctorDraft?.env?.[envVar]?.trim();
+    return value ? `✓ ${this.maskSecret(value)}` : `○ enter ${envVar}`;
+  }
+
+  private cycleDoctorField(field: Field, direction: 1 | -1): void {
+    if (!field.set) return;
+    const opts = this.fieldOptions(field);
+    if (opts.length === 0) return;
+    const idx = opts.indexOf(field.get());
+    field.set(opts[(idx + direction + opts.length) % opts.length]);
+    this.status = `Selected ${field.get()}.`;
+  }
+
+  private maskSecret(value: string): string {
+    if (value.length <= 8) return `${value.slice(0, 2)}...`;
+    return `${value.slice(0, 4)}...${value.slice(-4)}`;
   }
 
   private refreshResumeSessions(): void {
-    this.recentSessions = listStoredSessions({
-      cwd: process.cwd(),
+    this.recentSessions = this.data.listStoredSessions({
+      cwd: this.data.cwd(),
       limit: 200,
       scope: this.resumeFilter,
       sort: this.resumeSort,
@@ -643,11 +944,75 @@ export class PanelController {
 
 
   private refreshArtifacts(): void {
-    this.artifacts = listArtifacts();
+    this.artifacts = this.data.listArtifacts();
     this.artifactSelection = Math.max(0, Math.min(this.artifactSelection, this.artifacts.length - 1));
   }
+
+  setDoctor(doctor: DoctorResult | null): void {
+    this.doctor = doctor;
+    this.cursor = 0;
+    this.draft = null;
+    this.status = "";
+    if (doctor?.mode === "first_setup") {
+      this.doctorDraft = this.cfg ? cloneSettings(this.cfg) : null;
+    } else if (!this.doctorEditing) {
+      this.doctorDraft = null;
+    }
+  }
+
+  private toDoctorPanelView(doctor: DoctorResult): DoctorPanelView {
+    const actions = ["[Retry All]  press Enter or r"];
+    if (doctor.phases.some((phase) => phase.phase === "model")) actions.push("[Retry Model] press m");
+    if (doctor.phases.some((phase) => phase.phase === "tools")) actions.push("[Retry Tools] press t");
+    if (doctor.phases.some((phase) => phase.phase === "data")) actions.push("[Retry Data]  press d");
+    actions.push("[Configure]   press c");
+    return {
+      title: "WhyJ Doctor",
+      status: doctor.overall,
+      mode: doctor.mode,
+      model: doctor.config.model,
+      baseUrl: doctor.config.baseUrl,
+      endpointMode: doctor.config.endpointMode,
+      dataSource: doctor.config.dataSource,
+      settingsPath: doctor.config.settingsPath,
+      phases: doctor.phases.map((phase) => ({
+        phase: phase.phase,
+        status: phase.status,
+        detail: phase.error || phase.detail,
+        action: phase.action,
+        warnings: phase.warnings,
+      })),
+      actions,
+      hints: doctor.hints,
+      logPath: doctor.logPath,
+    };
+  }
+
+  private doctorProviderPreset(): string {
+    const baseUrl = this.doctorDraft?.env?.WHYJ_QUANT_BASE_URL?.trim() || "";
+    if (!baseUrl) return "Custom";
+    if (baseUrl === "https://api.deepseek.com/anthropic") return "DeepSeek";
+    if (baseUrl === "https://open.bigmodel.cn/api/anthropic") return "GLM";
+    if (baseUrl === "https://api.minimaxi.com/anthropic" || baseUrl === "https://api.minimaxi.com/v1") return "MiniMax";
+    return "Custom";
+  }
+
+  private setDoctorProviderPreset(value: string): void {
+    if (!this.doctorDraft) return;
+    const presets: Record<string, string> = {
+      DeepSeek: "https://api.deepseek.com/anthropic",
+      GLM: "https://open.bigmodel.cn/api/anthropic",
+      MiniMax: "https://api.minimaxi.com/anthropic",
+    };
+    if (value !== "Custom") {
+      this.doctorDraft.env = {
+        ...(this.doctorDraft.env || {}),
+        WHYJ_QUANT_BASE_URL: presets[value] || this.doctorDraft.env.WHYJ_QUANT_BASE_URL || "",
+      };
+    }
+  }
   private refreshLocalPortfolios(): void {
-    const portfolios = listLocalPortfolios();
+    const portfolios = this.data.listLocalPortfolios();
     this.localPortfolios = portfolios.sort((a, b) => {
       if (this.portfolioSort === "name") return a.name.localeCompare(b.name, "zh-CN");
       return new Date(b.updated || 0).getTime() - new Date(a.updated || 0).getTime();

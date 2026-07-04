@@ -1,4 +1,4 @@
-import type { FundNavDaily } from "../source/index.ts";
+import type { FundNavDaily } from "../types/data.ts";
 
 export type DcaFrequency = "weekly" | "biweekly" | "monthly" | "quarterly";
 

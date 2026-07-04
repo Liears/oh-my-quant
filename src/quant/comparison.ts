@@ -4,7 +4,7 @@
 
 import { classifySymbols, type ClassificationRule, type SymbolProfile } from "./auto-classify.ts";
 import { synthesizeEqualWeightNav, groupRiskFromNav, totalReturn, type GroupComparisonResult } from "./group-comparison.ts";
-import { saveComparison, generateComparisonId } from "../storage/index.ts";
+import type { ComparisonArtifact } from "../types/comparison.ts";
 
 export interface ComparisonConfig {
   name: string;
@@ -14,6 +14,9 @@ export interface ComparisonConfig {
 export interface ComparisonContext {
   fetchSymbolProfile: (code: string) => Promise<SymbolProfile | null>;
   fetchSymbolReturns: (code: string) => Promise<Map<string, number>>;
+  generateComparisonId?: () => string;
+  saveComparison?: (artifact: ComparisonArtifact) => void;
+  now?: () => Date;
 }
 
 /**
@@ -72,11 +75,17 @@ export async function runComparison(
   }
 
   const artifact = {
-    id: generateComparisonId(),
-    createdAt: new Date().toISOString(),
+    id: context.generateComparisonId?.() ?? generateComparisonId(),
+    createdAt: (context.now?.() ?? new Date()).toISOString(),
     groups: results,
   };
-  saveComparison(artifact);
+  context.saveComparison?.(artifact);
 
   return artifact.id;
+}
+
+export function generateComparisonId(now = new Date()): string {
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toISOString().slice(11, 19).replace(/:/g, "");
+  return `cmp-${date}-${time}`;
 }

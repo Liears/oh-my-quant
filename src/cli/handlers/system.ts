@@ -1,5 +1,5 @@
 import { buildCommandHelpText } from "../catalog.ts";
-import { formatDoctorText, runDoctor } from "../doctor.ts";
+import { collectDoctor, formatDoctorText } from "../doctor.ts";
 import type { CommandContext, CommandHandler, CommandResult } from "../types.ts";
 import type { CompactResult } from "../../agent/src/pi/index.ts";
 import { hasWhyjEnvValue } from "../../storage/index.ts";
@@ -241,9 +241,21 @@ export const configHandler: CommandHandler = async (_flags, _positional, ctx) =>
   };
 };
 
-export const doctorHandler: CommandHandler = async () => {
+export const doctorHandler: CommandHandler = async (_flags, _positional, ctx) => {
+  const requestedPhases = parseDoctorPhases(_flags.phase);
+  if (ctx.openDoctor) {
+    const { loadSettings } = await import("../../storage/index.ts");
+    ctx.openDoctor();
+    const doctor = await collectDoctor(loadSettings(), process.env, {
+      phases: requestedPhases,
+      seedState: ctx.currentDoctor ?? undefined,
+      onState: (state) => ctx.openDoctor?.(state),
+    });
+    ctx.openDoctor(doctor);
+    return { success: true, message: "", data: doctor };
+  }
   const { loadSettings } = await import("../../storage/index.ts");
-  const doctor = runDoctor(loadSettings(), process.env);
+  const doctor = await collectDoctor(loadSettings(), process.env, { phases: requestedPhases });
   return {
     success: true,
     message: formatDoctorText(doctor),
@@ -251,6 +263,17 @@ export const doctorHandler: CommandHandler = async () => {
     renderAs: "text",
   };
 };
+
+function parseDoctorPhases(value: string | number | boolean | undefined): ("model" | "tools" | "data")[] | undefined {
+  if (typeof value !== "string") return undefined;
+  const parts = value
+    .split(/[,\s]+/)
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+  const phases = parts.filter((part): part is "model" | "tools" | "data" =>
+    part === "model" || part === "tools" || part === "data");
+  return phases.length > 0 ? phases : undefined;
+}
 
 export const portfolioHandler: CommandHandler = async (_flags, positional, ctx) => {
   if (positional.length === 0 && ctx.openPortfolio) {

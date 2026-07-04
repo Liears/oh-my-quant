@@ -3,19 +3,25 @@ import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-function runCli(args: string[]) {
+function runCli(args: string[], envOverrides: Record<string, string | undefined> = {}) {
   const ohq = join(tmpdir(), `whyj-doctor-cli-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   try {
+    const env = {
+      ...process.env,
+      OHQUANT_DIR: ohq,
+      WHYJ_QUANT_API_KEY: "test-provider-key",
+      WHYJ_QUANT_BASE_URL: "https://api.deepseek.com/anthropic",
+      WHYJ_QUANT_LLMQUANT_API_KEY: "test-data-key",
+      WHYJ_DOCTOR_SKIP_NETWORK: "1",
+      ...envOverrides,
+    } as Record<string, string | undefined>;
+    for (const [key, value] of Object.entries(env)) {
+      if (value === undefined) delete env[key];
+    }
     return Bun.spawnSync({
       cmd: [process.execPath, "src/index.ts", ...args],
       cwd: process.cwd(),
-      env: {
-        ...process.env,
-        OHQUANT_DIR: ohq,
-        WHYJ_QUANT_API_KEY: "test-provider-key",
-        WHYJ_QUANT_BASE_URL: "https://api.deepseek.com/anthropic",
-        WHYJ_QUANT_LLMQUANT_API_KEY: "test-data-key",
-      },
+      env,
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -55,6 +61,36 @@ describe("CLI doctor command", () => {
       source: "env",
       value: expect.stringMatching(/^test\.\.\.-key · fp:[0-9a-f]{8}$/),
     }));
+  });
+
+  it("prints progress lines for whyj doctor text mode", () => {
+    const result = runCli(["doctor"]);
+    expect(result.exitCode).toBe(0);
+    expect(decode(result.stderr)).toBe("");
+
+    const text = decode(result.stdout);
+    expect(text).toContain("[....] Model");
+    expect(text).toContain("[ OK ] Model");
+    expect(text).toContain("[....] Tools");
+    expect(text).toContain("[ OK ] Data");
+    expect(text).toContain("WhyJ Doctor");
+    expect(text).toContain("Phases");
+  });
+
+  it("prints a first-setup scaffold for unconfigured whyj doctor text mode", () => {
+    const result = runCli(["doctor"], {
+      WHYJ_QUANT_API_KEY: undefined,
+      WHYJ_QUANT_BASE_URL: undefined,
+      WHYJ_QUANT_LLMQUANT_API_KEY: undefined,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(decode(result.stderr)).toBe("");
+
+    const text = decode(result.stdout);
+    expect(text).toContain("No credentials configured.");
+    expect(text).toContain('"WHYJ_QUANT_API_KEY": "sk-your-key-here"');
+    expect(text).toContain('"WHYJ_QUANT_BASE_URL": "https://api.deepseek.com/anthropic"');
+    expect(text).toContain("Then: whyj doctor");
   });
 
   it("runs /doctor through one-shot slash execution", () => {

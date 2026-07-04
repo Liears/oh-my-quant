@@ -1,7 +1,7 @@
 import type { CommandHandler } from "../types.ts";
 import { runComparison, type ComparisonConfig, type ComparisonContext } from "../../quant/comparison.ts";
 import { volatilityRule, drawdownRule, sectorRule, type ClassificationRule } from "../../quant/auto-classify.ts";
-import { collectPanelPortfolioSymbols, loadPanelPortfolio, loadBars as loadBarsFromStorage } from "../../storage/index.ts";
+import { collectPanelPortfolioSymbols, generateComparisonId, loadPanelPortfolio, loadBars as loadBarsFromStorage, saveComparison } from "../../storage/index.ts";
 import { metrics } from "../../quant/risk.ts";
 
 const compareUsage = "Use /compare run --rule volatility|drawdown|sector";
@@ -78,6 +78,8 @@ export const compareHandler: CommandHandler = async (flags, positional) => {
       }
       return returns;
     },
+    generateComparisonId,
+    saveComparison,
   };
 
   try {
