@@ -175,6 +175,36 @@ export function formatDoctorFirstSetupText(doctor: DoctorResult): string {
   ].join("\n");
 }
 
+export function buildDoctorErrorResult(
+  settings: OhQuantSettings,
+  processEnv: Record<string, string | undefined>,
+  error: unknown,
+  requestedPhases?: DoctorPhase["phase"][],
+): DoctorResult {
+  const initial = createInitialState(settings, processEnv);
+  const phases = [...initial.phases] as DoctorResult["phases"];
+  const targetPhases = normalizeRequestedPhases(requestedPhases);
+  const target = targetPhases[0] ?? "model";
+  const targetIndex = PHASE_ORDER.indexOf(target);
+  if (targetIndex >= 0) {
+    phases[targetIndex] = {
+      phase: target,
+      status: "fail",
+      label: titleCase(target),
+      detail: `Doctor runtime error: ${errorMessage(error)}`,
+      error: `Doctor runtime error: ${errorMessage(error)}`,
+      action: "Check settings, log path permissions, and provider configuration, then retry doctor.",
+      durationMs: 0,
+    };
+  }
+  return {
+    ...initial,
+    phases,
+    overall: "partial_fail",
+    hints: ["Check settings, log path permissions, and provider configuration, then retry doctor."],
+  };
+}
+
 export function formatDoctorProgressLine(state: DoctorResult): string {
   const active = [...state.phases].reverse().find((phase) => phase.status !== "pending") ?? state.phases[0];
   const status = active.status === "checking" ? "[....]" : active.status === "pass" ? "[ OK ]" : active.status === "fail" ? "[FAIL]" : "[    ]";

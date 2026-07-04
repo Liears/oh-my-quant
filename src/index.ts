@@ -8,7 +8,7 @@
 import { migrateOldConfig, loadSettings } from "./storage/index.ts";
 import { parseCommand, executeCommand } from "./cli/registry.ts";
 import { COMMAND_CATALOG } from "./cli/catalog.ts";
-import { collectDoctor, formatDoctorFirstSetupText, formatDoctorProgressLine, formatDoctorText } from "./cli/doctor.ts";
+import { buildDoctorErrorResult, collectDoctor, formatDoctorFirstSetupText, formatDoctorProgressLine, formatDoctorText } from "./cli/doctor.ts";
 import { printBanner } from "./tui/src/banner.ts";
 
 interface CliEnvelope {
@@ -49,12 +49,19 @@ if (args.includes("--help") || args.includes("-h")) {
   writeHelp(json);
   process.exit(0);
 } else if (positional[0] === "doctor") {
-  const doctor = await collectDoctor(settings, process.env, json
-    ? { phases: parseDoctorPhases(doctorPhase) }
-    : { phases: parseDoctorPhases(doctorPhase), onState: (state) => console.log(formatDoctorProgressLine(state)) });
-  if (json) writeJson({ ok: true, command: "doctor", data: doctor });
-  else console.log(`\n${doctor.mode === "first_setup" && doctor.overall === "unconfigured" ? formatDoctorFirstSetupText(doctor) : formatDoctorText(doctor)}`);
-  process.exit(doctor.ready ? 0 : 1);
+  try {
+    const doctor = await collectDoctor(settings, process.env, json
+      ? { phases: parseDoctorPhases(doctorPhase) }
+      : { phases: parseDoctorPhases(doctorPhase), onState: (state) => console.log(formatDoctorProgressLine(state)) });
+    if (json) writeJson({ ok: true, command: "doctor", data: doctor });
+    else console.log(`\n${doctor.mode === "first_setup" && doctor.overall === "unconfigured" ? formatDoctorFirstSetupText(doctor) : formatDoctorText(doctor)}`);
+    process.exit(doctor.ready ? 0 : 1);
+  } catch (error) {
+    const doctor = buildDoctorErrorResult(settings, process.env, error, parseDoctorPhases(doctorPhase));
+    if (json) writeJson({ ok: false, command: "doctor", data: doctor, error: { code: "doctor_failed", message: doctor.phases.find((phase) => phase.status === "fail")?.error || "Doctor failed" } });
+    else console.log(`\n${formatDoctorText(doctor)}`);
+    process.exit(1);
+  }
 } else if (cmdArg) {
   // Fix MSYS2 path mangling: "/config" → "C:/.../git/.../config"
   const fixed = cmdArg.replace(/^[A-Z]:\/[^ ]+\/(\w+)/, "/$1");

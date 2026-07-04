@@ -1,9 +1,10 @@
 import { buildCommandHelpText } from "../catalog.ts";
-import { collectDoctor, formatDoctorText } from "../doctor.ts";
+import { buildDoctorErrorResult, collectDoctor, formatDoctorText } from "../doctor.ts";
 import type { CommandContext, CommandHandler, CommandResult } from "../types.ts";
 import type { CompactResult } from "../../agent/src/pi/index.ts";
 import { hasWhyjEnvValue } from "../../storage/index.ts";
 import { describeEndpointMode } from "../doctor.ts";
+import { DEFAULT_SETTINGS } from "../../types/config.ts";
 
 function mark(ok: boolean): string {
   return ok ? "✓" : "○";
@@ -243,25 +244,50 @@ export const configHandler: CommandHandler = async (_flags, _positional, ctx) =>
 
 export const doctorHandler: CommandHandler = async (_flags, _positional, ctx) => {
   const requestedPhases = parseDoctorPhases(_flags.phase);
-  if (ctx.openDoctor) {
-    const { loadSettings } = await import("../../storage/index.ts");
-    ctx.openDoctor();
-    const doctor = await collectDoctor(loadSettings(), process.env, {
-      phases: requestedPhases,
-      seedState: ctx.currentDoctor ?? undefined,
-      onState: (state) => ctx.openDoctor?.(state),
-    });
-    ctx.openDoctor(doctor);
-    return { success: true, message: "", data: doctor };
-  }
   const { loadSettings } = await import("../../storage/index.ts");
-  const doctor = await collectDoctor(loadSettings(), process.env, { phases: requestedPhases });
-  return {
-    success: true,
-    message: formatDoctorText(doctor),
-    data: doctor,
-    renderAs: "text",
-  };
+  let settings = DEFAULT_SETTINGS;
+  try {
+    settings = loadSettings();
+  } catch {
+    settings = DEFAULT_SETTINGS;
+  }
+  if (ctx.openDoctor) {
+    ctx.openDoctor();
+    try {
+      const doctor = await collectDoctor(settings, process.env, {
+        phases: requestedPhases,
+        seedState: ctx.currentDoctor ?? undefined,
+        onState: (state) => ctx.openDoctor?.(state),
+      });
+      ctx.openDoctor(doctor);
+      return { success: true, message: "", data: doctor };
+    } catch (error) {
+      const doctor = buildDoctorErrorResult(settings, process.env, error, requestedPhases);
+      ctx.openDoctor(doctor);
+      return {
+        success: false,
+        message: `Doctor failed: ${doctor.phases.find((phase) => phase.status === "fail")?.error || "unknown error"}`,
+        data: doctor,
+      };
+    }
+  }
+  try {
+    const doctor = await collectDoctor(settings, process.env, { phases: requestedPhases });
+    return {
+      success: true,
+      message: formatDoctorText(doctor),
+      data: doctor,
+      renderAs: "text",
+    };
+  } catch (error) {
+    const doctor = buildDoctorErrorResult(settings, process.env, error, requestedPhases);
+    return {
+      success: false,
+      message: formatDoctorText(doctor),
+      data: doctor,
+      renderAs: "text",
+    };
+  }
 };
 
 function parseDoctorPhases(value: string | number | boolean | undefined): ("model" | "tools" | "data")[] | undefined {

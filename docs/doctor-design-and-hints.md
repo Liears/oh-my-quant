@@ -274,6 +274,7 @@ Doctor 同时承担两个产品角色：
 - 真实 provider/data probe、30s 级别超时、脱敏日志
 - CLI 文本模式渐进输出；`overall === "unconfigured"` 时直接输出首次配置 scaffold；`--json` 只输出最终结果
 - TUI `/doctor` 入口：命令执行后立即打开 doctor 面板，并随着 `runDoctor()` 逐阶段刷新状态
+- 如果 `/doctor` 在面板打开后遇到运行时异常，TUI / slash 命令链路会把 loading 面板替换成结构化 fail-state，而不是停在永久 loading
 - TUI first-setup 闭环：`overall === "unconfigured"` 时进入 doctor draft，`[Save & Verify]` 一次性写入并重跑 `/doctor`，ESC 丢弃 draft
 - TUI 诊断动作：`[Retry All]`、`[Retry Model]`、`[Retry Tools]`、`[Retry Data]` 和 `[Configure]`
 - Tools 阶段已校验 built-in registry、TypeBox schema compile、source adapter export，以及 `akshare` 场景下的 Python / package 可用性
@@ -500,6 +501,7 @@ src/
 - `runDoctor()` 返回 `AsyncIterable<DoctorState>`，每阶段完成 emit 一次
 - CLI 文本模式订阅 iterable，逐行输出；CLI JSON 模式消费完整 iterable 后只输出最终 state
 - TUI 订阅状态流，先打开 loading doctor 面板，再逐阶段刷新
+- 如果 `collectDoctor()` 或其外围配置/日志链路抛错，调用方会构造一个 doctor error result 回填到面板/文本输出
 - 状态机逻辑在 `doctor.ts`，面板/CLI 只做渲染
 - doctor 面板内 action 只驱动显式重试或显式保存，不隐式改写配置
 - 保持现有 `--json` 输出格式稳定性（新增 `phases` 字段）
@@ -522,7 +524,7 @@ src/
 | `checking` | `⟳` | spinner + 当前检查项名称 + 实时 detail 更新 | 无 |
 | `checking` (timeout) | `⟳` → `✗` | 30s 超时后自动转为 fail，detail 显示 "Timed out after 30s" | Retry |
 | `pass` | `✓` | 阶段名 + detail 摘要，行收起 | 查看摘要 |
-| `pass` (warning) | `✓` | 同 pass，但 detail 以 dim 色显示 warning 信息 | 查看摘要 |
+| `pass` (warning) | `✓` | 同 pass，并额外显示 `Warn · ...` 行 | 查看摘要 |
 | `fail` | `✗` | 行自动展开，error + action | Retry / Fix |
 | `fail` (dependency unavailable) | `✗` | 当前阶段自己的依赖缺失，例如未安装 Python 或缺少数据源 key；不因其他阶段失败而跳过 | Fix / Retry |
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { collectDoctor, describeEndpointMode, formatDoctorText, runDoctor } from "./doctor.ts";
+import { buildDoctorErrorResult, collectDoctor, describeEndpointMode, formatDoctorText, runDoctor } from "./doctor.ts";
 import { DEFAULT_SETTINGS } from "../types/config.ts";
 import { existsSync, readFileSync } from "node:fs";
 
@@ -228,6 +228,22 @@ describe("doctor", () => {
     expect(log).not.toContain("sk-test-secret-1234");
     expect(log).not.toContain("Authorization: Bearer sk-test-secret-1234");
     expect(log).toContain("sk-[redacted]");
+  });
+
+  it("builds a structured doctor failure result for command/runtime errors", () => {
+    const doctor = buildDoctorErrorResult({
+      ...DEFAULT_SETTINGS,
+      env: {
+        WHYJ_QUANT_BASE_URL: "https://api.deepseek.com/anthropic",
+      },
+    }, {}, new Error("disk full"), ["tools"]);
+
+    expect(doctor.overall).toBe("partial_fail");
+    expect(doctor.phases[1].status).toBe("fail");
+    expect(doctor.phases[1].error).toContain("disk full");
+    expect(doctor.hints).toEqual([
+      "Check settings, log path permissions, and provider configuration, then retry doctor.",
+    ]);
   });
 
   it("supports partial phase reruns with a seeded previous doctor state", async () => {

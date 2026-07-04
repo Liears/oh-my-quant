@@ -230,6 +230,30 @@ describe("doctorHandler", () => {
     expect(seen[0]).toBeUndefined();
     expect(seen.at(-1)).toEqual(expect.objectContaining({ phases: expect.any(Array) }));
   });
+
+  it("replaces the loading doctor panel with a structured failure state when collection throws in TUI", async () => {
+    const realDoctor = await import("../doctor.ts");
+    mock.module("../doctor.ts", () => ({
+      ...realDoctor,
+      collectDoctor: async () => { throw new Error("doctor exploded"); },
+    }));
+    const { doctorHandler: failingDoctorHandler } = await import(`./system.ts?case=doctor-fail-${Date.now()}`);
+    const seen: unknown[] = [];
+
+    const result = await failingDoctorHandler({}, [], {
+      openDoctor: (doctor?: unknown) => { seen.push(doctor); },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain("Doctor failed:");
+    expect(seen[0]).toBeUndefined();
+    expect(seen.at(-1)).toEqual(expect.objectContaining({
+      overall: "partial_fail",
+      phases: expect.any(Array),
+    }));
+    expect((seen.at(-1) as { phases: Array<{ status: string; error?: string }> }).phases.some((phase) =>
+      phase.status === "fail" && phase.error?.includes("doctor exploded"))).toBe(true);
+  });
 });
 
 describe("portfolioHandler", () => {
