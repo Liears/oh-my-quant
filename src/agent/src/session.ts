@@ -3,6 +3,7 @@ import {
   type BranchSummaryEntry,
   type CompactResult,
   type AgentHarnessEvent,
+  type AgentHarnessStreamOptions,
   JsonlSessionRepo,
   type JsonlSessionMetadata,
   type NavigateTreeResult,
@@ -42,7 +43,31 @@ export interface QuantAgentQueueUpdateEvent {
   nextTurn: AgentMessage[];
 }
 
-export type QuantAgentEvent = AgentEvent | QuantAgentQueueUpdateEvent;
+export interface QuantAgentBeforeProviderRequestEvent {
+  type: "before_provider_request";
+  model: Model<any>;
+  sessionId: string;
+  streamOptions: AgentHarnessStreamOptions;
+}
+
+export interface QuantAgentBeforeProviderPayloadEvent {
+  type: "before_provider_payload";
+  model: Model<any>;
+  payload: unknown;
+}
+
+export interface QuantAgentAfterProviderResponseEvent {
+  type: "after_provider_response";
+  status: number;
+  headers: Record<string, string>;
+}
+
+export type QuantAgentEvent =
+  | AgentEvent
+  | QuantAgentQueueUpdateEvent
+  | QuantAgentBeforeProviderRequestEvent
+  | QuantAgentBeforeProviderPayloadEvent
+  | QuantAgentAfterProviderResponseEvent;
 
 export interface QuantAgentState {
   systemPrompt: string;
@@ -482,7 +507,11 @@ function isCoreAgentEvent(event: AgentHarnessEvent): event is AgentEvent {
 }
 
 function isForwardedAgentEvent(event: AgentHarnessEvent): event is QuantAgentEvent {
-  return isCoreAgentEvent(event) || event.type === "queue_update";
+  return isCoreAgentEvent(event)
+    || event.type === "queue_update"
+    || event.type === "before_provider_request"
+    || event.type === "before_provider_payload"
+    || event.type === "after_provider_response";
 }
 
 function applySessionContextState(
@@ -850,3 +879,4 @@ function extractToolResultText(result: unknown): string {
   }
   return "";
 }
+

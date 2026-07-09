@@ -273,39 +273,48 @@ export class AgentHarness<
 	): Promise<AgentHarnessStreamOptions> {
 		const handlers = this.getHandlers("before_provider_request");
 		let current = cloneStreamOptions(streamOptions);
-		if (!handlers || handlers.size === 0) return current;
-		for (const handler of handlers) {
-			try {
-				const result = await handler({
-					type: "before_provider_request",
-					model,
-					sessionId,
-					streamOptions: cloneStreamOptions(current),
-				});
-				if (result?.streamOptions) {
-					current = applyStreamOptionsPatch(current, result.streamOptions);
+		if (handlers && handlers.size > 0) {
+			for (const handler of handlers) {
+				try {
+					const result = await handler({
+						type: "before_provider_request",
+						model,
+						sessionId,
+						streamOptions: cloneStreamOptions(current),
+					});
+					if (result?.streamOptions) {
+						current = applyStreamOptionsPatch(current, result.streamOptions);
+					}
+				} catch (error) {
+					throw normalizeHookError(error);
 				}
-			} catch (error) {
-				throw normalizeHookError(error);
 			}
 		}
+		await this.emitAny({
+			type: "before_provider_request",
+			model,
+			sessionId,
+			streamOptions: cloneStreamOptions(current),
+		});
 		return current;
 	}
 
 	private async emitBeforeProviderPayload(model: Model<any>, payload: unknown): Promise<unknown> {
 		const handlers = this.getHandlers("before_provider_payload");
 		let current = payload;
-		if (!handlers || handlers.size === 0) return current;
-		for (const handler of handlers) {
-			try {
-				const result = await handler({ type: "before_provider_payload", model, payload: current });
-				if (result !== undefined) {
-					current = result.payload;
+		if (handlers && handlers.size > 0) {
+			for (const handler of handlers) {
+				try {
+					const result = await handler({ type: "before_provider_payload", model, payload: current });
+					if (result !== undefined) {
+						current = result.payload;
+					}
+				} catch (error) {
+					throw normalizeHookError(error);
 				}
-			} catch (error) {
-				throw normalizeHookError(error);
 			}
 		}
+		await this.emitAny({ type: "before_provider_payload", model, payload: current });
 		return current;
 	}
 
@@ -330,13 +339,14 @@ export class AgentHarness<
 	}
 
 	private async createTurnState(): Promise<AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>> {
-		const context = await this.session.buildContext();
+		const contextPromise = this.session.buildContext();
 		const resources = this.getResources();
-		const sessionMetadata = await this.session.getMetadata();
+		const sessionMetadataPromise = this.session.getMetadata();
 		const tools = [...this.tools.values()];
 		const activeTools = this.activeToolNames
 			.map((name) => this.tools.get(name))
 			.filter((tool): tool is TTool => tool !== undefined);
+		const [context, sessionMetadata] = await Promise.all([contextPromise, sessionMetadataPromise]);
 		let systemPrompt = "You are a helpful assistant.";
 		if (typeof this.systemPrompt === "string") {
 			systemPrompt = this.systemPrompt;
@@ -1069,3 +1079,5 @@ export class AgentHarness<
 		return () => handlers!.delete(handler as AgentHarnessHandler);
 	}
 }
+
+

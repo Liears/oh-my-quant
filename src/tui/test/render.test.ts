@@ -890,15 +890,167 @@ describe("drawStatus", () => {
       activePortfolio: "core.json",
       source: "financial-datasets",
       showPortfolioPanel: true,
+        hud: {
+        contextUsage: { tokens: 24576, contextWindow: 200000, percent: 12.3 },
+        turnCount: 7,
+        ttftMs: 1820,
+        tpotMs: 84,      },
     });
 
     const statusLine = buf.toPlain()[3];
     expect(statusLine).toContain("openai/gpt-5.5");
     expect(statusLine).toContain("financial-datasets");
     expect(statusLine).toContain("core.json");
+    expect(statusLine).toContain("Ctx");
+    expect(statusLine).toContain("24.6K/200K");
+    expect(statusLine).toContain("TTFT");
+    expect(statusLine).toContain("T 7");
+    expect(statusLine).toContain("TPOT");
+    expect(statusLine).toContain("1.82s");
+    expect(statusLine).toContain("84ms/t");
+    const turnLabelX = statusLine.indexOf("T 7");
+    const turnTCell = buf.cells[3 * buf.w + turnLabelX];
+    const turnValueCell = buf.cells[3 * buf.w + turnLabelX + 2];
+    expect(turnTCell.dim).toBe(true);
+    expect(turnTCell.fg).toBe(S.dim.fg);
+    expect(turnValueCell.fg).toBe(S.code.fg);
   });
-});
 
+  it("elevates turn color when context pressure is high", () => {
+    const buf = new Buffer(140, 4);
+    drawStatus(buf, 3, 140, {
+      model: "glm-5.2",
+      modelLabel: "glm-5.2",
+      version: "0",
+      user: "u",
+      activity: "ready",
+      cost: 0,
+      cacheHit: 0,
+      messages: [],
+      panel: [],
+      panelLoading: false,
+      input: "",
+      composerQueue: [],
+      composerStatus: null,
+      activePortfolio: "core.json",
+      source: "financial-datasets",
+      showPortfolioPanel: true,
+        hud: {
+        contextUsage: { tokens: 162000, contextWindow: 200000, percent: 81 },
+        turnCount: 7,
+        ttftMs: 1820,
+        tpotMs: 84,      },
+    });
+
+    const statusLine = buf.toPlain()[3];
+    const turnLabelX = statusLine.indexOf("T 7");
+    const turnValueCell = buf.cells[3 * buf.w + turnLabelX + 2];
+    expect(turnValueCell.fg).toBe(S.gold.fg);
+  });
+
+  it("elevates context color when turn pressure is high", () => {
+    const buf = new Buffer(140, 4);
+    drawStatus(buf, 3, 140, {
+      model: "glm-5.2",
+      modelLabel: "glm-5.2",
+      version: "0",
+      user: "u",
+      activity: "ready",
+      cost: 0,
+      cacheHit: 0,
+      messages: [],
+      panel: [],
+      panelLoading: false,
+      input: "",
+      composerQueue: [],
+      composerStatus: null,
+      activePortfolio: "core.json",
+      source: "financial-datasets",
+      showPortfolioPanel: true,
+        hud: {
+        contextUsage: { tokens: 24576, contextWindow: 200000, percent: 12.3 },
+        turnCount: 24,
+        ttftMs: 1820,
+        tpotMs: 84,      },
+    });
+
+    const statusLine = buf.toPlain()[3];
+    const contextValueX = statusLine.indexOf("24.6K/200K");
+    const turnLabelX = statusLine.indexOf("T 24");
+    const contextValueCell = buf.cells[3 * buf.w + contextValueX];
+    const turnValueCell = buf.cells[3 * buf.w + turnLabelX + 2];
+    expect(contextValueCell.fg).toBe(S.gold.fg);
+    expect(turnValueCell.fg).toBe(S.gold.fg);
+  });
+
+  it("elevates latency colors when session pressure is high", () => {
+    const buf = new Buffer(140, 4);
+    drawStatus(buf, 3, 140, {
+      model: "glm-5.2",
+      modelLabel: "glm-5.2",
+      version: "0",
+      user: "u",
+      activity: "ready",
+      cost: 0,
+      cacheHit: 0,
+      messages: [],
+      panel: [],
+      panelLoading: false,
+      input: "",
+      composerQueue: [],
+      composerStatus: null,
+      activePortfolio: "core.json",
+      source: "financial-datasets",
+      showPortfolioPanel: true,
+        hud: {
+        contextUsage: { tokens: 24576, contextWindow: 200000, percent: 12.3 },
+        turnCount: 24,
+        ttftMs: 500,
+        tpotMs: 20,      },
+    });
+
+    const statusLine = buf.toPlain()[3];
+    const ttftValueX = statusLine.indexOf("500ms");
+    const tpotValueX = statusLine.indexOf("20ms/t");
+    const ttftValueCell = buf.cells[3 * buf.w + ttftValueX];
+    const tpotValueCell = buf.cells[3 * buf.w + tpotValueX];
+    expect(ttftValueCell.fg).toBe(S.gold.fg);
+    expect(tpotValueCell.fg).toBe(S.gold.fg);
+  });
+
+  it("shows dash instead of zero when turn count is unavailable", () => {
+    const buf = new Buffer(140, 4);
+    drawStatus(buf, 3, 140, {
+      model: "glm-5.2",
+      modelLabel: "glm-5.2",
+      version: "0",
+      user: "u",
+      activity: "ready",
+      cost: 0,
+      cacheHit: 0,
+      messages: [],
+      panel: [],
+      panelLoading: false,
+      input: "",
+      composerQueue: [],
+      composerStatus: null,
+      activePortfolio: "core.json",
+      source: "financial-datasets",
+      showPortfolioPanel: true,
+        hud: {
+        contextUsage: { tokens: 24576, contextWindow: 200000, percent: 12.3 },
+        turnCount: 0,
+        ttftMs: null,
+        tpotMs: null,      },
+    });
+
+    const statusLine = buf.toPlain()[3];
+    expect(statusLine).toContain("T -");
+    expect(statusLine).not.toContain("T 0");
+  });
+
+
+});
 describe("portfolio display", () => {
   const holding = (code: string, name: string, pct: number) => ({ code, name, price: 1.5, pct });
 
@@ -1029,3 +1181,7 @@ describe("portfolio display", () => {
     expect(rows.some(r => r.includes("Market"))).toBe(true);
   });
 });
+
+
+
+

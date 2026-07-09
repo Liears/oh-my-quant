@@ -40,6 +40,15 @@ import {
 } from "./runtime/agent-events.ts";
 import { perfLog, perfNow } from "./perf.ts";
 import type { DoctorResult } from "./runtime/doctor-contract.ts";
+import {
+  assistantEventHasVisibleOutput,
+  assistantMessageHasVisibleOutput,
+  computeTpotMs,
+  countConversationTurns,
+  createHudMetrics,
+  createLatencyTracker,
+  extractAssistantOutputTokens,
+} from "./runtime/hud.ts";
 
 export interface AppRuntimeSnapshot {
   model: string;
@@ -60,6 +69,7 @@ interface AppRuntimeCallbacks {
   onHelpRequest?: () => void;
   onSessionRequest?: (meta?: CurrentSessionMeta) => void;
   onPanel?: (panel: PanelSection[], loading?: boolean) => void;
+  onHud?: (hud: AppState["hud"]) => void;
 }
 
 type QuoteFetcher = OverviewQuoteFetcher;
@@ -86,6 +96,13 @@ export class AppRuntime {
   private marketSections: PanelSection[] = [];
   private marketRefreshPromise: Promise<void> | null = null;
   private currentDoctor: DoctorResult | null = null;
+  private hud = createHudMetrics();
+  private latencyTracker = createLatencyTracker();
+  private ttftTotalMs = 0;
+  private ttftSamples = 0;
+  private tpotTotalMs = 0;
+  private tpotSamples = 0;
+  private turnTtftRecorded = false;
 
   constructor(
     private readonly callbacks: AppRuntimeCallbacks,
@@ -117,6 +134,7 @@ export class AppRuntime {
     this.agent = this.agentFactory();
     perfLog("runtime.agent.create", agentStartedAt);
     this.agent.subscribe(async (event) => {
+      this.trackHudFromAgentEvent(event);
       handleAgentEvent(event, {
         messages: this.messages,
         thinkingText: this.agent?.state.thinkingText ?? "",
@@ -127,6 +145,7 @@ export class AppRuntime {
         emitComposerQueue: (queue) => this.emitComposerQueue(queue),
         scheduleMarketRefresh: () => this.scheduleMarketRefresh(),
       });
+      this.refreshHudFromAgentState();
     });
 
     void this.agent.waitForIdle()
@@ -134,6 +153,7 @@ export class AppRuntime {
       .catch(() => {});
 
     this.setActivity("ready");
+    this.refreshHudFromAgentState();
     this.scheduleMarketRefresh();
     perfLog("runtime.bootstrap", startedAt);
 
@@ -246,6 +266,7 @@ export class AppRuntime {
         agentSession: this.agent,
       });
       applyRuntimeCommandResult(result, this.commandResultContext());
+      this.refreshHudFromAgentState();
       if (invocation.isSkillInvoke) this.finalizeSkillMessage(!result.success);
       updateLastSymbol(parsed.flags);
     } catch (err) {
@@ -305,10 +326,94 @@ export class AppRuntime {
     const agentMessages = this.agent?.state.messages ?? [];
     this.messages = reduceSyncMessagesFromAgentState(agentMessages);
     this.emitMessages();
+    this.refreshHudFromAgentState();
   }
 
   private emitMessages(): void {
     this.callbacks.onMessages([...this.messages]);
+  }
+
+  private emitHud(): void {
+    const usage = this.hud.contextUsage
+      ? { ...this.hud.contextUsage }
+      : null;
+    this.callbacks.onHud?.({
+      ...this.hud,
+      contextUsage: usage,
+    });
+  }
+
+  private refreshHudFromAgentState(): void {
+    if (!this.agent) {
+      this.hud.contextUsage = null;
+      this.hud.turnCount = 0;
+      this.emitHud();
+      return;
+    }
+    this.hud.contextUsage = typeof this.agent.getContextUsage === "function"
+      ? this.agent.getContextUsage() ?? null
+      : null;
+    this.hud.turnCount = countConversationTurns(this.agent.state.messages as Array<{ role?: unknown }>);
+    this.emitHud();
+  }
+
+  private trackHudFromAgentEvent(event: { type: string; [key: string]: any }): void {
+    const now = Date.now();
+    if (event.type === "message_start") {
+      const role = event.message?.role;
+      if (role === "user" || role === "displayUser") {
+        this.latencyTracker.turnStartedAt = now;
+        this.latencyTracker.firstOutputAt = null;
+        this.turnTtftRecorded = false;
+        this.emitHud();
+      }
+      return;
+    }
+
+    if (
+      event.type === "message_update"
+      && event.message?.role === "assistant"
+      && this.latencyTracker.turnStartedAt !== null
+      && this.latencyTracker.firstOutputAt === null
+      && assistantEventHasVisibleOutput(event.assistantMessageEvent)
+    ) {
+      this.recordTurnTtft(now);
+      this.emitHud();
+      return;
+    }
+
+    if (event.type === "message_end" && event.message?.role === "assistant") {
+      if (
+        this.latencyTracker.turnStartedAt !== null
+        && this.latencyTracker.firstOutputAt === null
+        && assistantMessageHasVisibleOutput(event.message)
+      ) {
+        this.recordTurnTtft(now);
+      }
+      const outputTokens = extractAssistantOutputTokens(event.message);
+      const decodeMs = this.latencyTracker.firstOutputAt === null
+        ? null
+        : now - this.latencyTracker.firstOutputAt;
+      const turnTpotMs = computeTpotMs(decodeMs, outputTokens);
+      if (turnTpotMs !== null) {
+        this.tpotTotalMs += turnTpotMs;
+        this.tpotSamples += 1;
+        this.hud.tpotMs = this.tpotTotalMs / this.tpotSamples;
+      }
+      this.latencyTracker.turnStartedAt = null;
+      this.latencyTracker.firstOutputAt = null;
+      this.emitHud();
+    }
+  }
+
+  private recordTurnTtft(now: number): void {
+    if (this.latencyTracker.turnStartedAt === null || this.turnTtftRecorded) return;
+    this.latencyTracker.firstOutputAt = now;
+    const turnTtftMs = now - this.latencyTracker.turnStartedAt;
+    this.ttftTotalMs += turnTtftMs;
+    this.ttftSamples += 1;
+    this.hud.ttftMs = this.ttftTotalMs / this.ttftSamples;
+    this.turnTtftRecorded = true;
   }
 
   private setActivity(activity: AppState["activity"]): void {
@@ -472,6 +577,7 @@ export function createInitialAppState(version: string): AppState {
     input: "",
     composerQueue: [],
     composerStatus: null,
+    hud: createHudMetrics(),
     ...localState,
   };
 }
@@ -495,4 +601,5 @@ function updateLastSymbol(flags: Record<string, unknown>): void {
 }
 
 export const helpText = buildCommandHelpText();
+
 

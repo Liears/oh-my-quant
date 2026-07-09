@@ -31,7 +31,7 @@ export const UI_DENSITY: UiDensity =
 
 export const HEADER_H = UI_DENSITY === "compact" ? 2 : 3;
 export const COMPOSER_H = UI_DENSITY === "compact" ? 8 : 10;
-export const STATUS_H = 2;
+export const STATUS_H = 1;
 export const OVERVIEW_ROW_H = UI_DENSITY === "compact" ? 1 : 2;
 export const OVERVIEW_SECTION_H = UI_DENSITY === "compact" ? 2 : 3;
 export const DIVIDER_CHAR = "─";
@@ -81,3 +81,4 @@ export function pctStyle(pct: number): Style {
   if (pct < -0.001) return { fg: MARKET_DOWN };
   return S.muted;
 }
+

@@ -282,10 +282,12 @@ async function streamAssistantResponse(
 	// Apply context transform if configured (AgentMessage[] → AgentMessage[])
 	let messages = context.messages;
 	if (config.transformContext) {
+		const transformStartedAt = Date.now();
 		messages = await config.transformContext(messages, signal);
 	}
 
 	// Convert to LLM-compatible messages (AgentMessage[] → Message[])
+	const convertStartedAt = Date.now();
 	const llmMessages = await config.convertToLlm(messages);
 
 	// Build LLM context
@@ -740,3 +742,7 @@ async function emitToolResultMessage(toolResultMessage: ToolResultMessage, emit:
 	await emit({ type: "message_start", message: toolResultMessage });
 	await emit({ type: "message_end", message: toolResultMessage });
 }
+
+
+
+

@@ -805,7 +805,7 @@ export class PanelController {
           },
           { label: "Panel", get: () => this.cfg?.showPortfolioPanel === false ? "off" : "on", set: (v) => { if (this.cfg) this.cfg.showPortfolioPanel = v !== "off"; }, options: ENABLE_OPTIONS },
           { label: "Insight", get: () => this.cfg?.insightEnabled === false ? "off" : "on", set: (v) => { if (this.cfg) this.cfg.insightEnabled = v !== "off"; }, options: ENABLE_OPTIONS },
-        ],
+                  ],
       },
     ];
   }
@@ -1020,3 +1020,4 @@ export class PanelController {
     this.clampPortfolioSelection();
   }
 }
+

@@ -39,3 +39,4 @@ export function marketRefreshLoadingPanel(): PanelSection[] {
 export function marketUnavailablePanel(): PanelSection[] {
   return [{ kind: "keyvalue", title: "Market", rows: [{ label: "data", value: "unavailable" }] }];
 }
+

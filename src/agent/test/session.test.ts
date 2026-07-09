@@ -544,6 +544,64 @@ describe("createAgent", () => {
     expect((usage?.contextWindow ?? 0) > 0).toBe(true);
   });
 
+  it("forwards provider lifecycle hooks to session subscribers", async () => {
+    const agent = createAgent({
+      cwd: TEST_DIR,
+      sessionsRoot: TEST_SESSIONS_DIR,
+      settings: {
+        env: { WHYJ_QUANT_BASE_URL: "https://open.bigmodel.cn/api/anthropic" },
+        model: "glm-5.2",
+        thinkingLevel: "off",
+      },
+      skillPaths: [TEST_SKILLS_DIR],
+    }) as any;
+    await agent.waitForIdle();
+
+    const events: Array<{ type: string; [key: string]: unknown }> = [];
+    const unsubscribe = agent.subscribe((event: { type: string; [key: string]: unknown }) => {
+      events.push(event);
+    });
+
+    const harness = agent.harness as any;
+    const model = agent.state.model;
+    await harness.emitOwn({
+      type: "before_provider_request",
+      model,
+      sessionId: "s-1",
+      streamOptions: {},
+    });
+    await harness.emitOwn({
+      type: "before_provider_payload",
+      model,
+      payload: { messages: [{ role: "user" }], tools: [{ name: "bash" }], max_tokens: 2048 },
+    });
+    await harness.emitOwn({
+      type: "after_provider_response",
+      status: 200,
+      headers: { "x-request-id": "req_1" },
+    });
+    unsubscribe();
+
+    expect(events.map((event) => event.type)).toEqual([
+      "before_provider_request",
+      "before_provider_payload",
+      "after_provider_response",
+    ]);
+    expect(events[0]).toEqual(expect.objectContaining({
+      type: "before_provider_request",
+      sessionId: "s-1",
+    }));
+    expect(events[1]).toEqual(expect.objectContaining({
+      type: "before_provider_payload",
+      payload: expect.objectContaining({ max_tokens: 2048 }),
+    }));
+    expect(events[2]).toEqual(expect.objectContaining({
+      type: "after_provider_response",
+      status: 200,
+      headers: { "x-request-id": "req_1" },
+    }));
+  });
+
   it("surfaces tree-navigation errors from the harness facade", async () => {
     const agent = createAgent({
       cwd: TEST_DIR,
@@ -737,3 +795,4 @@ describe("createAgent", () => {
     expect(followCaptured.text).toContain("preserve ranking rows and scores instead of summarizing only the top name");
   });
 });
+

@@ -318,3 +318,5 @@ describe("slash command UX simulation", () => {
     expect((tui as any).panel.isOpen()).toBe(false);
   });
 });
+
+

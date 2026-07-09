@@ -380,7 +380,7 @@ export const streamAnthropicMessages: StreamFunction<"anthropic-messages", Anthr
 			}
 
 			const client = buildClient(model, options);
-			const params: Anthropic.MessageCreateParamsStreaming = {
+			let params: Anthropic.MessageCreateParamsStreaming = {
 				model: model.id,
 				max_tokens: options?.maxTokens ?? model.maxTokens,
 				messages: buildMessages(context, model),
@@ -401,6 +401,11 @@ export const streamAnthropicMessages: StreamFunction<"anthropic-messages", Anthr
 
 			if (options?.temperature !== undefined) {
 				params.temperature = options.temperature;
+			}
+
+			const nextParams = await options?.onPayload?.(params, model);
+			if (nextParams !== undefined) {
+				params = nextParams as Anthropic.MessageCreateParamsStreaming;
 			}
 
 			const request = client.messages.stream(params, {
@@ -473,10 +478,10 @@ export const streamAnthropicMessages: StreamFunction<"anthropic-messages", Anthr
 				}
 
 				if (event.type === "message_delta") {
-					output.stopReason = mapStopReason(event.delta.stop_reason).stopReason;
 					const mapped = mapStopReason(event.delta.stop_reason);
+					output.stopReason = mapped.stopReason;
 					if (mapped.errorMessage) output.errorMessage = mapped.errorMessage;
-			updateUsage(output, event.usage as any, model);
+					updateUsage(output, event.usage as any, model);
 				}
 			}
 
@@ -518,3 +523,4 @@ export const streamSimpleAnthropicMessages: StreamFunction<"anthropic-messages",
 		maxTokens: options?.maxTokens ?? model.maxTokens,
 	});
 };
+

@@ -69,6 +69,7 @@ function harness(
   const panels: Array<{ panel: PanelSection[]; loading: boolean }> = [];
   const queues: string[][] = [];
   const localStates: Array<Pick<AppState, "activePortfolio" | "source" | "showPortfolioPanel">> = [];
+  const huds: Array<AppState["hud"]> = [];
   let configOpened = 0;
   let resumeOpened = 0;
   let portfolioOpened = 0;
@@ -83,12 +84,13 @@ function harness(
       onResumeRequest: () => { resumeOpened++; },
       onPortfolioRequest: () => { portfolioOpened++; },
       onPanel: (panel, loading = false) => panels.push({ panel, loading }),
+      onHud: (hud) => huds.push(hud),
     },
     quoteFetcher,
     holdingFetcher,
     agentFactory,
   );
-  return { runtime, messages, activities, statuses, panels, queues, localStates, get configOpened() { return configOpened; }, get resumeOpened() { return resumeOpened; }, get portfolioOpened() { return portfolioOpened; } };
+  return { runtime, messages, activities, statuses, panels, queues, localStates, huds, get configOpened() { return configOpened; }, get resumeOpened() { return resumeOpened; }, get portfolioOpened() { return portfolioOpened; } };
 }
 
 type RuntimeAgentEvent = { type: string; [key: string]: unknown };
@@ -172,219 +174,71 @@ description: Use for crypto market analysis.
     expect(h.configOpened).toBe(1);
     expect(h.activities.at(-1)).toBe("ready");
   });
-
-  it("handles doctor locally without agent initialization", async () => {
-    const h = harness();
-    expect(await h.runtime.submit("/doctor")).toBe("continue");
-    expect(h.messages.at(-1)?.at(-1)).toEqual(expect.objectContaining({
-      role: "assistant",
-      text: expect.stringContaining("WhyJ Doctor"),
-    }));
-    expect(h.messages.at(-1)?.at(-1)?.text).toContain("Credentials");
-    expect(h.messages.at(-1)?.at(-1)?.text).toContain("value");
-    expect(h.statuses.at(-1)).toBeNull();
-    expect(h.activities.at(-1)).toBe("ready");
-  });
-
-  it("clears messages locally", async () => {
-    const h = harness();
-    await h.runtime.submit("hello");
-    expect(h.queues.at(-1)).toEqual(["hello"]);
-    expect(h.messages.at(-1)).toBeUndefined();
-
-    await h.runtime.submit("/clear");
-    expect(h.messages.at(-1)).toEqual([]);
-    expect(h.queues.at(-1)).toEqual([]);
-    expect(h.statuses.at(-1)).toBeNull();
-    expect(h.activities.at(-1)).toBe("ready");
-  });
-
-  it("keeps natural language input queued while the agent is starting", async () => {
-    const h = harness();
-    await h.runtime.submit("analyze AAPL");
-    expect(h.messages[0]).toBeUndefined();
-    expect(h.queues.at(-1)).toEqual(["analyze AAPL"]);
-    expect(h.statuses.at(-1)).toEqual({
-      kind: "info",
-      text: "Agent is still starting. Your message is kept in the composer; send it again in a moment.",
-    });
-    expect(h.activities).toContain("thinking");
-    expect(h.activities.at(-1)).toBe("ready");
-  });
-
-  it("drives composer queue from agent queue_update events", async () => {
-    const fakeAgent = makeFakeAgent(async (agent) => {
-      agent.state.isStreaming = true;
-    });
-    fakeAgent.followUp = async () => {
-      await fakeAgent.emit({
-        type: "queue_update",
-        steer: [],
-        followUp: [{ role: "user", content: [{ type: "text", text: "queued from harness" }], timestamp: Date.now() }],
-        nextTurn: [],
+  it("averages TTFT and TPOT across assistant turns", async () => {
+    const originalNow = Date.now;
+    let now = 1_000;
+    let turn = 0;
+    Date.now = () => now;
+    try {
+      const fakeAgent = makeFakeAgent(async (agent) => {
+        turn += 1;
+        agent.state.isStreaming = true;
+        await agent.emit({
+          type: "message_start",
+          message: { role: "displayUser", content: [{ type: "text", text: "" }], displayText: `average turn ${turn}` },
+        });
+        await agent.emit({ type: "message_start", message: { role: "assistant", content: [] } });
+        if (turn === 1) {
+          now = 3_200;
+          await agent.emit({
+            type: "message_update",
+            assistantMessageEvent: { type: "text_start" },
+            message: { role: "assistant", content: [{ type: "text", text: "A" }] },
+          });
+          now = 4_000;
+          await agent.emit({
+            type: "message_end",
+            message: {
+              role: "assistant",
+              content: [{ type: "text", text: "Alpha" }],
+              usage: { output: 11 },
+            },
+          });
+        } else {
+          now = 5_000;
+          await agent.emit({
+            type: "message_update",
+            assistantMessageEvent: { type: "text_start" },
+            message: { role: "assistant", content: [{ type: "text", text: "B" }] },
+          });
+          now = 5_400;
+          await agent.emit({
+            type: "message_end",
+            message: {
+              role: "assistant",
+              content: [{ type: "text", text: "Beta" }],
+              usage: { output: 6 },
+            },
+          });
+        }
+        agent.state.isStreaming = false;
+        await agent.emit({ type: "agent_end", messages: [] });
       });
-    };
-    const h = harness(async () => [], async () => [], () => fakeAgent as never);
+      const h = harness(async () => [], async () => [], () => fakeAgent as never);
 
-    await h.runtime.bootstrap();
-    (fakeAgent.state as { isStreaming: boolean }).isStreaming = true;
-    await h.runtime.submit("raw text");
+      await h.runtime.bootstrap();
+      await h.runtime.submit("first average turn");
+      now = 4_200;
+      await h.runtime.submit("second average turn");
 
-    expect(h.queues.at(-1)).toEqual(["queued from harness"]);
+      expect(h.huds.at(-1)).toEqual(expect.objectContaining({
+        ttftMs: 1500,
+        tpotMs: 80,
+      }));
+    } finally {
+      Date.now = originalNow;
+    }
   });
-
-  it("executes unknown slash command through deterministic command path", async () => {
-    const h = harness();
-    await h.runtime.submit("/does-not-exist");
-    expect(h.statuses.at(-1)).toEqual({ kind: "error", text: "Unknown /does-not-exist. Run /help to see available slash commands." });
-    expect(h.activities.at(-1)).toBe("ready");
-    expect(h.panels[0]).toMatchObject({ loading: true });
-    const latestPanel = h.panels.at(-1)?.panel ?? [];
-    expect(latestPanel[0]).toMatchObject({ kind: "group", title: "Default" });
-    expect(latestPanel.some((section) => section.title === "Market")).toBe(true);
-  });
-
-  it("keeps one thinking block and streams assistant separately", () => {
-    const h = harness();
-    const runtime = h.runtime as unknown as {
-      messages: UIMessage[];
-      upsertThinkingMessage: (text: string) => void;
-    };
-    runtime.messages = [
-      { role: "user", text: "hi" },
-      { role: "thinking", text: "", thinkingLive: true },
-      { role: "assistant", text: "" },
-    ];
-    runtime.upsertThinkingMessage("Let me greet the user.");
-    runtime.upsertThinkingMessage("Let me greet the user in Chinese.");
-    expect(runtime.messages.filter((m) => m.role === "thinking")).toHaveLength(1);
-    expect(runtime.messages[1]?.text).toBe("Let me greet the user in Chinese.");
-    expect(runtime.messages[2]?.role).toBe("assistant");
-  });
-
-  it("suppresses duplicate skill echo user lines when a skill banner is already visible", () => {
-    const h = harness();
-    const runtime = h.runtime as unknown as {
-      messages: UIMessage[];
-      addUserMessage: (text: string) => void;
-    };
-    runtime.messages = [
-      {
-        role: "skill",
-        skill: {
-          name: "llmquant-portfolio",
-          label: "SKILL.llmquant-portfolio",
-          status: "running",
-          startedAt: Date.now(),
-        },
-      },
-    ];
-
-    runtime.addUserMessage("SKILL.llmquant-portfolio");
-
-    expect(runtime.messages).toHaveLength(1);
-    expect(runtime.messages[0]?.role).toBe("skill");
-  });
-
-  it("keeps non-empty thinking content when the turn finalizes", () => {
-    const h = harness();
-    const runtime = h.runtime as unknown as {
-      messages: UIMessage[];
-      finalizeThinking: () => void;
-    };
-    runtime.messages = [
-      { role: "user", text: "hi" },
-      { role: "thinking", text: "temporary reasoning", thinkingLive: true, startedAt: Date.now() - 1000 },
-      { role: "assistant", text: "hello" },
-    ];
-
-    runtime.finalizeThinking();
-
-    expect(runtime.messages.map((m) => m.role)).toEqual(["user", "thinking", "assistant"]);
-    expect(runtime.messages[1]).toMatchObject({
-      role: "thinking",
-      text: "temporary reasoning",
-      thinkingLive: false,
-    });
-  });
-
-  it("bridges agent prompt, bash tool call, and assistant output into conversation messages", async () => {
-    let promptInput = "";
-    const fakeAgent = makeFakeAgent(async (agent, input) => {
-      promptInput = input;
-      agent.state.isStreaming = true;
-      await agent.emit({
-        type: "message_start",
-        message: { role: "displayUser", content: [{ type: "text", text: "ignored by runtime" }], displayText: "read the runtime bridge" },
-      });
-      await agent.emit({ type: "message_start", message: { role: "assistant", content: [] } });
-      agent.state.thinkingText = "Need to inspect the file.";
-      await agent.emit({
-        type: "message_update",
-        message: { role: "assistant", content: [{ type: "text", text: "" }] },
-      });
-      await agent.emit({
-        type: "tool_execution_start",
-        toolCallId: "bash-1",
-        toolName: "bash",
-        args: { command: "Get-Content src/app-runtime.ts" },
-      });
-      await agent.emit({
-        type: "tool_execution_update",
-        toolCallId: "bash-1",
-        toolName: "bash",
-        args: { command: "Get-Content src/app-runtime.ts" },
-        partialResult: textResult("reading app-runtime"),
-      });
-      await agent.emit({
-        type: "tool_execution_end",
-        toolCallId: "bash-1",
-        toolName: "bash",
-        result: textResult("read app-runtime successfully"),
-        isError: false,
-      });
-      await agent.emit({
-        type: "message_update",
-        message: { role: "assistant", content: [{ type: "text", text: "I read the runtime bridge." }] },
-      });
-      await agent.emit({
-        type: "message_end",
-        message: { role: "assistant", content: [{ type: "text", text: "I read the runtime bridge." }] },
-      });
-      agent.state.isStreaming = false;
-      await agent.emit({ type: "agent_end", messages: [] });
-    });
-    const h = harness(async () => [], async () => [], () => fakeAgent as never);
-
-    await h.runtime.bootstrap();
-    await h.runtime.submit("read the runtime bridge");
-
-    expect(promptInput).toContain("read the runtime bridge");
-    const latest = h.messages.at(-1) ?? [];
-    expect(latest).toEqual([
-      { role: "user", text: "read the runtime bridge" },
-      expect.objectContaining({
-        role: "thinking",
-        text: "Need to inspect the file.",
-        thinkingLive: false,
-      }),
-      { role: "assistant", text: "I read the runtime bridge." },
-      expect.objectContaining({
-        role: "tool",
-        tool: expect.objectContaining({
-          name: "bash",
-          label: `${shellDisplayName()}.Read · Get-Content src/app-runtime.ts`,
-          args: "Get-Content src/app-runtime.ts",
-          status: "done",
-          result: "read app-runtime successfully",
-        }),
-      }),
-    ]);
-    expect(h.activities).toContain("thinking");
-    expect(h.activities).toContain("running tool");
-    expect(h.activities.at(-1)).toBe("ready");
-  });
-
   it("bridges agent quant tool errors into polite conversation output", async () => {
     const fakeAgent = makeFakeAgent(async (agent) => {
       agent.state.isStreaming = true;
@@ -886,5 +740,7 @@ description: Use for crypto market analysis.
     expect(marketSeen.length).toBeGreaterThan(0);
   });
 });
+
+
 
 

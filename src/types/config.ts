@@ -1,5 +1,4 @@
-import type { Market } from "./data.ts";
-
+export type Market = "A" | "HK" | "US" | "Fund" | "Crypto";
 export type DataSource = "akshare" | "tushare" | "llmquant-data" | "financial-datasets";
 
 export interface UserPreferences {

@@ -23,6 +23,7 @@ export async function startApp(): Promise<void> {
     onHelpRequest: () => tui?.openHelp(),
     onSessionRequest: (meta) => tui?.syncCurrentSessionMeta(meta),
     onPanel: (panel, panelLoading = false) => tui?.update({ panel, panelLoading }),
+    onHud: (hud) => tui?.update({ hud }),
   });
 
   tui = new QuantTui(initial);
@@ -76,3 +77,4 @@ function getPkgVersion(): string {
     return "0.1.0";
   }
 }
+

@@ -15,8 +15,10 @@ export interface Quote {
 }
 
 import type { SkillState } from "../../types/skills.ts";
+import type { HudMetrics } from "../../runtime/hud.ts";
 
 export type { SkillState };
+export type { HudMetrics };
 
 export interface ToolState {
   name: string;
@@ -71,6 +73,8 @@ export interface AppState {
   source: string;
   /** Whether the right-side overview panel is visible. */
   showPortfolioPanel: boolean;
+  /** Bottom HUD metrics for the current session and latest assistant turn. */
+  hud?: HudMetrics;
 }
 
 export interface Layout {
@@ -81,3 +85,6 @@ export interface Layout {
   statusRow: number;
   showPanel: boolean;
 }
+
+
+
