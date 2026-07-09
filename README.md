@@ -6,6 +6,12 @@
 
 ![WhyJ Quant terminal homepage](./docs/assets/terminal.png)
 
+## What's New in 1.1.2
+
+- HUD 简化为更专业的终端状态栏，只保留 Ctx、TTFT、TPOT、T 四个核心指标。
+- TTFT 与 TPOT 改为跨多轮会话的平均值，更适合观察模型整体响应表现。
+- 底部状态栏进一步收紧间距，信息密度更高，视觉上更接近专业交易终端。
+
 ## Quick Start
 
 全局安装：

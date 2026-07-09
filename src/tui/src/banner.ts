@@ -53,7 +53,7 @@ export interface BannerOptions {
 
 export function buildBanner(opts: BannerOptions = {}): string {
   const {
-    version = "0.1.0",
+    version = "1.1.2",
     marginTop = 1,
   } = opts;
 

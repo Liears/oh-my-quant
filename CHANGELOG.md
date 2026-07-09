@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.2] - 2026-07-10
+
+### Changed
+
+- 底部 HUD 简化为 Ctx、TTFT、TPOT、T 四项核心指标，移除冗长的阶段级 trace 展示。
+- TTFT 与 TPOT 统计口径调整为跨会话多轮的平均值，不再按单轮重新计数。
+- HUD 文案间距与分隔符收紧，整体观感更接近专业终端状态栏。
+
+### Removed
+
+- 移除详细链路状态行及其配置开关，不再显示 Ctx/Sys/LLM/Auth/Pack/Net/1st/HTTP 等内部阶段占位。
+- 清理与阶段级 latency trace 相关的运行时状态、渲染逻辑和测试分支。
+
 ## [0.1.0] - 2026-06-25
 
 首个重新梳理后的 WhyJ Quant 版本。本版本按当前 TypeScript/Bun 代码线重新定义为新的 `v0.1.0`，旧发布记录不再作为当前发布口径。
@@ -37,6 +50,6 @@
 
 - npm 包名：`whyj-quant`
 - CLI binary：`whyj`
-- 版本号：`0.1.0`
+- 版本号：`1.1.2`
 - 发布前建议执行：`bun run typecheck`、`bun test src/`、`bun run build`
-- 如需重新建立 Git tag，建议在确认工作区 clean 后创建新的 `v0.1.0` tag；旧 tag 可保留为历史，不纳入本次发布说明。
+- 如需重新建立 Git tag，建议在确认工作区 clean 后创建新的 `v1.1.2` tag；旧 tag 可保留为历史，不纳入本次发布说明。

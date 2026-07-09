@@ -72,9 +72,9 @@ export async function startApp(): Promise<void> {
 function getPkgVersion(): string {
   try {
     const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8"));
-    return pkg.version || "0.1.0";
+    return pkg.version || "1.1.2";
   } catch {
-    return "0.1.0";
+    return "1.1.2";
   }
 }
 
