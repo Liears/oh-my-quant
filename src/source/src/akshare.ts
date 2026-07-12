@@ -7,14 +7,17 @@ import { AKSHARE_PUBLIC_FUND_ENDPOINT_SET, AKSHARE_PUBLIC_INDEX_ENDPOINT_SET } f
 import type { AksharePublicFundEndpoint, AksharePublicIndexEndpoint } from "./akshare-endpoints.ts";
 import {
   constituentSymbolCandidates,
+  classifyAkshareBarSymbol,
   normalizeAkshareIndexConstituentRows,
   normalizeAkshareIndexInfoRows,
   normalizeAkshareIndexQuotes,
+  normalizeAkshareBarSourcePriority,
   normalizeConstituentSourcePriority,
   normalizeSecurityCode,
   parseAkshareFundHistoryJson,
   parseAkshareIndexRowsJson,
   parseAkshareJson,
+  parseAkshareBarsResultJson,
   parseAkshareRowsJson,
 } from "./akshare-normalize.ts";
 import { runPython } from "./akshare-python.ts";
@@ -22,6 +25,8 @@ import { AKSCRIPT, AK_FUND_HISTORY_SCRIPT, AK_GENERIC_FUND_SCRIPT, AK_GENERIC_IN
 import type {
   AkshareArtifactReferenceLine,
   AkshareAttempt,
+  AkshareBarsOptions,
+  AkshareBarsResult,
   AkshareFundHistory,
   AkshareIndexConstituentsResult,
   AkshareIndexInfoResult,
@@ -35,19 +40,26 @@ export { AKSHARE_PUBLIC_FUND_ENDPOINTS, AKSHARE_PUBLIC_INDEX_ENDPOINTS } from ".
 export type { AksharePublicFundEndpoint, AksharePublicIndexEndpoint } from "./akshare-endpoints.ts";
 export {
   normalizeAkshareIndexConstituentRow,
+  classifyAkshareBarSymbol,
   normalizeAkshareIndexConstituentRows,
   normalizeAkshareIndexInfoRow,
   normalizeAkshareIndexInfoRows,
   normalizeAkshareIndexQuote,
   normalizeAkshareIndexQuotes,
+  normalizeAkshareBarSourcePriority,
   parseAkshareFundHistoryJson,
   parseAkshareIndexRowsJson,
   parseAkshareJson,
+  parseAkshareBarsResultJson,
   parseAkshareRowsJson,
 } from "./akshare-normalize.ts";
 export type {
   AkshareArtifactReferenceLine,
   AkshareAttempt,
+  AkshareBarInstrument,
+  AkshareBarSource,
+  AkshareBarsOptions,
+  AkshareBarsResult,
   AkshareFundHistory,
   AkshareIndexConstituent,
   AkshareIndexConstituentEndpoint,
@@ -170,12 +182,24 @@ export async function fetchFromAKShare(
   symbol: string,
   start?: string,
   end?: string,
+  options: AkshareBarsOptions = {},
 ): Promise<Bar[]> {
+  return (await fetchFromAKShareDetailed(symbol, start, end, options)).bars;
+}
+
+export async function fetchFromAKShareDetailed(
+  symbol: string,
+  start?: string,
+  end?: string,
+  options: AkshareBarsOptions = {},
+): Promise<AkshareBarsResult> {
   const startDate = start?.replace(/-/g, "") || "20200101";
   const endDate = end?.replace(/-/g, "") || todayYmd();
+  const sourcePriority = normalizeAkshareBarSourcePriority(options.sourcePriority);
+  const instrument = classifyAkshareBarSymbol(symbol);
 
-  const { stdout } = await runPython(AKSCRIPT, [symbol, startDate, endDate]);
-  return parseAkshareJson(JSON.parse(stdout));
+  const { stdout } = await runPython(AKSCRIPT, [symbol, startDate, endDate, JSON.stringify(sourcePriority), instrument]);
+  return parseAkshareBarsResultJson(JSON.parse(stdout));
 }
 
 export async function fetchAkshareFundHistory(symbol: string): Promise<AkshareFundHistory> {

@@ -65,7 +65,7 @@ async function tryProvider(
 function createProviderAdapters(options: SourceProviderOptions): Record<ProviderSource, BarProviderAdapter> {
   return {
     akshare: options.adapters?.akshare ?? {
-      fetchBars: ({ symbol, start, end }) => fetchFromAKShare(symbol, start, end),
+      fetchBars: ({ symbol, start, end }) => fetchFromAKShare(symbol, start, end, options.akshare),
     },
     tushare: options.adapters?.tushare ?? {
       fetchBars: ({ symbol, start, end }) => fetchFromTushare(symbol, start, end, options.tushare),

@@ -2,6 +2,7 @@ import type { Bar, Market } from "../../types/data.ts";
 import type { FinancialDatasetsOptions } from "./financial-datasets.ts";
 import type { LlmQuantOptions } from "./llmquant.ts";
 import type { TushareOptions } from "./tushare.ts";
+import type { AkshareBarsOptions } from "./akshare-types.ts";
 
 export type DataSource = "auto" | "akshare" | "tushare" | "llmquant-data" | "financial-datasets";
 
@@ -49,6 +50,7 @@ export interface SourceRuntimeDeps {
 }
 
 export interface SourceProviderOptions {
+  akshare?: AkshareBarsOptions;
   tushare?: TushareOptions;
   llmquant?: LlmQuantOptions;
   financialDatasets?: FinancialDatasetsOptions;

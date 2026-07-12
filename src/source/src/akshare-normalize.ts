@@ -1,8 +1,16 @@
 import type { Bar, FundNavDaily } from "../../types/data.ts";
 import { AKSHARE_PUBLIC_FUND_ENDPOINT_SET, AKSHARE_PUBLIC_INDEX_ENDPOINT_SET } from "./akshare-endpoints.ts";
+import {
+  AKSHARE_BAR_SOURCE_ENDPOINTS,
+  AKSHARE_KNOWN_A_INDEX_SYMBOLS,
+  DEFAULT_AKSHARE_BAR_SOURCE_PRIORITY,
+} from "./akshare-endpoints.ts";
 import type { AksharePublicFundEndpoint, AksharePublicIndexEndpoint } from "./akshare-endpoints.ts";
 import type {
   AkshareAttempt,
+  AkshareBarInstrument,
+  AkshareBarSource,
+  AkshareBarsResult,
   AkshareFundHistory,
   AkshareIndexConstituent,
   AkshareIndexConstituentEndpoint,
@@ -15,11 +23,15 @@ import type {
 } from "./akshare-types.ts";
 
 export function parseAkshareJson(parsed: unknown): Bar[] {
-  if (!Array.isArray(parsed)) {
-    throw new Error(`AKShare error: ${(parsed as { error: string }).error}`);
-  }
-  if (parsed.length === 0) return [];
-  return parsed.map((r: Record<string, unknown>) => ({
+  return parseAkshareBarsResultJson(parsed).bars;
+}
+
+export function parseAkshareBarsResultJson(parsed: unknown): AkshareBarsResult {
+  const record = isRecord(parsed) ? parsed : null;
+  if (record?.error) throw new Error(`AKShare error: ${String(record.error)}`);
+  const rows = Array.isArray(parsed) ? parsed : record && Array.isArray(record.bars) ? record.bars : null;
+  if (!rows) throw new Error("AKShare error: invalid bars payload");
+  const bars = rows.filter(isRecord).map((r) => ({
     date: String(r.date || ""),
     open: Number(r.open || 0),
     high: Number(r.high || 0),
@@ -28,6 +40,40 @@ export function parseAkshareJson(parsed: unknown): Bar[] {
     volume: Number(r.volume || 0),
     amount: Number(r.amount || 0),
   }));
+  return {
+    bars,
+    endpoint: record?.endpoint == null ? null : String(record.endpoint),
+    attempts: record && Array.isArray(record.attempts)
+      ? record.attempts.filter(isRecord).map(normalizeAttempt)
+      : [],
+  };
+}
+
+export function normalizeAkshareBarSourcePriority(value?: string | readonly string[]): AkshareBarSource[] {
+  const tokens = Array.isArray(value) ? value : typeof value === "string" ? value.split(/[,，>、\s]+/u) : [];
+  const aliases: Record<string, AkshareBarSource> = {
+    eastmoney: "eastmoney", em: "eastmoney", "东方财富": "eastmoney", "东财": "eastmoney",
+    sina: "sina", "新浪": "sina",
+    tencent: "tencent", tx: "tencent", "腾讯": "tencent",
+  };
+  for (const [source, endpoint] of Object.entries(AKSHARE_BAR_SOURCE_ENDPOINTS)) {
+    aliases[endpoint] = source as AkshareBarSource;
+  }
+  const normalized: AkshareBarSource[] = [];
+  for (const token of tokens) {
+    const source = aliases[String(token).trim().toLowerCase()];
+    if (source && !normalized.includes(source)) normalized.push(source);
+  }
+  return normalized.length > 0 ? normalized : [...DEFAULT_AKSHARE_BAR_SOURCE_PRIORITY];
+}
+
+export function classifyAkshareBarSymbol(symbol: string): AkshareBarInstrument {
+  const normalized = symbol.trim().toUpperCase();
+  if (AKSHARE_KNOWN_A_INDEX_SYMBOLS[normalized]) return "index";
+  if (normalized.endsWith(".OF")) return "fund";
+  if (/\.(?:SH|SZ|BJ)$/u.test(normalized)) return "stock";
+  if (/^\d{6}$/u.test(normalized)) return "ambiguous";
+  return "stock";
 }
 
 export function parseAkshareFundHistoryJson(parsed: unknown): AkshareFundHistory {

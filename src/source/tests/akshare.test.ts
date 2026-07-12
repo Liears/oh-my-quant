@@ -1,16 +1,22 @@
 import { describe, expect, it } from "bun:test";
 import {
+  AKSHARE_BAR_SOURCE_ENDPOINTS,
+  DEFAULT_AKSHARE_BAR_SOURCE_PRIORITY,
   AKSHARE_PUBLIC_FUND_ENDPOINTS,
   AKSHARE_PUBLIC_INDEX_ENDPOINTS,
 } from "../src/akshare-endpoints.ts";
 import {
   fetchAkshareAIndexSpot,
 } from "../src/akshare.ts";
+import { AKSCRIPT } from "../src/akshare-scripts.ts";
 import {
   normalizeAkshareIndexConstituentRows,
+  classifyAkshareBarSymbol,
+  normalizeAkshareBarSourcePriority,
   normalizeAkshareIndexInfoRows,
   normalizeAkshareIndexQuote,
   parseAkshareFundHistoryJson,
+  parseAkshareBarsResultJson,
   parseAkshareIndexRowsJson,
   parseAkshareJson,
   parseAkshareRowsJson,
@@ -50,6 +56,75 @@ describe("parseAkshareJson", () => {
     expect(() => parseAkshareJson({ error: "No data for 000001.SH" })).toThrow(
       "AKShare error: No data for 000001.SH",
     );
+  });
+
+  it("parses the selected upstream and fallback attempts", () => {
+    const result = parseAkshareBarsResultJson({
+      bars: [{ date: "2026-06-08", open: 1, high: 2, low: 0.5, close: 1.5, volume: 10, amount: 20 }],
+      endpoint: "stock_zh_a_daily",
+      attempts: [
+        { endpoint: "stock_zh_a_hist", status: "error", error: "offline" },
+        { endpoint: "stock_zh_a_daily", status: "ok", rows: 1 },
+      ],
+    });
+    expect(result.endpoint).toBe("stock_zh_a_daily");
+    expect(result.bars).toHaveLength(1);
+    expect(result.attempts).toEqual([
+      { endpoint: "stock_zh_a_hist", status: "error", error: "offline" },
+      { endpoint: "stock_zh_a_daily", status: "ok", rows: 1 },
+    ]);
+  });
+
+  it("keeps empty bars and endpoint attempts available for outer fallback", () => {
+    const result = parseAkshareBarsResultJson({
+      bars: [],
+      endpoint: null,
+      attempts: [
+        { endpoint: "stock_zh_a_hist", status: "ok", rows: 0 },
+        { endpoint: "stock_zh_a_daily", status: "error", error: "offline" },
+        { endpoint: "stock_zh_a_hist_tx", status: "ok", rows: 0 },
+      ],
+    });
+    expect(result.bars).toEqual([]);
+    expect(result.endpoint).toBeNull();
+    expect(result.attempts).toHaveLength(3);
+  });
+});
+
+describe("normalizeAkshareBarSourcePriority", () => {
+  it("accepts provider names, endpoint aliases, and removes duplicates", () => {
+    expect(normalizeAkshareBarSourcePriority("新浪 > stock_zh_a_hist、tx sina")).toEqual([
+      "sina", "eastmoney", "tencent",
+    ]);
+  });
+
+  it("uses the resilient default chain when configuration is empty or invalid", () => {
+    expect(normalizeAkshareBarSourcePriority("unknown")).toEqual(["eastmoney", "sina", "tencent"]);
+  });
+});
+
+describe("AKShare bar routing contract", () => {
+  it("defines the canonical Eastmoney, Sina, Tencent chain", () => {
+    expect(DEFAULT_AKSHARE_BAR_SOURCE_PRIORITY).toEqual(["eastmoney", "sina", "tencent"]);
+    expect(AKSHARE_BAR_SOURCE_ENDPOINTS).toEqual({
+      eastmoney: "stock_zh_a_hist",
+      sina: "stock_zh_a_daily",
+      tencent: "stock_zh_a_hist_tx",
+    });
+  });
+
+  it("distinguishes colliding stock, fund, and index symbols before fallback", () => {
+    expect(classifyAkshareBarSymbol("000001.SZ")).toBe("stock");
+    expect(classifyAkshareBarSymbol("000001.OF")).toBe("fund");
+    expect(classifyAkshareBarSymbol("000001.SH")).toBe("index");
+    expect(classifyAkshareBarSymbol("000001")).toBe("ambiguous");
+  });
+
+  it("preserves empty attempts and maps Tencent hand volume away from turnover amount", () => {
+    expect(AKSCRIPT).toContain('json.dumps({"bars": [], "endpoint": None, "attempts": attempts})');
+    expect(AKSCRIPT).toContain("sys.exit(0)");
+    expect(AKSCRIPT).toContain('df["volume"] = df["amount"]');
+    expect(AKSCRIPT).toContain('df["amount"] = 0');
   });
 });
 

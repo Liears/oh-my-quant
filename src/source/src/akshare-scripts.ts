@@ -1,3 +1,9 @@
+import {
+  AKSHARE_BAR_SOURCE_ENDPOINTS,
+  AKSHARE_KNOWN_A_INDEX_SYMBOLS,
+  DEFAULT_AKSHARE_BAR_SOURCE_PRIORITY,
+} from "./akshare-endpoints.ts";
+
 // AKShare 股票数据 — AKShare 1.18.64 文档 https://akshare.akfamily.xyz/data/stock/stock.html#
 
 export const AKSCRIPT = `
@@ -10,18 +16,13 @@ try:
     symbol = sys.argv[1]
     start = sys.argv[2] if len(sys.argv) > 2 else "20200101"
     end = sys.argv[3] if len(sys.argv) > 3 else datetime.today().strftime("%Y%m%d")
+    source_priority = json.loads(sys.argv[4]) if len(sys.argv) > 4 else ${JSON.stringify(DEFAULT_AKSHARE_BAR_SOURCE_PRIORITY)}
+    instrument = sys.argv[5] if len(sys.argv) > 5 else "ambiguous"
     df = None
+    selected_endpoint = None
+    attempts = []
 
-    index_map = {
-        "000001.SH": "sh000001",
-        "399001.SZ": "sz399001",
-        "000300.SH": "sh000300",
-        "000905.SH": "sh000905",
-        "399006.SZ": "sz399006",
-        "000016.SH": "sh000016",
-        "000688.SH": "sh000688",
-        "000852.SH": "sh000852",
-    }
+    index_map = ${JSON.stringify(AKSHARE_KNOWN_A_INDEX_SYMBOLS)}
 
     def normalize_date_filter(input_df):
         if input_df is None or input_df.empty:
@@ -37,6 +38,54 @@ try:
                 local_df = local_df[local_df["date"] <= pd.to_datetime(end).strftime("%Y-%m-%d")]
         return local_df
 
+    def call_endpoint(name, fn):
+        try:
+            result = normalize_date_filter(fn())
+            rows = 0 if result is None else len(result.index)
+            attempts.append({"endpoint": name, "status": "ok", "rows": rows})
+            return result
+        except Exception as e:
+            attempts.append({"endpoint": name, "status": "error", "error": str(e)[:240]})
+            return None
+
+    def fetch_stock_hist(code, market_symbol):
+        endpoint_calls = {
+            "eastmoney": ("${AKSHARE_BAR_SOURCE_ENDPOINTS.eastmoney}", lambda: getattr(ak, "${AKSHARE_BAR_SOURCE_ENDPOINTS.eastmoney}")(
+                symbol=code, period="daily", start_date=start, end_date=end, adjust="qfq")),
+            "sina": ("${AKSHARE_BAR_SOURCE_ENDPOINTS.sina}", lambda: getattr(ak, "${AKSHARE_BAR_SOURCE_ENDPOINTS.sina}")(
+                symbol=market_symbol, start_date=start, end_date=end, adjust="qfq")),
+            "tencent": ("${AKSHARE_BAR_SOURCE_ENDPOINTS.tencent}", lambda: getattr(ak, "${AKSHARE_BAR_SOURCE_ENDPOINTS.tencent}")(
+                symbol=market_symbol, start_date=start, end_date=end, adjust="qfq")),
+        }
+        for source in source_priority:
+            entry = endpoint_calls.get(source)
+            if entry is None:
+                attempts.append({"endpoint": str(source), "status": "error", "error": "unsupported source"})
+                continue
+            name, fn = entry
+            hist = call_endpoint(name, fn)
+            if hist is not None and not hist.empty:
+                return hist, name
+        return None, None
+
+    def fetch_fund_nav(code):
+        fund_df = call_endpoint("fund_open_fund_info_em", lambda: ak.fund_open_fund_info_em(
+            symbol=code, indicator="单位净值走势"))
+        if fund_df is None or fund_df.empty:
+            return None
+        fund_df = fund_df.rename(columns={"净值日期": "date", "单位净值": "close"})
+        fund_df["open"] = fund_df["close"]
+        fund_df["high"] = fund_df["close"]
+        fund_df["low"] = fund_df["close"]
+        fund_df["volume"] = 0
+        fund_df["amount"] = 0
+        fund_df["date"] = pd.to_datetime(fund_df["date"]).dt.strftime("%Y-%m-%d")
+        if start:
+            fund_df = fund_df[fund_df["date"] >= pd.to_datetime(start).strftime("%Y-%m-%d")]
+        if end:
+            fund_df = fund_df[fund_df["date"] <= pd.to_datetime(end).strftime("%Y-%m-%d")]
+        return fund_df
+
     def fetch_index_hist(code, market_symbol=None):
         endpoint_calls = [
             ("index_zh_a_hist", lambda: ak.index_zh_a_hist(symbol=code, period="daily", start_date=start, end_date=end)),
@@ -46,86 +95,41 @@ try:
             ("index_hist_sw", lambda: ak.index_hist_sw(symbol=code, period="day")),
             ("stock_zh_index_daily", lambda: ak.stock_zh_index_daily(symbol=market_symbol or code)),
         ]
-        for _name, fn in endpoint_calls:
-            try:
-                hist = normalize_date_filter(fn())
-                if hist is not None and not hist.empty:
-                    return hist
-            except Exception:
-                pass
-        return None
+        for name, fn in endpoint_calls:
+            hist = call_endpoint(name, fn)
+            if hist is not None and not hist.empty:
+                return hist, name
+        return None, None
 
-    if symbol in index_map:
+    if instrument == "index":
         code = symbol.split(".")[0]
-        df = fetch_index_hist(code, index_map[symbol])
-    elif "." in symbol:
+        df, selected_endpoint = fetch_index_hist(code, index_map.get(symbol.upper()))
+    elif instrument == "fund":
+        df = fetch_fund_nav(symbol.split(".")[0])
+        selected_endpoint = "fund_open_fund_info_em" if df is not None and not df.empty else None
+    elif instrument == "stock":
         code = symbol.split(".")[0]
-        if code.isdigit() and len(code) == 6:
-            stock_df = None
-            try:
-                stock_df = ak.stock_zh_a_hist(symbol=code, period="daily",
-                                              start_date=start, end_date=end,
-                                              adjust="qfq")
-            except Exception:
-                pass
-            if stock_df is not None and not stock_df.empty:
-                df = stock_df
-            else:
-                try:
-                    df = ak.fund_open_fund_info_em(symbol=code, indicator="单位净值走势")
-                except Exception:
-                    df = None
-                if df is not None and not df.empty:
-                    df = df.rename(columns={"净值日期": "date", "单位净值": "close"})
-                    df["open"] = df["close"]
-                    df["high"] = df["close"]
-                    df["low"] = df["close"]
-                    df["volume"] = 0
-                    df["amount"] = 0
-                    df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
-                    if start:
-                        df = df[df["date"] >= pd.to_datetime(start).strftime("%Y-%m-%d")]
-                    if end:
-                        df = df[df["date"] <= pd.to_datetime(end).strftime("%Y-%m-%d")]
-            if df is None or df.empty:
-                market_prefix = "sh" if symbol.upper().endswith(".SH") else "sz" if symbol.upper().endswith(".SZ") else ""
-                df = fetch_index_hist(code, f"{market_prefix}{code}" if market_prefix else code)
-        else:
-            df = ak.stock_zh_a_hist(symbol=code, period="daily",
-                                    start_date=start, end_date=end,
-                                    adjust="qfq")
-    elif symbol.isdigit() and len(symbol) == 6:
-        try:
-            df = ak.fund_open_fund_info_em(symbol=symbol, indicator="单位净值走势")
-        except Exception:
-            df = None
-        if df is not None and not df.empty:
-            df = df.rename(columns={"净值日期": "date", "单位净值": "close"})
-            df["open"] = df["close"]
-            df["high"] = df["close"]
-            df["low"] = df["close"]
-            df["volume"] = 0
-            df["amount"] = 0
-            df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
-            if start:
-                df = df[df["date"] >= pd.to_datetime(start).strftime("%Y-%m-%d")]
-            if end:
-                df = df[df["date"] <= pd.to_datetime(end).strftime("%Y-%m-%d")]
-        if df is None or df.empty:
-            df = fetch_index_hist(symbol)
+        market_prefix = "sh" if symbol.upper().endswith(".SH") else "sz" if symbol.upper().endswith(".SZ") else "bj" if symbol.upper().endswith(".BJ") else ""
+        market_symbol = f"{market_prefix}{code}" if market_prefix else code
+        df, selected_endpoint = fetch_stock_hist(code, market_symbol)
     else:
-        df = ak.stock_zh_a_hist(symbol=symbol, period="daily",
-                                start_date=start, end_date=end,
-                                adjust="qfq")
+        df = fetch_fund_nav(symbol)
+        if df is not None and not df.empty:
+            selected_endpoint = "fund_open_fund_info_em"
+        if df is None or df.empty:
+            df, selected_endpoint = fetch_index_hist(symbol)
 
     if df is None or df.empty:
-        print(json.dumps({"error": f"No data for {symbol}"}))
-        sys.exit(1)
+        print(json.dumps({"bars": [], "endpoint": None, "attempts": attempts}))
+        sys.exit(0)
 
     # Normalize column names
     col_map = {"日期":"date","开盘":"open","开盘价":"open","今开":"open","最高":"high","最高价":"high","最低":"low","最低价":"low",
                "收盘":"close","收盘价":"close","最新价":"close","latest":"close","成交量":"volume","成交额":"amount","成交金额":"amount"}
     df = df.rename(columns=col_map)
+    if selected_endpoint == "${AKSHARE_BAR_SOURCE_ENDPOINTS.tencent}" and "amount" in df.columns:
+        df["volume"] = df["amount"]
+        df["amount"] = 0
     cols = ["date","open","high","low","close","volume","amount"]
     df = df[[c for c in cols if c in df.columns]]
     df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
@@ -138,7 +142,7 @@ try:
         for k in ("volume","amount"):
             if k in r and r[k] is not None:
                 r[k] = int(float(r[k]))
-    print(json.dumps(records))
+    print(json.dumps({"bars": records, "endpoint": selected_endpoint, "attempts": attempts}))
 except Exception as e:
     print(json.dumps({"error": str(e)}))
     sys.exit(1)

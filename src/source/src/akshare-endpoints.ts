@@ -1,3 +1,28 @@
+export const AKSHARE_BAR_SOURCE_ENDPOINTS = {
+  eastmoney: "stock_zh_a_hist",
+  sina: "stock_zh_a_daily",
+  tencent: "stock_zh_a_hist_tx",
+} as const;
+
+export type AkshareBarSource = keyof typeof AKSHARE_BAR_SOURCE_ENDPOINTS;
+
+export const DEFAULT_AKSHARE_BAR_SOURCE_PRIORITY: readonly AkshareBarSource[] = [
+  "eastmoney",
+  "sina",
+  "tencent",
+];
+
+export const AKSHARE_KNOWN_A_INDEX_SYMBOLS: Readonly<Record<string, string>> = {
+  "000001.SH": "sh000001",
+  "399001.SZ": "sz399001",
+  "000300.SH": "sh000300",
+  "000905.SH": "sh000905",
+  "399006.SZ": "sz399006",
+  "000016.SH": "sh000016",
+  "000688.SH": "sh000688",
+  "000852.SH": "sh000852",
+};
+
 export const AKSHARE_PUBLIC_INDEX_ENDPOINTS = [
   "stock_zh_index_spot_em",
   "stock_zh_index_spot_sina",

@@ -5,7 +5,9 @@ export {
   fetchAkshareIndexInfo,
   fetchAkshareIndexRows,
   buildAkshareArtifactReferenceLine,
+  classifyAkshareBarSymbol,
   fetchFromAKShare,
+  fetchFromAKShareDetailed,
   fetchAkshareFundHistory,
   fetchAkshareFundNav,
   fetchAkshareFundProfile,
@@ -15,6 +17,10 @@ export {
 } from "./src/akshare.ts";
 export type {
   AkshareArtifactReferenceLine,
+  AkshareBarInstrument,
+  AkshareBarSource,
+  AkshareBarsOptions,
+  AkshareBarsResult,
   AkshareFundHistory,
   AkshareIndexConstituent,
   AkshareIndexConstituentsResult,
