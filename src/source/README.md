@@ -16,6 +16,7 @@
 - normalize configured source selection
 - fetch bars from AKShare, Tushare, LLMQuant, and Financial Datasets
 - fall back across providers when one source is empty, stale, or unavailable
+- fall back across AKShare upstream endpoints before falling through to another provider
 - merge provider results with cache behavior only through injectable runtime deps
 - expose source attribution metadata for TUI Overview
 
@@ -43,14 +44,31 @@
 1. External callers import from `src/source/index.ts`.
 2. Tests may import deep module paths when they are targeting one adapter directly.
 3. Cross-provider policy belongs in `source-providers.ts`, not in individual adapters.
-4. Provider-specific parsing or transport logic stays in the adapter file.
-5. Raw provider adapters do not import storage; callers pass explicit provider options or rely on canonical environment variables.
-6. Storage-backed cache/settings defaults live in `src/runtime/source-runtime.ts`, not in this module.
+4. AKShare endpoint fallback belongs inside the AKShare adapter; runtime callers must not select Eastmoney/Sina/Tencent directly.
+5. Provider-specific parsing or transport logic stays in the adapter file.
+6. Raw provider adapters do not import storage; callers pass explicit provider options or rely on canonical environment variables.
+7. Storage-backed cache/settings defaults live in `src/runtime/source-runtime.ts`, not in this module.
+
+## Fallback model
+
+For ordinary A-share daily bars, fallback is deliberately layered:
+
+1. AKShare tries Eastmoney (`stock_zh_a_hist`), Sina (`stock_zh_a_daily`), then Tencent (`stock_zh_a_hist_tx`).
+2. Symbol classification keeps suffixed stocks, `.OF` funds, and known indexes on separate endpoint families.
+3. Empty/error endpoint attempts are retained by `fetchFromAKShareDetailed()`.
+4. If AKShare returns no bars or raises an adapter-level error, `source-providers.ts` tries Tushare.
+5. `fetchBars()` may finally use date-matching provider cache; `fetchLiveBars()` never reads or writes cache.
+
+Callers may configure `providers.akshare.sourcePriority`, override a `BarProviderAdapter`, or set a market
+`fallbackOrder`. These are separate controls: endpoint order is internal to AKShare, while fallback order chooses
+between top-level providers.
 
 ## Test rules
 
 - put provider parsing tests in `src/source/tests/`
 - when a live-source bug causes Overview to show empty quotes or wrong source labels, add a regression test in `sources.test.ts`
+- test AKShare endpoint payloads, priorities, and embedded chain behavior in `akshare.test.ts`
+- cover both endpoint-level and provider-level empty/error fallback paths
 - keep tests deterministic; mock provider adapters instead of hitting network paths
 
 ## Related docs

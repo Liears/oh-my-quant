@@ -22,15 +22,23 @@
 - 官方文档：
   - 主页：https://akshare.akfamily.xyz/
 - WhyJ Quant 调用：
-  - `ak.stock_zh_index_daily(...)`
+  - 普通 A 股日线按默认链降级：
+    1. `ak.stock_zh_a_hist(...)`（东方财富）
+    2. `ak.stock_zh_a_daily(...)`（新浪）
+    3. `ak.stock_zh_a_hist_tx(...)`（腾讯）
+  - 指数日线依次尝试 `index_zh_a_hist`、`stock_zh_index_daily_em`、中证/国证/申万及新浪接口
   - `ak.fund_open_fund_info_em(..., indicator="单位净值走势")`
-  - `ak.stock_zh_a_hist(..., period="daily", adjust="qfq")`
 - 本地角色：
   - A 股/指数/基金日线的主要数据源
   - 中国市场数据的零密钥本地回退
 - 本地 wrapper 形态：
   - Node 通过 `child_process.spawn` 启动 Python 子进程执行 AKShare 代码片段
   - adapter 将结果标准化为内部 `Bar[]`
+  - `fetchFromAKShareDetailed()` 额外返回实际命中的 endpoint 和每次 endpoint attempt
+  - 全部 AKShare endpoint 失败/返回空时，adapter 返回空 bars，由上层继续降级到 Tushare
+  - 可通过 `providers.akshare.sourcePriority` 调整普通 A 股日线顺序，例如 `sina,eastmoney,tencent`
+  - 在进入 Python 前先区分带后缀的股票、`.OF` 基金和已知指数，避免 `000001.SZ` 错降级成同代码基金或指数
+  - 腾讯日线的 `amount` 表示手数，adapter 将其映射到内部 `volume`，成交额记为 `0`
 - Python 发现顺序（`getPythonCandidates()`）：
   1. 项目 `.venv/` 下的 python（按源文件位置解析，不依赖 cwd）
   2. `py -3`（Windows Python Launcher）
@@ -101,7 +109,7 @@
 3. 如果缓存缺失/过期：
    - 调用 `pullBarsFromProviders(...)`
 4. 如果实时拉取仍然返回空：
-   - 按以下顺序扫描任何现有缓存：
+   - 按以下顺序扫描现有缓存，只接受日期窗口内非空的数据：
      - `akshare`
      - `tushare`
      - `llmquant-data`
@@ -132,6 +140,79 @@
 - A 股始终尝试两个 provider（首选 + 回退），顺序由 `selected` 参数决定。
 - US/HK 不尝试 AKShare/Tushare。
 - `Financial Datasets` 对 `US` 自动，但对 `HK` 不自动。
+- provider 抛错或返回空数组时，source orchestrator 不向上抛出该错误，而是继续尝试下一项。
+- 返回的 `source` 与缓存目录始终使用实际成功的 provider，不能使用失败的首选 provider。
+
+### 3.2.1 两级降级模型
+
+A 股日线包含两层独立的降级：
+
+```text
+AKShare adapter
+  stock_zh_a_hist（东方财富）
+    → stock_zh_a_daily（新浪）
+    → stock_zh_a_hist_tx（腾讯）
+      ↓ 全部 error/empty
+source orchestrator
+  Tushare
+    ↓ 仍然 error/empty
+fetchBars() 的任意本地缓存
+```
+
+AKShare 内部 endpoint 顺序通过每次调用的 `providers.akshare.sourcePriority` 配置：
+
+```ts
+const result = await fetchLiveBars("600000.SH", "A", undefined, undefined, {
+  providers: {
+    akshare: {
+      sourcePriority: ["sina", "eastmoney", "tencent"],
+    },
+  },
+});
+```
+
+支持 provider 名、AKShare endpoint 名和中文别名；重复项会去除，无效或空配置回到默认链。
+`fetchFromAKShareDetailed()` 用于需要 endpoint 级诊断的调用：
+
+```ts
+const detail = await fetchFromAKShareDetailed("600000.SH", undefined, undefined, {
+  sourcePriority: "新浪,东方财富,腾讯",
+});
+
+detail.bars;     // 标准 Bar[]
+detail.endpoint; // 实际命中的 AKShare endpoint；全部为空时为 null
+detail.attempts; // 每个 endpoint 的 ok/error、rows 或 error
+```
+
+普通业务调用继续使用 `fetchFromAKShare()`，其返回类型保持为 `Bar[]`。全部 AKShare endpoint
+失败或为空属于可降级结果，返回空数组而不是让 Python 子进程以失败退出；导入 AKShare/Python
+不可用等 adapter 级故障仍由外层 provider orchestrator 捕获并切换到 Tushare。
+
+### 3.2.2 替换 adapter 与自定义 provider 降级链
+
+`SourceProviderOptions.adapters` 是 provider 的可替换边界。调用方可以只替换不稳定的 AKShare
+实现，不需要修改 `fetchBars()`、`fetchLiveBars()` 或 Overview：
+
+```ts
+await fetchLiveBars("000300.SH", "A", undefined, undefined, {
+  providers: {
+    adapters: {
+      akshare: {
+        fetchBars: ({ symbol, start, end }) => alternativeClient.fetchBars(symbol, start, end),
+      },
+    },
+    fallbackOrder: { A: ["akshare", "tushare"] },
+  },
+});
+```
+
+`pullBarsFromProviders()` 同时返回 `attempts`，逐项标记 `success`、`empty` 或 `error`。
+错误文本会脱敏、压成单行并截断；它只用于诊断，不影响成功降级，也不直接替代面向用户的 source label。
+
+两类 attempts 不应混用：
+
+- `AkshareBarsResult.attempts`：AKShare 内部 endpoint 级尝试，例如东方财富失败后新浪成功。
+- `PullBarsResult.attempts`：跨 provider 尝试，例如 AKShare 空数据后 Tushare 成功。
 
 ### 3.3 `fetchLiveBars()` 优先级
 
@@ -220,6 +301,9 @@
 覆盖意图：
 
 - adapter payload 标准化
+- AKShare 详细 bars payload、空数据与 endpoint attempts 契约
+- AKShare 默认东方财富 → 新浪 → 腾讯内部链
+- AKShare 空数据后 source orchestrator 降级到 Tushare
 - snapshot 映射
 - provider fallback order
 - 实时获取空窗口回退
@@ -231,6 +315,9 @@
 2. 仅通过 `src/source/index.ts` 导出。
 3. 当端点形态或优先级变化时更新本文档。
 4. 添加一个 adapter 测试文件和至少一个编排回归测试。
+5. provider 调用必须经过 `BarProviderAdapter`，不要在 runtime/Overview 内直接依赖 AKShare。
+6. 添加或调整 AKShare 日线 endpoint 时，同时更新 `AkshareBarSource`、优先级归一化、嵌入式 Python 链及对应测试。
+7. endpoint 失败必须保留 attempt；全部 endpoint 为空必须交回 source orchestrator，不能在 runtime 内自行切源。
 
 ---
 
