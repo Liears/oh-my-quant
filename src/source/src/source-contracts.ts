@@ -9,6 +9,31 @@ export type DataSource = "auto" | "akshare" | "tushare" | "llmquant-data" | "fin
 export type PullSource = "akshare" | "tushare" | "llmquant-data" | "financial-datasets" | "unavailable";
 export type ProviderSource = Exclude<PullSource, "unavailable">;
 
+export interface SourceBarsRequest {
+  symbol: string;
+  market: Market;
+  start?: string;
+  end?: string;
+}
+
+/** Replaceable boundary between source orchestration and a concrete data client. */
+export interface BarProviderAdapter {
+  fetchBars(request: SourceBarsRequest): Promise<Bar[]>;
+}
+
+export interface ProviderAttempt {
+  source: ProviderSource;
+  status: "success" | "empty" | "error";
+  /** Redacted, one-line diagnostic. The orchestrator never throws provider failures. */
+  error?: string;
+}
+
+export interface PullBarsResult {
+  bars: Bar[];
+  source: PullSource;
+  attempts: ProviderAttempt[];
+}
+
 export interface LiveFetchResult {
   bars: Bar[];
   source: PullSource;
@@ -27,6 +52,10 @@ export interface SourceProviderOptions {
   tushare?: TushareOptions;
   llmquant?: LlmQuantOptions;
   financialDatasets?: FinancialDatasetsOptions;
+  /** Per-call adapter overrides, useful for replacing an unavailable provider. */
+  adapters?: Partial<Record<ProviderSource, BarProviderAdapter>>;
+  /** Optional fallback chain override per market. The selected source is still tried first. */
+  fallbackOrder?: Partial<Record<Market, readonly ProviderSource[]>>;
 }
 
 export interface SourceFetchOptions {

@@ -43,9 +43,13 @@ export {
   searchSymbols,
 } from "./src/sources.ts";
 export type {
+  BarProviderAdapter,
   DataSource,
   LiveFetchResult,
+  ProviderAttempt,
+  PullBarsResult,
   PullSource,
+  SourceBarsRequest,
   SourceFetchOptions,
   SourceProviderOptions,
   SourceRuntimeDeps,

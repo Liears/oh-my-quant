@@ -3,31 +3,14 @@ import { fetchFromFinancialDatasets } from "./financial-datasets.ts";
 import { fetchFromLlmQuant } from "./llmquant.ts";
 import { fetchFromTushare, searchTushareSymbols } from "./tushare.ts";
 import type { Bar, Market, SymbolInfo } from "../../types/data.ts";
-import type { DataSource, ProviderSource, PullSource, SourceProviderOptions } from "./source-contracts.ts";
-
-interface BarProviderAdapter {
-  id: ProviderSource;
-  fetchBars(symbol: string, start: string | undefined, end: string | undefined, options: SourceProviderOptions): Promise<Bar[]>;
-}
-
-const BAR_PROVIDER_ADAPTERS: Record<ProviderSource, BarProviderAdapter> = {
-  akshare: {
-    id: "akshare",
-    fetchBars: (symbol, start, end) => fetchFromAKShare(symbol, start, end),
-  },
-  tushare: {
-    id: "tushare",
-    fetchBars: (symbol, start, end, options) => fetchFromTushare(symbol, start, end, options.tushare),
-  },
-  "llmquant-data": {
-    id: "llmquant-data",
-    fetchBars: (symbol, start, end, options) => fetchFromLlmQuant(symbol, start, end, options.llmquant),
-  },
-  "financial-datasets": {
-    id: "financial-datasets",
-    fetchBars: (symbol, start, end, options) => fetchFromFinancialDatasets(symbol, start, end, options.financialDatasets),
-  },
-};
+import type {
+  BarProviderAdapter,
+  DataSource,
+  ProviderAttempt,
+  ProviderSource,
+  PullBarsResult,
+  SourceProviderOptions,
+} from "./source-contracts.ts";
 
 /** Provider fallback chain for live/cache pulls. */
 export async function pullBarsFromProviders(
@@ -37,13 +20,16 @@ export async function pullBarsFromProviders(
   end?: string,
   selected: DataSource = fallbackSourceForMarket(market),
   providerOptions: SourceProviderOptions = {},
-): Promise<{ bars: Bar[]; source: PullSource }> {
+): Promise<PullBarsResult> {
   const normalized = normalizeSymbol(symbol, market);
-  for (const id of providerOrderFor(market, selected)) {
-    const result = await tryProvider(BAR_PROVIDER_ADAPTERS[id], normalized, start, end, providerOptions);
-    if (result && result.bars.length > 0) return result;
+  const adapters = createProviderAdapters(providerOptions);
+  const attempts: ProviderAttempt[] = [];
+  for (const id of providerOrderFor(market, selected, providerOptions.fallbackOrder)) {
+    const result = await tryProvider(id, adapters[id], { symbol: normalized, market, start, end });
+    attempts.push(result.attempt);
+    if (result.bars.length > 0) return { bars: result.bars, source: id, attempts };
   }
-  return { bars: [], source: "unavailable" };
+  return { bars: [], source: "unavailable", attempts };
 }
 
 /** Search symbols */
@@ -64,21 +50,43 @@ export function fallbackSourceForMarket(market: Market): DataSource {
 }
 
 async function tryProvider(
+  id: ProviderSource,
   provider: BarProviderAdapter,
-  symbol: string,
-  start: string | undefined,
-  end: string | undefined,
-  options: SourceProviderOptions,
-): Promise<{ bars: Bar[]; source: ProviderSource } | null> {
+  request: Parameters<BarProviderAdapter["fetchBars"]>[0],
+): Promise<{ bars: Bar[]; attempt: ProviderAttempt }> {
   try {
-    const bars = await provider.fetchBars(symbol, start, end, options);
-    return { bars, source: provider.id };
-  } catch {
-    return null;
+    const bars = await provider.fetchBars(request);
+    return { bars, attempt: { source: id, status: bars.length > 0 ? "success" : "empty" } };
+  } catch (error) {
+    return { bars: [], attempt: { source: id, status: "error", error: providerErrorMessage(error) } };
   }
 }
 
-function providerOrderFor(market: Market, selected: DataSource): ProviderSource[] {
+function createProviderAdapters(options: SourceProviderOptions): Record<ProviderSource, BarProviderAdapter> {
+  return {
+    akshare: options.adapters?.akshare ?? {
+      fetchBars: ({ symbol, start, end }) => fetchFromAKShare(symbol, start, end),
+    },
+    tushare: options.adapters?.tushare ?? {
+      fetchBars: ({ symbol, start, end }) => fetchFromTushare(symbol, start, end, options.tushare),
+    },
+    "llmquant-data": options.adapters?.["llmquant-data"] ?? {
+      fetchBars: ({ symbol, start, end }) => fetchFromLlmQuant(symbol, start, end, options.llmquant),
+    },
+    "financial-datasets": options.adapters?.["financial-datasets"] ?? {
+      fetchBars: ({ symbol, start, end }) => fetchFromFinancialDatasets(symbol, start, end, options.financialDatasets),
+    },
+  };
+}
+
+function providerOrderFor(
+  market: Market,
+  selected: DataSource,
+  overrides: SourceProviderOptions["fallbackOrder"],
+): ProviderSource[] {
+  const configured = overrides?.[market];
+  if (configured?.length) return orderedWithSelectedFirst(selected, configured);
+
   if (market === "A") {
     return selected === "tushare" ? ["tushare", "akshare"] : ["akshare", "tushare"];
   }
@@ -91,6 +99,25 @@ function providerOrderFor(market: Market, selected: DataSource): ProviderSource[
   if (selected === "llmquant-data" || market === "US" || market === "HK") add("llmquant-data");
   if (selected === "financial-datasets" || market === "US") add("financial-datasets");
   return order;
+}
+
+function orderedWithSelectedFirst(selected: DataSource, fallback: readonly ProviderSource[]): ProviderSource[] {
+  const order: ProviderSource[] = [];
+  if (selected !== "auto") order.push(selected);
+  for (const id of fallback) {
+    if (!order.includes(id)) order.push(id);
+  }
+  return order;
+}
+
+function providerErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .replace(/(bearer\s+)[^\s]+/giu, "$1[redacted]")
+    .replace(/([?&](?:api[_-]?key|token|key)=)[^&\s]+/giu, "$1[redacted]")
+    .replace(/((?:api[_-]?key|token)\s*[:=]\s*)[^\s]+/giu, "$1[redacted]")
+    .replace(/[\r\n]+/g, " ")
+    .slice(0, 240);
 }
 
 /** Normalize bare 6-digit Chinese codes to exchange-suffixed format. */

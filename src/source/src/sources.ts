@@ -10,9 +10,13 @@ import type { DataSource, LiveFetchResult, PullSource, SourceFetchOptions, Sourc
 export { SOURCE_LABELS } from "./source-contracts.ts";
 export { pullBarsFromProviders, searchSymbols } from "./source-providers.ts";
 export type {
+  BarProviderAdapter,
   DataSource,
   LiveFetchResult,
+  ProviderAttempt,
+  PullBarsResult,
   PullSource,
+  SourceBarsRequest,
   SourceFetchOptions,
   SourceProviderOptions,
   SourceRuntimeDeps,
@@ -53,22 +57,19 @@ export async function fetchBars(
     }
   }
 
-  let bars = (await pullBarsFromProviders(symbol, market, start, end, selected, options.providers)).bars;
+  const pulled = await pullBarsFromProviders(symbol, market, start, end, selected, options.providers);
+  if (pulled.bars.length > 0) {
+    await deps.saveBars(symbol, pulled.source, pulled.bars);
+    return { bars: filterBarsByDate(pulled.bars, start, end), source: pulled.source };
+  }
 
   // Last resort: load any cached data
-  if (bars.length === 0) {
-    for (const src of ["akshare", "tushare", "llmquant-data", "financial-datasets"]) {
-      const cached = await deps.loadBars(symbol, src);
-      if (cached.length > 0) { bars = cached; break; }
-    }
+  for (const src of ["akshare", "tushare", "llmquant-data", "financial-datasets"]) {
+    const cached = filterBarsByDate(await deps.loadBars(symbol, src), start, end);
+    if (cached.length > 0) return { bars: cached, source: src };
   }
 
-  const usedSource = explicit ? selected : (bars.length > 0 ? selected : "cache");
-  if (bars.length > 0) {
-    await deps.saveBars(symbol, usedSource, bars);
-  }
-
-  return { bars: filterBarsByDate(bars, start, end), source: usedSource };
+  return { bars: [], source: pulled.source };
 }
 
 /** Live provider pull for TUI quotes — never reads or writes `.ohquant/data` cache. */
