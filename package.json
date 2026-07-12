@@ -15,10 +15,10 @@
     "ai",
     "agent"
   ],
-  "homepage": "https://github.com/yangjing/oh-my-quant",
+  "homepage": "https://github.com/yangjingo/oh-my-quant",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yangjing/oh-my-quant"
+    "url": "git+https://github.com/yangjingo/oh-my-quant.git"
   },
   "license": "MIT",
   "author": "yangjing",
