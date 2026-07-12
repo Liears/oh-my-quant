@@ -499,15 +499,16 @@ HTML 中可以实现为：
 compact
 ```
 
-Artifact 导出参数：
+Artifact 命令语义：
 
 ```bash id="gmyiai"
-/artifact export --latest --traj compact
-/artifact export --latest --traj audit
-/artifact export --latest --traj debug
-/artifact export --latest --traj raw
-/artifact export --latest --no-traj
+/artifact                         # TUI 中打开 Artifacts 面板；非 TUI 时生成当前 session artifact
+/artifact --generate              # 显式生成当前 session artifact
+/artifact --title "我的分析"     # 生成时覆盖标题
+/artifact --open <session-id>     # 恢复该 artifact 对应的 session，并打开 HTML 报告
 ```
+
+当前实现内置 trajectory 渲染；生成成功会写入 `artifact_export` 隐藏上下文，恢复成功会写入 `artifact_restore` 隐藏上下文。
 
 ### 13. Trajectory 采集策略
 

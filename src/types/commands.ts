@@ -54,6 +54,7 @@ export interface CommandContextUsage {
 export interface CommandAgentSession {
   readonly state?: unknown;
   waitForIdle(): Promise<void>;
+  appendContextNote?(customType: string, content: string, details?: unknown): Promise<void>;
   compact(customInstructions?: string): Promise<CommandCompactResult>;
   listSessions(): Promise<CommandSessionMetadata[]>;
   getSessionMetadata(): Promise<CommandSessionMetadata | null>;
@@ -92,6 +93,8 @@ export interface CommandContext {
   openSession?: () => void;
   /** Active agent session for session/harness commands. */
   agentSession?: CommandAgentSession | null;
+  /** Overrides local file opening for tests or non-desktop runtimes. */
+  openFile?: (path: string) => void;
 }
 
 export interface CommandResult {

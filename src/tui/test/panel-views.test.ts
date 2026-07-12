@@ -56,7 +56,7 @@ describe("panel views", () => {
 
   it("renders artifact metadata through the shared artifact view", () => {
     const buf = new Buffer(120, 20);
-    const frame = drawPanelFrame(buf, "Artifacts", "↑↓ move  ↵ open  g generate  esc close");
+    const frame = drawPanelFrame(buf, "Artifacts", "↑↓ move  ↵ restore  g generate  esc close");
 
     renderArtifactPanelView(buf, frame, {
       meta: {
@@ -67,7 +67,7 @@ describe("panel views", () => {
       items: [
         { age: "2h ago  ", title: "Analysis artifact", stats: "3 msg · 2KB", selected: true },
       ],
-      footer: "↑↓ select  ↵ open  g generate  esc close  ·  1 artifact",
+      footer: "↑↓ select  ↵ restore  g generate  esc close  ·  1 artifact",
     });
 
     const plain = buf.toPlain().join("\n");

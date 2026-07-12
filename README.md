@@ -98,6 +98,7 @@ Slash commands:
 | `/config` | 配置面板 |
 | `/doctor` | 检查 runtime、auth 来源和修复 hints |
 | `/skill` | 查看、安装和运行 skills |
+| `/artifact` | 生成分析报告；在 TUI 面板中选择 artifact 默认恢复对应 session |
 | `/clear` | 清空当前对话 |
 | `/help` | 命令参考 |
 

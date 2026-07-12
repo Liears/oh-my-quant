@@ -252,7 +252,7 @@ export class PanelController {
     if (key.name === "return") {
       const selected = this.artifacts[this.artifactSelection];
       if (!selected) return {};
-      this.status = `Opening ${selected.sessionId}...`;
+      this.status = `Restoring ${selected.sessionId}...`;
       return { command: `/artifact --open ${selected.sessionId}`, close: true };
     }
     return {};
@@ -426,7 +426,7 @@ export class PanelController {
     const frame = this.drawPanelFrame(
       buf,
       "Artifacts",
-      "↑↓ move  ↵ open  g generate  esc close",
+      "↑↓ move  ↵ restore  g generate  esc close",
     );
     renderArtifactPanelView(buf, frame, buildArtifactPanelData({
       items: this.artifacts,
@@ -1020,4 +1020,3 @@ export class PanelController {
     this.clampPortfolioSelection();
   }
 }
-

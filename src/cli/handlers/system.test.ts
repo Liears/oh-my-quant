@@ -46,6 +46,7 @@ function mockAgent(overrides: Partial<QuantAgentSession> = {}): QuantAgentSessio
     subscribe: mock(() => () => {}),
     prompt: mock(async () => {}),
     waitForIdle: mock(async () => {}),
+    appendContextNote: mock(async () => {}),
     steer: mock(async () => {}),
     followUp: mock(async () => {}),
     skill: mock(async () => {}),

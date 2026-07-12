@@ -28,6 +28,7 @@ import { ensureDirs, loadSettings, resolveSessionsDir } from "../../storage/inde
 import { readWhyjEnvValue, stripTerminalControlCodes } from "../../storage/index.ts";
 import type { OhQuantSettings } from "../../types/config.ts";
 import { discoverSkills, type QuantSkill } from "./skills.ts";
+import { createCustomMessage } from "./pi/harness/messages.ts";
 import { perfLog, perfNow } from "../../perf.ts";
 
 export interface QuantAgentContextUsage {
@@ -88,6 +89,7 @@ export interface QuantAgentSession {
   subscribe(listener: (event: QuantAgentEvent, signal?: AbortSignal) => Promise<void> | void): () => void;
   prompt(input: string, options?: { displayText?: string }): Promise<void>;
   waitForIdle(): Promise<void>;
+  appendContextNote(customType: string, content: string, details?: unknown): Promise<void>;
   steer(message: AgentMessage): Promise<void>;
   followUp(message: AgentMessage): Promise<void>;
   skill(name: string, additionalInstructions?: string): Promise<void>;
@@ -214,6 +216,13 @@ class QuantAgentHarnessSession implements QuantAgentSession {
     await this.ready;
     perfLog("agent.ready.wait", readyStartedAt, { phase: "waitForIdle" });
     await this.harness?.waitForIdle();
+  }
+
+  async appendContextNote(customType: string, content: string, details?: unknown): Promise<void> {
+    await this.ready;
+    if (!this.harness) throw new Error("Agent harness not initialized");
+    await this.harness.appendMessage(createCustomMessage(customType, content, false, details, new Date().toISOString()));
+    await this.refreshStateFromSession();
   }
 
   async compact(customInstructions?: string): Promise<CompactResult> {
@@ -879,4 +888,3 @@ function extractToolResultText(result: unknown): string {
   }
   return "";
 }
-

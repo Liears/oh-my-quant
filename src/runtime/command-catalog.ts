@@ -22,7 +22,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
   { name: "/skill", desc: "Skill", help: "List, inspect, and run skills", example: "/skill" },
   { name: "/help", desc: "Help", help: "Show commands and hotkeys" },
   { name: "/clear", desc: "Clear", help: "Clear conversation and reset agent" },
-  { name: "/artifact", desc: "Artifact", help: "Generate analysis dashboard from current session, open in browser", example: "/artifact" },
+  { name: "/artifact", desc: "Artifact", help: "Generate dashboards and restore artifact sessions", example: "/artifact" },
   { name: "/exit", desc: "Exit", help: "Exit WhyJ Quant" },
 ];
 

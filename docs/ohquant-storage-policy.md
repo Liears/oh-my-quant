@@ -99,10 +99,18 @@ Artifacts 将 WhyJ Quant agent session 导出为自包含、可交互、可分�
 
 `src/storage/src/artifacts.ts`：
 
-- `saveArtifact(sessionId: string, html: string): void` — 写入 HTML 文件，发出 WRITE 事件
+- `saveArtifact(sessionId: string, html: string, meta?: { title?: string; messageCount?: number }): void` — 写入 HTML 文件和 sidecar metadata，发出 WRITE 事件
 - `loadArtifact(sessionId: string): string | null` — 读取 HTML 文件
-- `listArtifacts(): ArtifactMeta[]` — 列出所有已生成的 artifact，含 sessionId、createdAt、title
+- `loadArtifactMeta(sessionId: string): ArtifactMeta | null` — 读取 sidecar metadata
+- `listArtifacts(): ArtifactMeta[]` — 列出所有已生成的 artifact，含 sessionId、createdAt、title、messageCount、bytes
 - `deleteArtifact(sessionId: string): boolean` — 删除 HTML 文件，发出 DELETE 事件
+
+### 命令与上下文语义
+
+- `/artifact --generate` 从当前 agent session JSONL 生成 HTML，保存到 `.ohquant/artifacts/{session-id}.html`，并向当前 session 写入隐藏 `artifact_export` context note。
+- `/artifact --open {session-id}` 在有 agent session 的运行时默认恢复对应 JSONL session，打开 HTML 报告，并写入隐藏 `artifact_restore` context note；纯 CLI fallback 无 agent session 时只打开 HTML。
+- TUI Artifacts 面板的 `Enter` 触发 `/artifact --open {session-id}`，因此默认行为是恢复选中的 artifact session；`g` 生成当前 session 的新 artifact。
+- `artifact_export` / `artifact_restore` note 记录 title、sessionId、HTML 路径、bytes 和 messageCount，供后续 agent turn 解析“这个报告”“刚才选中的 artifact”等指代。
 
 ### 可缓存性
 

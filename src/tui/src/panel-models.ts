@@ -163,7 +163,7 @@ export function buildArtifactPanelData(args: {
     })),
     footer: items.length === 0
       ? "No artifacts yet. Press g to generate one from the current session."
-      : (status || `↑↓ select  ↵ open  g generate  esc close  ·  ${items.length} artifact${items.length === 1 ? "" : "s"}`),
+      : (status || `↑↓ select  ↵ restore  g generate  esc close  ·  ${items.length} artifact${items.length === 1 ? "" : "s"}`),
   };
 }
 
