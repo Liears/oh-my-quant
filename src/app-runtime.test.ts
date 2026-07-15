@@ -64,6 +64,7 @@ function harness(
   agentFactory: ConstructorParameters<typeof AppRuntime>[3] | undefined = undefined,
   autoArtifactRunner: ConstructorParameters<typeof AppRuntime>[4] | undefined = undefined,
   artifactRestoreRunner: ConstructorParameters<typeof AppRuntime>[5] | undefined = undefined,
+  marketRefreshTimeoutMs: ConstructorParameters<typeof AppRuntime>[6] | undefined = undefined,
 ) {
   const messages: UIMessage[][] = [];
   const activities: AppState["activity"][] = [];
@@ -93,6 +94,7 @@ function harness(
     agentFactory,
     autoArtifactRunner,
     artifactRestoreRunner,
+    marketRefreshTimeoutMs,
   );
   return { runtime, messages, activities, statuses, panels, queues, localStates, huds, get configOpened() { return configOpened; }, get resumeOpened() { return resumeOpened; }, get portfolioOpened() { return portfolioOpened; } };
 }
@@ -502,6 +504,58 @@ description: Use for crypto market analysis.
     expect(latestPanel[0]).toMatchObject({ kind: "group", title: "Default" });
     expect(latestPanel.some((section) => section.title === "Market")).toBe(true);
     expect(latestPanel.some((section) => section.title === "Source")).toBe(true);
+  });
+
+  it("clears the refreshing state and keeps the last good overview when a refresh fails", async () => {
+    let failRefresh = false;
+    const h = harness(
+      async () => {
+        if (failRefresh) throw new Error("market source unavailable");
+        return [{ code: "000001", name: "上证指数", price: 3000, pct: 1 }];
+      },
+      async () => [{ code: "510300", name: "沪深300ETF", price: 4.2, pct: -0.5 }],
+    );
+
+    await h.runtime.refreshOverviewPanel();
+    const readyPanel = h.panels.at(-1)!.panel;
+    failRefresh = true;
+    await h.runtime.refreshOverviewPanel();
+
+    expect(h.panels.at(-2)).toMatchObject({ loading: true });
+    expect(h.panels.at(-1)).toEqual({ panel: readyPanel, loading: false });
+  });
+
+  it("recovers from a timed-out pull and ignores its stale late result", async () => {
+    let quoteCalls = 0;
+    let resolveFirstPull: ((quotes: Array<{ code: string; name: string; price: number; pct: number }>) => void) | undefined;
+    const h = harness(
+      async () => {
+        quoteCalls++;
+        if (quoteCalls === 1) {
+          return new Promise((resolve) => { resolveFirstPull = resolve; });
+        }
+        return [{ code: "000001", name: "上证指数", price: 3200, pct: 2 }];
+      },
+      async () => [{ code: "510300", name: "沪深300ETF", price: 4.3, pct: 0.5 }],
+      undefined,
+      undefined,
+      undefined,
+      10,
+    );
+
+    await h.runtime.refreshOverviewPanel();
+    expect(h.panels.at(-1)).toMatchObject({ loading: false });
+    await h.runtime.refreshOverviewPanel();
+
+    const successfulPanel = h.panels.at(-1)!.panel;
+    expect(quoteCalls).toBe(2);
+    expect(successfulPanel?.some((section) => section.title === "Source")).toBe(true);
+    const panelUpdates = h.panels.length;
+
+    resolveFirstPull?.([{ code: "000001", name: "stale", price: 1, pct: -99 }]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(h.panels).toHaveLength(panelUpdates);
+    expect(h.panels.at(-1)).toEqual({ panel: successfulPanel, loading: false });
   });
 
   it("syncs resumed session messages into conversation", async () => {

@@ -108,6 +108,8 @@ export class AppRuntime {
   private overviewReady = false;
   private marketSections: PanelSection[] = [];
   private marketRefreshPromise: Promise<void> | null = null;
+  /** Invalidates timed-out or superseded pulls so stale data cannot overwrite a newer panel. */
+  private marketRefreshGeneration = 0;
   private currentDoctor: DoctorResult | null = null;
   private hud = createHudMetrics();
   private latencyTracker = createLatencyTracker();
@@ -126,13 +128,11 @@ export class AppRuntime {
     private readonly agentFactory: AgentFactory = createRuntimeAgent,
     private readonly autoArtifactRunner: AutoArtifactRunner = runAutoArtifact,
     private readonly artifactRestoreRunner: ArtifactRestoreRunner = runArtifactRestore,
+    private readonly marketRefreshTimeoutMs = AppRuntime.MARKET_REFRESH_TIMEOUT_MS,
   ) {}
 
   async refreshOverviewPanel(): Promise<void> {
-    if (this.overviewReady) {
-      this.callbacks.onPanel?.(this.marketSections, true);
-    }
-    await this.refreshMarketPanel();
+    await this.startMarketRefresh();
   }
 
   /** Startup agent, then enter ready before blocking on market quotes. */
@@ -502,30 +502,47 @@ export class AppRuntime {
 
   private scheduleMarketRefresh(): void {
     if (this.marketRefreshPromise) return;
-    if (!this.overviewReady) this.syncOverviewPanel(true);
     const startedAt = perfNow();
-    this.marketRefreshPromise = this.refreshMarketPanel()
-      .then(() => perfLog("runtime.market.refresh", startedAt, { background: true }))
-      .catch(() => this.setMarketUnavailable())
+    void this.startMarketRefresh()
+      .then(() => perfLog("runtime.market.refresh", startedAt, { background: true }));
+  }
+
+  private startMarketRefresh(): Promise<void> {
+    const generation = ++this.marketRefreshGeneration;
+    this.syncOverviewPanel(true);
+
+    const refresh = this.pullMarketPanelWithTimeout(generation)
+      .catch(() => {
+        if (generation !== this.marketRefreshGeneration) return;
+        this.marketRefreshGeneration++;
+        if (this.overviewReady) this.syncOverviewPanel();
+        else this.setMarketUnavailable();
+      })
       .finally(() => {
-        this.marketRefreshPromise = null;
+        if (this.marketRefreshPromise === refresh) this.marketRefreshPromise = null;
       });
+    this.marketRefreshPromise = refresh;
+    return refresh;
   }
 
-  private async refreshMarketPanel(): Promise<void> {
-    if (!this.overviewReady) this.syncOverviewPanel(true);
-    await Promise.race([
-      this.pullMarketPanel(),
-      new Promise<never>((_, reject) => {
-        setTimeout(
-          () => reject(new Error("Overview market refresh timed out")),
-          AppRuntime.MARKET_REFRESH_TIMEOUT_MS,
-        );
-      }),
-    ]);
+  private async pullMarketPanelWithTimeout(generation: number): Promise<void> {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        this.pullMarketPanel(generation),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error("Overview market refresh timed out")),
+            this.marketRefreshTimeoutMs,
+          );
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
 
-  private async pullMarketPanel(): Promise<void> {
+  private async pullMarketPanel(generation: number): Promise<void> {
     const refreshedAt = new Date();
     const pullMeta: OverviewPullMeta = { sources: [], asOfDates: [] };
     const panelPortfolio = loadPanelPortfolio();
@@ -534,7 +551,7 @@ export class AppRuntime {
       this.quoteFetcher(MARKET_INDICES, pullMeta),
       this.holdingFetcher(portfolioSymbols, pullMeta),
     ]);
-    this.marketSections = buildOverviewPanelSections({
+    const sections = buildOverviewPanelSections({
       portfolio: panelPortfolio,
       portfolioSymbols,
       marketQuotes,
@@ -542,6 +559,8 @@ export class AppRuntime {
       pullMeta,
       refreshedAt,
     });
+    if (generation !== this.marketRefreshGeneration) return;
+    this.marketSections = sections;
     this.overviewReady = true;
     this.syncOverviewPanel();
   }
@@ -592,7 +611,7 @@ export class AppRuntime {
       },
       emitLocalStorageState: () => this.emitLocalStorageState(),
       refreshMarketPanel: () => {
-        void this.refreshMarketPanel().catch(() => this.setMarketUnavailable());
+        void this.startMarketRefresh();
       },
     };
   }
