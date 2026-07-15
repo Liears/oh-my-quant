@@ -178,6 +178,37 @@ describe("injectTurnContext", () => {
     });
     expect(result).toContain("total return, CAGR, Sharpe, max drawdown, win rate, P/L ratio");
     expect(result).toContain("preserve VaR/CVaR and drawdown lines explicitly");
+    expect(result).toContain("<!-- mandatory quant analysis workflow -->");
+    expect(result).toContain("TECHNICAL INDICATORS");
+    expect(result).toContain("RISK METRICS");
+    expect(result).toContain("compute_factor for momentum(20), rsi(14), sma_deviation(20), and volatility(20)");
+    expect(result).toContain("call check_risk");
+  });
+
+  it("injects the mandatory technical and risk workflow for a symbol analysis", () => {
+    const result = injectTurnContext("分析中际旭创 300308 的近期走势", {
+      lastSymbol: null,
+      lastMarket: null,
+      lastStartDate: null,
+      lastEndDate: null,
+      recentToolState: { toolName: null, resultShape: null },
+    });
+    expect(result).toContain("relevant installed quant/risk/trading skill");
+    expect(result).toContain("fetch_bars");
+    expect(result).toContain("volume_ratio(20)");
+    expect(result).toContain("VaR(95/99)");
+    expect(result).toContain("Never invent a metric");
+  });
+
+  it("does not force the quant workflow for a simple quote lookup", () => {
+    const result = injectTurnContext("查看 300308 最新价格", {
+      lastSymbol: null,
+      lastMarket: null,
+      lastStartDate: null,
+      lastEndDate: null,
+      recentToolState: { toolName: null, resultShape: null },
+    });
+    expect(result).not.toContain("<!-- mandatory quant analysis workflow -->");
   });
 
   it("adds figure guidance for quant chart terms without saying chart", () => {
@@ -256,5 +287,7 @@ describe("injectSkillContext", () => {
     expect(result).toContain("structured rows visible");
     expect(result).toContain("3 short lines");
     expect(result).toContain("Preserve score rows, ranking rows, risk rows, and backtest metric rows");
+    expect(result).toContain("<!-- quant skill analysis contract -->");
+    expect(result).toContain("technical factors → risk metrics");
   });
 });

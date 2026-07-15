@@ -187,6 +187,7 @@ class QuantAgentHarnessSession implements QuantAgentSession {
     await this.ready;
     perfLog("agent.ready.wait", readyStartedAt, { phase: "prompt" });
     if (!this.harness) throw new Error("Agent harness not initialized");
+    await this.maybeAutoCompact();
     const prompt = injectTurnContext(input, sessionCtx);
     const promptStartedAt = perfNow();
     await this.harness.prompt(prompt, { displayText: options?.displayText });
@@ -475,6 +476,16 @@ class QuantAgentHarnessSession implements QuantAgentSession {
     applySessionContextState(this.state, context, this.state.model, this.resolveSettings().env);
   }
 
+  private async maybeAutoCompact(): Promise<void> {
+    if (!this.harness) return;
+    const usage = this.getContextUsage();
+    if (!usage) return;
+    const triggerTokens = resolveCompactTriggerTokens(this.resolveSettings().env, usage.contextWindow);
+    if (usage.tokens < triggerTokens) return;
+    await this.harness.compact();
+    await this.refreshStateFromSession();
+  }
+
   private resolveSettings(): OhQuantSettings {
     const base = loadSettings();
     return {
@@ -671,7 +682,31 @@ function resolveModel(provider: string, id: string, env: Record<string, string>)
     resolved.baseUrl = baseUrl;
   }
   resolved.id = id;
+  resolved.contextWindow = resolveContextWindow(env, resolved.contextWindow);
   return resolved;
+}
+
+function readPositiveInteger(value: string | undefined): number | undefined {
+  if (!value || !/^\d+$/.test(value.trim())) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+export function resolveContextWindow(env: Record<string, string>, fallback: number): number {
+  const configured = readPositiveInteger(
+    readWhyjEnvValue(env, "contextWindow")
+      ?? readWhyjEnvValue(process.env, "contextWindow"),
+  );
+  return configured ?? fallback;
+}
+
+export function resolveCompactTriggerTokens(env: Record<string, string>, contextWindow: number): number {
+  const configured = readPositiveInteger(
+    readWhyjEnvValue(env, "compactTriggerTokens")
+      ?? readWhyjEnvValue(process.env, "compactTriggerTokens"),
+  );
+  const fallback = Math.max(1, contextWindow - 16_384);
+  return Math.min(configured ?? fallback, contextWindow);
 }
 
 function buildGenericFallbackModel(provider: string, id: string, baseUrl?: string): Model<"openai-completions"> | undefined {

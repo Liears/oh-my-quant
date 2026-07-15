@@ -6,6 +6,8 @@ export const WHYJ_ENV_KEY_ALIASES = {
   apiKey: ["WHYJ_QUANT_API_KEY"],
   baseUrl: ["WHYJ_QUANT_BASE_URL"],
   model: ["WHYJ_QUANT_MODEL"],
+  contextWindow: ["WHYJ_QUANT_CONTEXT_WINDOW"],
+  compactTriggerTokens: ["WHYJ_QUANT_COMPACT_TRIGGER_TOKENS"],
   tushareToken: ["WHYJ_QUANT_TUSHARE_TOKEN", "TUSHARE_TOKEN"],
   financialDatasetsKey: ["WHYJ_QUANT_FINANCIAL_DATASETS_KEY", "FINANCIAL_DATASETS_KEY"],
   llmquantApiKey: ["WHYJ_QUANT_LLMQUANT_API_KEY", "LLMQUANT_API_KEY"],

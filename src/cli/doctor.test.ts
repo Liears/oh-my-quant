@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildDoctorErrorResult, collectDoctor, describeEndpointMode, formatDoctorText, runDoctor } from "./doctor.ts";
+import { buildDoctorErrorResult, collectDoctor, describeEndpointMode, formatDoctorText, resolveDoctorRequestModel, runDoctor } from "./doctor.ts";
 import { DEFAULT_SETTINGS } from "../types/config.ts";
 import { existsSync, readFileSync } from "node:fs";
 
@@ -206,6 +206,14 @@ describe("doctor", () => {
     expect(seenModel).toBe("glm-5.2");
     expect(doctor.config.model).toBe("glm-5.2");
     expect(doctor.overall).toBe("all_pass");
+  });
+
+  it("uses the same raw model id as the agent for provider probes", () => {
+    expect(resolveDoctorRequestModel({
+      ...DEFAULT_SETTINGS,
+      model: "sonnet",
+      env: { WHYJ_DEFAULT_SONNET_MODEL: "glm-5.2[1m]" },
+    }, {})).toBe("glm-5.2[1m]");
   });
 
   it("writes redacted diagnostic logs for probe failures", async () => {

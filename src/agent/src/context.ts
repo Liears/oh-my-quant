@@ -152,6 +152,7 @@ export function injectTurnContext(input: string, ctx: SessionCtx): string {
   const withSession = injectSessionContext(input, ctx);
   const turnHints = [
     buildToolExecutionGuidance(),
+    buildQuantAnalysisGuidance(input, ctx),
     buildRenderGuidance(input, ctx),
   ].filter((value): value is string => Boolean(value));
   if (turnHints.length === 0) return withSession;
@@ -162,8 +163,9 @@ export function injectSkillContext(skillName: string, additionalInstructions?: s
   const base = (additionalInstructions ?? "").trim();
   const hints = [
     buildToolExecutionGuidance(),
+    buildQuantSkillGuidance(skillName),
     buildSkillRenderGuidance(skillName),
-  ];
+  ].filter((value): value is string => Boolean(value));
   const appended = hints.join("\n\n");
   return base ? `${base}\n\n${appended}` : appended;
 }
@@ -288,4 +290,37 @@ function buildToolSpecificRenderGuidance(input: string, ctx: SessionCtx): string
   }
 
   return lines;
+}
+
+function buildQuantAnalysisGuidance(input: string, ctx: SessionCtx): string | null {
+  if (!isQuantAnalysisRequest(input, ctx.lastSymbol)) return null;
+  return [
+    "<!-- mandatory quant analysis workflow -->",
+    "This turn requests security, fund, index, sector, or portfolio analysis. Do not finish with generic commentary only.",
+    "1. If a relevant installed quant/risk/trading skill is available, load and follow it before selecting tools.",
+    "2. Resolve the researched object and code, then obtain an OHLC or NAV series with fetch_bars or the narrowest matching fund data tool. Reuse valid cached bars when live data is unavailable.",
+    "3. For OHLC technical analysis, call compute_factor for momentum(20), rsi(14), sma_deviation(20), and volatility(20); add volume_ratio(20) when volume exists.",
+    "4. After price/NAV data exists, call check_risk. Preserve annual volatility, downside volatility, VaR(95/99), CVaR(95/99), max drawdown/duration, skewness, and kurtosis.",
+    "5. Include return context: period return and risk-adjusted return (Sharpe when enough observations exist). Backtest only when the request concerns a strategy or signal rule.",
+    "6. If a tool fails, retry with the normalized symbol or cached series. Never invent a metric; label it unavailable with the failed source when it cannot be computed.",
+    "7. The final answer must contain two compact labeled blocks named TECHNICAL INDICATORS and RISK METRICS. Emit each metric as `Label: value` so Artifact can detect it.",
+  ].join("\n");
+}
+
+function buildQuantSkillGuidance(skillName: string): string | null {
+  if (!/(quant|trader|trading|risk|factor|technical|market)/i.test(skillName)) return null;
+  return [
+    "<!-- quant skill analysis contract -->",
+    "Use this skill to produce an auditable analysis chain: researched object/code → price or NAV data → technical factors → risk metrics → concise conclusion.",
+    "Do not omit risk metrics when a valid return series exists. Keep technical and risk values as labeled rows for Artifact Dashboard ingestion.",
+  ].join("\n");
+}
+
+export function isQuantAnalysisRequest(input: string, lastSymbol?: string | null): boolean {
+  const asksForAnalysis = /(分析|研究|评估|诊断|走势|技术面|风险|投资建议|买入|卖出|持有|估值|回测|策略|因子|analysis|analy[sz]e|research|technical|risk|outlook|investment|buy|sell|hold|valuation|backtest|strategy|factor)/i.test(input);
+  if (!asksForAnalysis) return false;
+  const hasObject = /\b(?:\d{6}(?:\.(?:SZ|SH|BJ))?|[A-Z]{1,5})\b/i.test(input)
+    || /(股票|基金|ETF|指数|板块|行业|组合|持仓|沪深|中证|上证|深证|创业板|科创|恒生|纳斯达克|标普|stock|fund|index|sector|portfolio|holding)/i.test(input)
+    || Boolean(lastSymbol);
+  return hasObject;
 }

@@ -219,11 +219,7 @@ function createInitialState(
   const auth = resolveAuth(settings, processEnv);
   const dataSource = settings.preferences?.source ?? "llmquant-data";
   const baseUrl = resolvedValue(settings, processEnv, "WHYJ_QUANT_BASE_URL");
-  const modelEnv: Record<string, string> = {
-    ...settings.env,
-    ...definedStringEnv(processEnv),
-  };
-  const resolvedModel = stripAnsi(resolveModelId(settings.model || "sonnet", modelEnv));
+  const resolvedModel = stripAnsi(resolveDoctorRequestModel(settings, processEnv));
   const hasModelCredential = (auth.WHYJ_QUANT_API_KEY?.available ?? false)
     || (auth.WHYJ_QUANT_AUTH_TOKEN?.available ?? false);
   const sourceTokenKey = sourceTokenEnvKey(dataSource);
@@ -692,7 +688,7 @@ async function runProbe(probe: DoctorProbe, ctx: DoctorProbeContext): Promise<Do
 async function defaultModelProbe(ctx: DoctorProbeContext): Promise<DoctorProbeResult> {
   const baseUrl = rawEnvValue(ctx.settings, ctx.processEnv, "WHYJ_QUANT_BASE_URL");
   const apiKey = rawModelCredential(ctx.settings, ctx.processEnv);
-  const model = ctx.state.config.model || "sonnet";
+  const model = resolveDoctorRequestModel(ctx.settings, ctx.processEnv);
   if (!baseUrl || !apiKey) return { ok: false, detail: "Missing model provider credentials" };
 
   const endpointMode = ctx.state.config.endpointMode;
@@ -716,6 +712,17 @@ async function defaultModelProbe(ctx: DoctorProbeContext): Promise<DoctorProbeRe
   }, ctx.timeoutMs);
 
   return responseToProbeResult(response, endpointMode);
+}
+
+export function resolveDoctorRequestModel(
+  settings: OhQuantSettings,
+  processEnv: Record<string, string | undefined>,
+): string {
+  const modelEnv: Record<string, string> = {
+    ...settings.env,
+    ...definedStringEnv(processEnv),
+  };
+  return resolveModelId(settings.model || "sonnet", modelEnv).trim();
 }
 
 async function defaultDataProbe(ctx: DoctorProbeContext): Promise<DoctorProbeResult> {

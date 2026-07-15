@@ -133,6 +133,64 @@ describe("resolveModelId", () => {
   });
 });
 
+describe("model context configuration", () => {
+  beforeEach(() => {
+    setupSettings({});
+  });
+  afterEach(() => cleanup());
+
+  it("uses independent context-window and compact-trigger settings", async () => {
+    const agent = createAgent({
+      cwd: TEST_DIR,
+      sessionsRoot: TEST_SESSIONS_DIR,
+      settings: {
+        env: {
+          WHYJ_QUANT_BASE_URL: "https://open.bigmodel.cn/api/anthropic",
+          WHYJ_QUANT_CONTEXT_WINDOW: "1000000",
+          WHYJ_QUANT_COMPACT_TRIGGER_TOKENS: "800000",
+        },
+        model: "glm-5.2[1m]",
+        thinkingLevel: "off",
+      },
+      skillPaths: [TEST_SKILLS_DIR],
+    });
+    await agent.waitForIdle();
+
+    expect(agent.state.model.contextWindow).toBe(1_000_000);
+  });
+
+  it("automatically compacts before a prompt when the independent trigger is reached", async () => {
+    const agent = createAgent({
+      cwd: TEST_DIR,
+      sessionsRoot: TEST_SESSIONS_DIR,
+      settings: {
+        env: {
+          WHYJ_QUANT_CONTEXT_WINDOW: "1000",
+          WHYJ_QUANT_COMPACT_TRIGGER_TOKENS: "10",
+        },
+        model: "gpt-5.5",
+        thinkingLevel: "off",
+      },
+      skillPaths: [TEST_SKILLS_DIR],
+    }) as any;
+    await agent.waitForIdle();
+    agent.state.messages = [{ role: "user", content: "x".repeat(100), timestamp: Date.now() }];
+
+    const calls: string[] = [];
+    agent.harness.compact = async () => {
+      calls.push("compact");
+      return { summary: "summary", firstKeptEntryId: "entry-1", tokensBefore: 25 };
+    };
+    agent.harness.prompt = async () => {
+      calls.push("prompt");
+    };
+
+    await agent.prompt("hello");
+
+    expect(calls).toEqual(["compact", "prompt"]);
+  });
+});
+
 describe("estimateContextTokens", () => {
   it("sums tokens across all messages", () => {
     const messages = [
