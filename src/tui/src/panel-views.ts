@@ -1,4 +1,4 @@
-import { Buffer, truncate } from "./buffer.ts";
+import { Buffer, truncate, wrap } from "./buffer.ts";
 import { S, GOLD, GOLD_HIGHLIGHT } from "./styles.ts";
 import type { PanelFrame } from "./panel-chrome.ts";
 
@@ -11,7 +11,8 @@ export function renderConfigPanelView(
   frame: PanelFrame,
   rows: ConfigRowView[],
   footer: string,
-  draftLine?: string,
+  editorLine?: string,
+  editorActive = false,
 ): void {
   const { inner } = frame;
   const visible = frame.contentH;
@@ -30,8 +31,12 @@ export function renderConfigPanelView(
   }
 
   buf.text(inner.x, frame.footerY, truncate(footer, inner.w), S.dim);
-  if (draftLine) {
-    buf.text(inner.x, frame.footerY - 1, truncate(draftLine, inner.w), { fg: GOLD_HIGHLIGHT });
+  if (editorLine) {
+    const lines = wrap(editorLine, inner.w).slice(0, 2);
+    const startY = frame.footerY - lines.length;
+    for (const [index, line] of lines.entries()) {
+      buf.text(inner.x, startY + index, truncate(line, inner.w), editorActive ? { fg: GOLD_HIGHLIGHT } : S.dim);
+    }
   }
 }
 
@@ -317,7 +322,9 @@ export function renderHelpPanelView(
   },
 ): void {
   const { inner } = frame;
-  const midX = inner.x + Math.floor(inner.w / 2);
+  // Command descriptions carry the primary navigation meaning; give them
+  // enough room to remain useful at the default panel width.
+  const midX = inner.x + Math.floor(inner.w * 0.56);
   const leftW = midX - inner.x - 1;
   const rightW = inner.x + inner.w - midX - 1;
 

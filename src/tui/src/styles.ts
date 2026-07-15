@@ -1,27 +1,28 @@
 /** Style presets matching DESIGN.md palette. */
 import type { Style } from "./buffer.ts";
+import { WHYJ_THEME } from "../../types/theme-colors.ts";
 
-export const GOLD = "#E8B339";
-export const GOLD_HIGHLIGHT = "#F2C95A";
-export const CASH = "#E8B339";
-export const CASH_DARK = "#947618";
-export const CASH_WARM = "#F4CD68";
-export const CREAM = "#F2EEE6";
-export const MUTED = "#9B968C";
-export const BODY_COPY = "#A09880";
-export const AUTHOR_COPY = "#8A8478";
-export const HAIRLINE = "#2B2722";
-export const STEP_DIM = "#3C3730";
-export const POSITIVE = "#1E9F4D";
-export const NEGATIVE = "#E5494D";
-export const MARKET_UP = NEGATIVE;
-export const MARKET_DOWN = POSITIVE;
-export const CODE_DIM = "#7A7368";
-export const THINKING = "#7F807D";
+export const GOLD = WHYJ_THEME.gold;
+export const GOLD_HIGHLIGHT = WHYJ_THEME.goldHighlight;
+export const CASH = WHYJ_THEME.gold;
+export const CASH_DARK = WHYJ_THEME.cashDark;
+export const CASH_WARM = WHYJ_THEME.cashWarm;
+export const CREAM = WHYJ_THEME.cream;
+export const MUTED = WHYJ_THEME.muted;
+export const BODY_COPY = WHYJ_THEME.bodyCopy;
+export const AUTHOR_COPY = WHYJ_THEME.authorCopy;
+export const HAIRLINE = WHYJ_THEME.hairline;
+export const STEP_DIM = WHYJ_THEME.stepDim;
+export const POSITIVE = WHYJ_THEME.positive;
+export const NEGATIVE = WHYJ_THEME.negative;
+export const MARKET_UP = WHYJ_THEME.marketUp;
+export const MARKET_DOWN = WHYJ_THEME.marketDown;
+export const CODE_DIM = WHYJ_THEME.codeDim;
+export const THINKING = WHYJ_THEME.thinking;
 export const SHADOW = "#000000";
-export const SELECTION_FG = "#0D0B0A";
-export const SELECTION_BG = "#C9A227";
-export const CANVAS = "#0B0B0C";
+export const SELECTION_FG = WHYJ_THEME.selectionFg;
+export const SELECTION_BG = WHYJ_THEME.selectionBg;
+export const CANVAS = WHYJ_THEME.canvas;
 
 // ── Layout ──
 /** `compact` (default) uses tighter rows; set WHYJ_UI_DENSITY=comfortable to restore spacious layout. */

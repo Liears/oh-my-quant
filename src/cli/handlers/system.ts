@@ -226,18 +226,21 @@ export const configHandler: CommandHandler = async (_flags, _positional, ctx) =>
   const activeName = panelPortfolio.groups.length === 1 && panelPortfolio.groups[0]?.name
     ? panelPortfolio.groups[0].name
     : activeFile;
+  const providerUrl = cfg.env.WHYJ_QUANT_BASE_URL;
+  const providerSummary = providerUrl
+    ? `${providerUrl}  ·  ${describeEndpointMode(providerUrl)}`
+    : "(provider default URL)";
   return {
     success: true,
     message: [
-      "Config",
-      `  Model ${cfg.model}  ·  Thinking ${cfg.thinkingLevel}  ·  Insight ${cfg.insightEnabled ? "on" : "off"}`,
-      `  Active portfolio  ${activeName}`,
-      `  Skills     Codex ${cfg.skillIntegrations.codex ? "on" : "off"}  ·  Claude ${cfg.skillIntegrations.claude ? "on" : "off"}`,
-      `  API Key    ${mark(hasWhyjEnvValue(cfg.env, "apiKey"))} WHYJ_QUANT_API_KEY`,
-      `  Base URL   ${cfg.env.WHYJ_QUANT_BASE_URL || "(default)"}  ·  ${describeEndpointMode(cfg.env.WHYJ_QUANT_BASE_URL || "")}`,
-      `  Data       ${mark(hasWhyjEnvValue(cfg.env, "tushareToken"))} Tushare  ${mark(hasWhyjEnvValue(cfg.env, "financialDatasetsKey"))} Financial Datasets  ${mark(hasWhyjEnvValue(cfg.env, "llmquantApiKey"))} LLMQuant`,
-      `  Path       ${resolveSettingsPath()}`,
-      "  Ctrl+P opens the settings panel",
+      "Settings",
+      `  Agent       ${cfg.model}  ·  thinking ${cfg.thinkingLevel}`,
+      `  Provider    key ${mark(hasWhyjEnvValue(cfg.env, "apiKey"))}  ·  ${providerSummary}`,
+      `  Research    ${cfg.preferences.source}  ·  portfolio ${activeName}`,
+      `  Data keys   ${mark(hasWhyjEnvValue(cfg.env, "tushareToken"))} Tushare  ${mark(hasWhyjEnvValue(cfg.env, "financialDatasetsKey"))} Financial Datasets  ${mark(hasWhyjEnvValue(cfg.env, "llmquantApiKey"))} LLMQuant`,
+      `  Workspace   external skills ${cfg.skillIntegrations.external ? "on" : "off"}  ·  overview ${cfg.showPortfolioPanel ? "on" : "off"}  ·  auto artifacts ${cfg.artifactGeneration.auto ? "on" : "off"}`,
+      `  Path        ${resolveSettingsPath()}`,
+      "  Open /config or press Ctrl+P to change these settings.",
     ].join("\n"),
   };
 };

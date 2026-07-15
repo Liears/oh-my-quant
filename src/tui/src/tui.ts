@@ -33,6 +33,7 @@ export class QuantTui {
   private history: string[] = [];
   private histIdx = -1;
   private submitHandler: ((text: string) => void) | null = null;
+  private artifactRestoreHandler: ((reportId: string) => void) | null = null;
   private panelRefreshHandler: (() => void) | null = null;
   private running = false;
   private animTimer: ReturnType<typeof setInterval> | null = null;
@@ -94,6 +95,7 @@ export class QuantTui {
   }
 
   onSubmit(handler: (text: string) => void): void { this.submitHandler = handler; }
+  onArtifactRestore(handler: (reportId: string) => void): void { this.artifactRestoreHandler = handler; }
   onPanelRefresh(handler: () => void): void { this.panelRefreshHandler = handler; }
   openConfig(): void { this.panel.open("config"); this.paint(); }
   openDoctor(doctor?: unknown): void {
@@ -355,6 +357,7 @@ export class QuantTui {
     if (this.panel.isOpen()) {
       const result = this.panel.handleKey(ch, key);
       if (result?.command) this.submitHandler?.(result.command);
+      if (result?.restoreArtifact) this.artifactRestoreHandler?.(result.restoreArtifact);
       if (result?.refreshPanel) this.panelRefreshHandler?.();
       if (result?.close) {
         const name = this.panel.activePortfolioName();
@@ -386,8 +389,7 @@ export class QuantTui {
         const idx = Math.min(this.suggestionIdx, suggestions.length - 1);
         const fill = suggestions[idx].fill;
         // Auto-complete only when fill is a different command (e.g. /r -> /resume).
-        // When fill is a subcommand/arg of current input,
-        // submit the current input and let the user pick subcommands via Tab.
+        // Keep an exact command runnable; Tab can choose a contextual suggestion such as a skill.
         const trimInput = input.trim();
         if (fill !== input && !fill.startsWith(trimInput + " ")) {
           this.applySuggestion(fill);

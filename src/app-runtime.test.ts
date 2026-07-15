@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { JsonlSessionRepo } from "./agent/src/pi/index.ts";
 import { NodeExecutionEnv } from "./agent/src/pi/node.ts";
 import { loadPanelPortfolio, resolveSkillsDir, savePanelPortfolio, saveSettings } from "./storage/index.ts";
+import { DEFAULT_SETTINGS } from "./types/config.ts";
 import { AppRuntime, createInitialAppState, createRuntimeAgent } from "./app-runtime.ts";
 import { shellDisplayName } from "./tools/catalog.ts";
 import type { AppState, PanelSection, UIMessage } from "./tui/src/types.ts";
@@ -35,11 +36,10 @@ describe("initial app state", () => {
       },
       model: "sonnet",
       thinkingLevel: "high",
-      insightEnabled: true,
       showPortfolioPanel: true,
+      artifactGeneration: { auto: false },
       skillIntegrations: {
-        codex: false,
-        claude: false,
+        external: false,
       },
       permissions: {},
       preferences: {
@@ -62,6 +62,8 @@ function harness(
   quoteFetcher: ConstructorParameters<typeof AppRuntime>[1] = async () => [],
   holdingFetcher: ConstructorParameters<typeof AppRuntime>[2] = async () => [],
   agentFactory: ConstructorParameters<typeof AppRuntime>[3] | undefined = undefined,
+  autoArtifactRunner: ConstructorParameters<typeof AppRuntime>[4] | undefined = undefined,
+  artifactRestoreRunner: ConstructorParameters<typeof AppRuntime>[5] | undefined = undefined,
 ) {
   const messages: UIMessage[][] = [];
   const activities: AppState["activity"][] = [];
@@ -89,6 +91,8 @@ function harness(
     quoteFetcher,
     holdingFetcher,
     agentFactory,
+    autoArtifactRunner,
+    artifactRestoreRunner,
   );
   return { runtime, messages, activities, statuses, panels, queues, localStates, huds, get configOpened() { return configOpened; }, get resumeOpened() { return resumeOpened; }, get portfolioOpened() { return portfolioOpened; } };
 }
@@ -173,6 +177,65 @@ description: Use for crypto market analysis.
     expect(await h.runtime.submit("/config")).toBe("continue");
     expect(h.configOpened).toBe(1);
     expect(h.activities.at(-1)).toBe("ready");
+  });
+
+  it("auto-generates an artifact after a completed quant analysis turn", async () => {
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      artifactGeneration: { auto: true },
+    });
+    const fakeAgent = makeFakeAgent(async (agent) => {
+      agent.state.isStreaming = false;
+      await agent.emit({ type: "agent_end", messages: [] });
+    });
+    const autoArtifactRunner = mock(async () => ({ success: true, message: "300308 research" }));
+    const h = harness(async () => [], async () => [], () => fakeAgent as never, autoArtifactRunner as never);
+
+    await h.runtime.bootstrap();
+    await h.runtime.submit("分析 300308.SZ 的技术面和风险");
+
+    expect(autoArtifactRunner).toHaveBeenCalledTimes(1);
+    expect(h.statuses.at(-1)).toEqual({ kind: "info", text: "Artifact ready · 300308 research" });
+  });
+
+  it("does not auto-generate artifacts for ordinary chat", async () => {
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      artifactGeneration: { auto: true },
+    });
+    const fakeAgent = makeFakeAgent(async (agent) => {
+      agent.state.isStreaming = false;
+      await agent.emit({ type: "agent_end", messages: [] });
+    });
+    const autoArtifactRunner = mock(async () => ({ success: true, message: "unused" }));
+    const h = harness(async () => [], async () => [], () => fakeAgent as never, autoArtifactRunner as never);
+
+    await h.runtime.bootstrap();
+    await h.runtime.submit("你好，请介绍一下你自己");
+
+    expect(autoArtifactRunner).not.toHaveBeenCalled();
+  });
+
+  it("restores an artifact panel selection without submitting a second-level slash command", async () => {
+    const fakeAgent = makeFakeAgent(async () => {});
+    const artifactRestoreRunner = mock(async (reportId: string) => ({
+      success: true,
+      message: `Restored ${reportId}`,
+    }));
+    const h = harness(
+      async () => [],
+      async () => [],
+      () => fakeAgent as never,
+      undefined,
+      artifactRestoreRunner as never,
+    );
+
+    await h.runtime.bootstrap();
+    await h.runtime.restoreArtifact("report-1");
+
+    expect(artifactRestoreRunner).toHaveBeenCalledTimes(1);
+    expect(artifactRestoreRunner.mock.calls[0]![0]).toBe("report-1");
+    expect(h.statuses.at(-1)).toEqual({ kind: "info", text: "Restored report-1" });
   });
   it("averages TTFT and TPOT across assistant turns", async () => {
     const originalNow = Date.now;

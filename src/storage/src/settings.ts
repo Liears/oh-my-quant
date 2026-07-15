@@ -58,17 +58,42 @@ function cloneSettings(settings: OhQuantSettings): OhQuantSettings {
   return JSON.parse(JSON.stringify(settings)) as OhQuantSettings;
 }
 
+const MODEL_ALIAS_MAPPINGS = [
+  { alias: "sonnet", envKey: "WHYJ_DEFAULT_SONNET_MODEL" },
+  { alias: "opus", envKey: "WHYJ_DEFAULT_OPUS_MODEL" },
+  { alias: "haiku", envKey: "WHYJ_DEFAULT_HAIKU_MODEL" },
+] as const;
+
+export function normalizeModelSelection(model: string | undefined, env: Record<string, string>): string {
+  const requested = model?.trim() || DEFAULT_SETTINGS.model;
+  const configured = MODEL_ALIAS_MAPPINGS
+    .map(({ alias, envKey }) => ({ alias, modelId: env[envKey]?.trim() || "" }))
+    .filter(({ modelId }) => modelId.length > 0);
+  if (configured.length === 0) return requested;
+  if (configured.some(({ alias, modelId }) => requested === alias || requested === modelId)) return requested;
+  return configured[0]!.alias;
+}
+
 function normalizeSettings(raw: Partial<OhQuantSettings>): OhQuantSettings {
+  const env = { ...DEFAULT_SETTINGS.env, ...canonicalizeWhyjEnv(raw.env ?? {}) };
   return {
-    version: raw.version ?? DEFAULT_SETTINGS.version,
-    env: { ...DEFAULT_SETTINGS.env, ...canonicalizeWhyjEnv(raw.env ?? {}) },
-    model: raw.model || DEFAULT_SETTINGS.model,
-    thinkingLevel: raw.thinkingLevel && raw.thinkingLevel !== "off" ? raw.thinkingLevel : DEFAULT_SETTINGS.thinkingLevel,
-    insightEnabled: raw.insightEnabled ?? DEFAULT_SETTINGS.insightEnabled,
+    version: DEFAULT_SETTINGS.version,
+    env,
+    model: normalizeModelSelection(raw.model, env),
+    thinkingLevel: normalizeThinkingLevel(raw.thinkingLevel),
     showPortfolioPanel: raw.showPortfolioPanel ?? DEFAULT_SETTINGS.showPortfolioPanel,
+    artifactGeneration: normalizeArtifactGeneration(raw.artifactGeneration),
     skillIntegrations: normalizeSkillIntegrations(raw.skillIntegrations),
     permissions: { ...DEFAULT_SETTINGS.permissions, ...(raw.permissions ?? {}) },
     preferences: normalizePreferences(raw.preferences),
+  };
+}
+
+function normalizeArtifactGeneration(
+  raw: Partial<OhQuantSettings["artifactGeneration"]> | undefined,
+): OhQuantSettings["artifactGeneration"] {
+  return {
+    auto: raw?.auto ?? raw?.mode === "auto",
   };
 }
 
@@ -77,13 +102,18 @@ function isValidSource(s: unknown): boolean {
   return typeof s === "string" && VALID_SOURCES.has(s);
 }
 
-function normalizeSkillIntegrations(
+export function normalizeSkillIntegrations(
   raw: Partial<OhQuantSettings["skillIntegrations"]> | undefined,
 ): OhQuantSettings["skillIntegrations"] {
   return {
-    codex: raw?.codex ?? DEFAULT_SETTINGS.skillIntegrations.codex,
-    claude: raw?.claude ?? DEFAULT_SETTINGS.skillIntegrations.claude,
+    external: raw?.external ?? Boolean(raw?.codex || raw?.claude),
   };
+}
+
+const VALID_THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh"]);
+
+export function normalizeThinkingLevel(value: string | undefined): string {
+  return value && VALID_THINKING_LEVELS.has(value) ? value : DEFAULT_SETTINGS.thinkingLevel;
 }
 
 function normalizePreferences(raw: Partial<OhQuantSettings["preferences"]> | undefined): OhQuantSettings["preferences"] {

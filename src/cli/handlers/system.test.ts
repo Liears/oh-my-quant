@@ -289,10 +289,11 @@ describe("portfolioHandler", () => {
       });
       const result = await configHandler({}, [], {});
       expect(result.success).toBe(true);
-      expect(result.message).toContain("Config");
-      expect(result.message).toContain("Active portfolio  当前主组合");
-      expect(result.message).toContain("Skills     Codex off  ·  Claude off");
-      expect(result.message).toContain("Ctrl+P opens the settings panel");
+      expect(result.message).toContain("Settings");
+      expect(result.message).toContain("Research    llmquant-data  ·  portfolio 当前主组合");
+      expect(result.message).toContain("external skills off");
+      expect(result.message).toContain("auto artifacts off");
+      expect(result.message).toContain("press Ctrl+P");
       expect(result.message).not.toContain("────────────────");
     });
   });

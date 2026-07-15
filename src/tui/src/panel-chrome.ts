@@ -17,7 +17,13 @@ const PANEL_H = 22;
 const PANEL_HEADER_INFO_H = 3;
 const PANEL_FOOTER_H = 2;
 
-export function drawPanelFrame(buf: Buffer, title: string, titleRight: string): PanelFrame {
+export function drawPanelFrame(
+  buf: Buffer,
+  title: string,
+  titleRight: string,
+  footerRows = PANEL_FOOTER_H,
+  headerRows = PANEL_HEADER_INFO_H,
+): PanelFrame {
   const boxW = Math.min(PANEL_W, buf.w - 4);
   const boxH = Math.min(PANEL_H, buf.h - 4);
   const boxX = Math.floor((buf.w - boxW) / 2);
@@ -31,21 +37,27 @@ export function drawPanelFrame(buf: Buffer, title: string, titleRight: string): 
     titleRightStyle: S.dim,
     border: S.rule,
   });
-  const contentY = inner.y + PANEL_HEADER_INFO_H;
+  const contentY = inner.y + headerRows;
   const footerY = inner.y + inner.h - 1;
-  const contentH = Math.max(1, footerY - contentY - (PANEL_FOOTER_H - 1));
+  const contentH = Math.max(1, footerY - contentY - (footerRows - 1));
   return { boxX, boxY, boxW, boxH, inner, contentY, contentH, footerY };
 }
 
 export function renderConfigHeaderInfo(
   buf: Buffer,
   frame: PanelFrame,
-  info: { model: string; thinking: string; panel: "on" | "off"; activePortfolio: string },
+  info: {
+    model: string;
+    thinking: string;
+    overview: "on" | "off";
+    artifactAuto: "on" | "off";
+    activePortfolio: string;
+    source: string;
+  },
 ): void {
-  const left = `Model: ${info.model}    Thinking: ${info.thinking}`;
-  const right = `Panel: ${info.panel}`;
+  const left = `Agent  ${info.model} · thinking ${info.thinking}`;
+  const right = `Overview ${info.overview} · Auto Artifacts ${info.artifactAuto}`;
   buf.text(frame.inner.x, frame.inner.y, truncate(left, frame.inner.w - Math.min(frame.inner.w - 20, strWidth(right) + 2)), S.cream);
   buf.textRight(frame.inner.x + frame.inner.w, frame.inner.y, truncate(right, Math.floor(frame.inner.w * 0.4)), S.dim, frame.inner.x + Math.floor(frame.inner.w * 0.45));
-  buf.text(frame.inner.x, frame.inner.y + 1, truncate(`Active portfolio: ${info.activePortfolio}`, frame.inner.w), S.dim);
-  buf.text(frame.inner.x, frame.inner.y + 2, truncate("Local settings panel.", frame.inner.w), S.dim);
+  buf.text(frame.inner.x, frame.inner.y + 1, truncate(`Research  ${info.activePortfolio} · ${info.source}`, frame.inner.w), S.dim);
 }

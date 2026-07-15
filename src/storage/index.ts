@@ -28,7 +28,7 @@ export { displayPath, emitFileEvent, subscribeFileEvents } from "./src/fs-events
 export type { FileEvent, FileOperation } from "./src/fs-events.ts";
 export { STORAGE_POLICY, assertPortfolioCacheDisabled, isPortfolioCachePath } from "./src/policy.ts";
 export type { StorageClass, StoragePolicyEntry } from "./src/policy.ts";
-export { loadSettings, migrateOldConfig, saveSettings } from "./src/settings.ts";
+export { loadSettings, migrateOldConfig, normalizeModelSelection, saveSettings } from "./src/settings.ts";
 export { loadWatchlist, saveWatchlist } from "./src/watchlist.ts";
 export type { Watchlist, WatchlistEntry } from "./src/watchlist.ts";
 export { getMeta, isCacheFresh, listCachedSymbols, loadBars, saveBars } from "./src/bars.ts";

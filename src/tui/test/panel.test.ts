@@ -67,8 +67,7 @@ describe("PanelController portfolio UI", () => {
     expect(plain).toContain("partial_fail");
     expect(plain).toContain("Missing WHYJ_QUANT_LLMQUANT_API_KEY");
     expect(plain).toContain("Warn · Network probe skipped by WHYJ_DOCTOR_SKIP_NETWORK.");
-    expect(plain).toContain("[Retry All]  press Enter or r");
-    expect(plain).toContain("[Retry Model] press m");
+    expect(plain).toContain("r Retry all  ·  m Model");
     expect(panel.handleKey("", key("escape"))).toEqual({ close: true });
     panel.close();
   });
@@ -345,19 +344,22 @@ describe("PanelController portfolio UI", () => {
     configPanel.open("config");
     const configBuf = new Buffer(120, 28);
     configPanel.render(configBuf);
-    expect(configBuf.toPlain().join("\n")).toContain("Active portfolio: holdings.json");
-    expect(configBuf.toPlain().join("\n")).toContain("Portfolio");
-    expect(configBuf.toPlain().join("\n")).toContain("Source");
-    expect(configBuf.toPlain().join("\n")).toContain("Token");
-    expect(configBuf.toPlain().join("\n")).toContain("Codex Skills");
-    expect(configBuf.toPlain().join("\n")).toContain("Claude Skills");
-    expect(configBuf.toPlain().join("\n")).toContain("Local settings panel.");
-    expect(configBuf.toPlain().join("\n")).not.toContain("-- Basic --");
-    expect(configBuf.toPlain().join("\n")).toContain("↑↓ move  ↵ toggle/edit  esc close");
+    expect(configBuf.toPlain().join("\n")).toContain("Research  holdings.json · llmquant-data");
+    expect(configBuf.toPlain().join("\n")).toContain("Active Portfolio");
+    expect(configBuf.toPlain().join("\n")).toContain("Market Data");
+    expect(configBuf.toPlain().join("\n")).toContain("Data Token");
+    expect(configBuf.toPlain().join("\n")).toContain("External Skills");
+    expect(configBuf.toPlain().join("\n")).not.toContain("Codex Skills");
+    expect(configBuf.toPlain().join("\n")).not.toContain("Claude Skills");
+    expect(configBuf.toPlain().join("\n")).not.toContain("Changes save immediately");
+    expect(configBuf.toPlain().join("\n")).toContain("-- Agent Runtime --");
+    expect(configBuf.toPlain().join("\n")).not.toContain("↑↓ select");
+    expect(configBuf.toPlain().join("\n")).not.toContain("change/edit");
+    expect(configBuf.toPlain().join("\n")).not.toContain("esc done");
+    expect(configBuf.toPlain().join("\n")).not.toContain("About ·");
     expect(configBuf.toPlain().join("\n")).not.toContain("Use slash commands for data");
     expect(configBuf.toPlain().join("\n")).toContain("holdings.json");
-    configPanel.handleKey("", key("down"));
-    configPanel.handleKey("", key("down"));
+    for (let i = 0; i < 6; i++) configPanel.handleKey("", key("down"));
     configPanel.handleKey("", key("return"));
     configPanel.close();
 
@@ -412,15 +414,41 @@ describe("PanelController portfolio UI", () => {
     panel.close();
   });
 
-  it("lets config save a source-specific key", () => {
+  it("keeps Settings free of per-field explanation rows", () => {
+    const panel = new PanelController();
+    panel.open("config");
+
+    for (let index = 0; index < 10; index++) {
+      const buf = new Buffer(120, 28);
+      panel.render(buf);
+      expect(buf.toPlain().join("\n")).not.toContain("About ·");
+      panel.handleKey("", key("down"));
+    }
+
+    panel.close();
+  });
+
+  it("masks provider credentials while they are being edited", () => {
     const panel = new PanelController();
     panel.open("config");
     panel.handleKey("", key("down"));
     panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
+    panel.handleKey("", key("return"));
+    for (const ch of "super-secret-key") panel.handleKey(ch, key("", ch));
+
+    const buf = new Buffer(120, 28);
+    panel.render(buf);
+    const plain = buf.toPlain().join("\n");
+    expect(plain).not.toContain("super-secret-key");
+    expect(plain).toContain("••••");
+    expect(plain).not.toContain("code or code name");
+    panel.close();
+  });
+
+  it("lets config save a source-specific key", () => {
+    const panel = new PanelController();
+    panel.open("config");
+    for (let i = 0; i < 5; i++) panel.handleKey("", key("down"));
     panel.handleKey("", key("return"));
     for (const ch of "test-llmquant-key") {
       panel.handleKey(ch, key("", ch));
@@ -435,11 +463,7 @@ describe("PanelController portfolio UI", () => {
   it("lets config cycle through data sources", () => {
     const panel = new PanelController();
     panel.open("config");
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
+    for (let i = 0; i < 4; i++) panel.handleKey("", key("down"));
     panel.handleKey("", key("return"));
     panel.close();
 
@@ -455,8 +479,17 @@ describe("PanelController portfolio UI", () => {
     panel.close();
 
     const settings = loadSettings();
-    expect(settings.skillIntegrations.codex).toBe(true);
-    expect(settings.skillIntegrations.claude).toBe(false);
+    expect(settings.skillIntegrations).toEqual({ external: true });
+  });
+
+  it("lets config enable automatic artifact generation", () => {
+    const panel = new PanelController();
+    panel.open("config");
+    for (let i = 0; i < 9; i++) panel.handleKey("", key("down"));
+    panel.handleKey("", key("return"));
+    panel.close();
+
+    expect(loadSettings().artifactGeneration.auto).toBe(true);
   });
 
   it("renders a dedicated resume selector and returns a resume command", () => {
@@ -498,7 +531,8 @@ describe("PanelController portfolio UI", () => {
     panel.render(buf);
     const plain = buf.toPlain().join("\n");
     expect(plain).toContain("Resume a previous session");
-    expect(plain).toContain("↑↓ move  ↵ resume  esc close");
+    expect(plain).not.toContain("↑↓ move");
+    expect(plain).not.toContain("esc close");
     expect(plain).toContain("U: 请你参考");
 
     const result = panel.handleKey("", key("return"));
@@ -618,7 +652,20 @@ describe("PanelController portfolio UI", () => {
   });
 
 
-  it("renders a dedicated artifact panel and returns artifact commands", () => {
+  it("renders a dedicated artifact panel and returns an internal restore intent", () => {
+    const sessionDir = join(OHQ, "sessions", encodeCwd(process.cwd()));
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(
+      join(sessionDir, "2026-07-13T00-00-00-000Z_sess-artifact-1.jsonl"),
+      JSON.stringify({
+        type: "session",
+        version: 3,
+        id: "sess-artifact-1",
+        timestamp: "2026-07-13T00:00:00.000Z",
+        cwd: process.cwd(),
+      }),
+      "utf-8",
+    );
     saveArtifact("sess-artifact-1", "<html><body>artifact</body></html>", { title: "Analysis artifact", messageCount: 3 });
 
     const panel = new PanelController();
@@ -629,12 +676,15 @@ describe("PanelController portfolio UI", () => {
     expect(plain).toContain("Artifacts");
     expect(plain).toContain("Analysis artifact");
     expect(plain).not.toContain("Hotkeys");
+    expect(plain).not.toContain("↑↓ select");
+    expect(plain).not.toContain("restore & open");
+    expect(plain).not.toContain("esc close");
 
     const open = panel.handleKey("", key("return"));
-    expect(open).toEqual({ command: "/artifact --open sess-artifact-1", close: true });
+    expect(open).toEqual({ restoreArtifact: "sess-artifact-1", close: true });
 
-    const generate = panel.handleKey("g", key("g", "g"));
-    expect(generate).toEqual({ command: "/artifact --generate", close: true });
+    const ignored = panel.handleKey("g", key("g", "g"));
+    expect(ignored).toEqual({});
     panel.close();
   });
   it("uses the same panel frame size for config, resume, and portfolio", () => {
@@ -655,7 +705,7 @@ describe("PanelController portfolio UI", () => {
     const configLines = configBuf.toPlain();
     const resumeLines = resumeBuf.toPlain();
     const portfolioLines = portfolioBuf.toPlain();
-    const configTop = configLines.find((line) => line.includes("Config"));
+    const configTop = configLines.find((line) => line.includes("Settings"));
     const resumeTop = resumeLines.find((line) => line.includes("Resume a previous session"));
     const portfolioTop = portfolioLines.find((line) => line.includes("Local portfolios"));
     expect(configTop).toBeDefined();

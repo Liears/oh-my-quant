@@ -36,8 +36,8 @@ describe("panel views", () => {
 
     renderHelpPanelView(buf, frame, {
       commands: [
-        { name: "/resume", desc: "Resume a session", selected: true },
-        { name: "/config", desc: "Open settings", selected: false },
+        { name: "/resume", desc: "Browse and restore saved sessions", selected: true },
+        { name: "/artifact", desc: "Browse, restore, and open reports", selected: false },
       ],
       hotkeys: [
         { key: "Ctrl+P", desc: "Open settings" },
@@ -49,6 +49,8 @@ describe("panel views", () => {
     const plain = buf.toPlain().join("\n");
     expect(plain).toContain("Commands");
     expect(plain).toContain("/resume");
+    expect(plain).toContain("Browse and restore saved sessions");
+    expect(plain).toContain("Browse, restore, and open reports");
     expect(plain).toContain("Hotkeys");
     expect(plain).toContain("Ctrl+P");
   });
@@ -56,7 +58,7 @@ describe("panel views", () => {
 
   it("renders artifact metadata through the shared artifact view", () => {
     const buf = new Buffer(120, 20);
-    const frame = drawPanelFrame(buf, "Artifacts", "↑↓ move  ↵ restore  g generate  esc close");
+    const frame = drawPanelFrame(buf, "Artifacts", "↑↓ select  ↵ restore & open  esc close");
 
     renderArtifactPanelView(buf, frame, {
       meta: {
@@ -67,7 +69,7 @@ describe("panel views", () => {
       items: [
         { age: "2h ago  ", title: "Analysis artifact", stats: "3 msg · 2KB", selected: true },
       ],
-      footer: "↑↓ select  ↵ restore  g generate  esc close  ·  1 artifact",
+      footer: "↑↓ select  ↵ restore & open  esc close  ·  1 artifact",
     });
 
     const plain = buf.toPlain().join("\n");

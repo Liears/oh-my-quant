@@ -10,7 +10,7 @@ import type { DoctorResult } from "../../runtime/doctor-contract.ts";
 import { createStoragePanelDataService, type ArtifactMeta, type LocalPortfolioSummary, type PanelDataService, type StoredSessionSummary, type WhyjEnvAliasKey } from "../../runtime/panel-data.ts";
 import type { DataSource, OhQuantSettings } from "../../types/config.ts";
 
-export type PanelResult = { command?: string; close?: boolean; refreshPanel?: boolean };
+export type PanelResult = { command?: string; restoreArtifact?: string; close?: boolean; refreshPanel?: boolean };
 type PanelMode = "config" | "doctor" | "resume" | "portfolio" | "help" | "artifact";
 
 export interface CurrentSessionMeta {
@@ -41,20 +41,8 @@ type Field = {
 type Row = { section: string } | { field: Field; index: number };
 const MODEL_SHORT_NAMES = ["sonnet", "opus", "haiku"];
 
-function resolveModelId(shortName: string): string {
-  const envKey = `WHYJ_DEFAULT_${shortName.toUpperCase()}_MODEL`;
-  const fromEnv = process.env[envKey];
-  if (fromEnv) return fromEnv;
-  switch (shortName) {
-    case "sonnet": return "deepseek-v4-pro";
-    case "opus": return "deepseek-v4-pro";
-    case "haiku": return "deepseek-v4-flash";
-    default: return shortName;
-  }
-}
-
-function buildModelOptions(): string[] {
-  return MODEL_SHORT_NAMES.map((name) => resolveModelId(name));
+function buildModelOptions(current?: string): string[] {
+  return [...new Set([current?.trim(), ...MODEL_SHORT_NAMES].filter((value): value is string => Boolean(value)))];
 }
 
 function formatRelativeAge(value: string): string {
@@ -233,12 +221,8 @@ export class PanelController {
   }
 
 
-  private handleArtifactKey(input: string, key: readline.Key): PanelResult {
+  private handleArtifactKey(_input: string, key: readline.Key): PanelResult {
     if (key.name === "escape") return { close: true };
-    if (input.toLowerCase() === "g") {
-      this.status = "Generating artifact...";
-      return { command: "/artifact --generate", close: true };
-    }
     if (key.name === "up") {
       const items = this.artifacts;
       if (items.length > 0) this.artifactSelection = (this.artifactSelection - 1 + items.length) % items.length;
@@ -253,7 +237,7 @@ export class PanelController {
       const selected = this.artifacts[this.artifactSelection];
       if (!selected) return {};
       this.status = `Restoring ${selected.sessionId}...`;
-      return { command: `/artifact --open ${selected.sessionId}`, close: true };
+      return { restoreArtifact: selected.sessionId, close: true };
     }
     return {};
   }
@@ -320,25 +304,27 @@ export class PanelController {
     const fields = this.fields();
     const frame = this.drawPanelFrame(
       buf,
-      "Config",
-      "↑↓ move  ↵ toggle/edit  esc close",
+      "Settings",
+      "",
+      this.draft !== null ? 3 : 2,
+      2,
     );
     const { inner } = frame;
 
     this.renderConfigHeaderInfo(buf, frame);
-    const footer = this.status || "↑↓ move  ↵ toggle/edit  esc close";
+    const footer = this.status;
     const rowViews: ConfigRowView[] = buildConfigRowViews(rows, this.cursor, this.draft, (field, active) => this.valueText(field as Field, active));
     const draftLine = this.draft !== null && fields[this.cursor]
-      ? `${fields[this.cursor].label}${fields[this.cursor].apply ? " (code or code name)" : ""}: ${this.draft}|`
+      ? `${fields[this.cursor].label}: ${this.draftDisplay(fields[this.cursor])}|`
       : undefined;
-    renderConfigPanelView(buf, frame, rowViews, footer, draftLine);
+    renderConfigPanelView(buf, frame, rowViews, footer, draftLine, this.draft !== null);
   }
 
   private renderResumePanel(buf: Buffer): void {
     const frame = this.drawPanelFrame(
       buf,
       "Resume a previous session",
-      "↑↓ move  ↵ resume  esc close",
+      "",
     );
     const sessions = this.filteredResumeSessions();
     renderResumePanelView(buf, frame, buildResumePanelData({
@@ -361,7 +347,7 @@ export class PanelController {
     const frame = this.drawPanelFrame(
       buf,
       "Doctor",
-      this.doctor ? "↵/r retry  esc close" : "esc close",
+      "",
     );
     if (!this.doctor) {
       renderDoctorPanelView(buf, frame, {
@@ -390,16 +376,18 @@ export class PanelController {
     const frame = this.drawPanelFrame(
       buf,
       this.doctor?.mode === "first_setup" ? "Doctor · First Setup" : "Doctor · Configure",
-      "↑↓ move  ↵ edit/save  esc discard",
+      "",
+      this.draft !== null ? 3 : 2,
+      2,
     );
     const rows = this.doctorWizardRows();
     const fields = this.doctorWizardFields();
-    const footer = this.status || "↑↓ move  ↵ edit/save  esc discard";
+    const footer = this.status;
     const rowViews: ConfigRowView[] = buildConfigRowViews(rows, this.cursor, this.draft, (field, active) => this.valueText(field as Field, active));
     const draftLine = this.draft !== null && fields[this.cursor]
-      ? `${fields[this.cursor].label}: ${this.draft}|`
+      ? `${fields[this.cursor].label}: ${this.draftDisplay(fields[this.cursor])}|`
       : undefined;
-    renderConfigPanelView(buf, frame, rowViews, footer, draftLine);
+    renderConfigPanelView(buf, frame, rowViews, footer, draftLine, this.draft !== null);
   }
 
   private renderPortfolioPanel(buf: Buffer): void {
@@ -407,7 +395,7 @@ export class PanelController {
     const frame = this.drawPanelFrame(
       buf,
       "Local portfolios",
-      "↑↓ move  esc close",
+      "",
     );
     const items = this.filteredPortfolioItems();
     const activeFile = this.cfg?.preferences.currentPortfolioFile || "holdings.json";
@@ -426,7 +414,7 @@ export class PanelController {
     const frame = this.drawPanelFrame(
       buf,
       "Artifacts",
-      "↑↓ move  ↵ restore  g generate  esc close",
+      "",
     );
     renderArtifactPanelView(buf, frame, buildArtifactPanelData({
       items: this.artifacts,
@@ -436,14 +424,14 @@ export class PanelController {
     }));
   }
   private renderHelpPanel(buf: Buffer): void {
-    const frame = this.drawPanelFrame(buf, "Help", "↑↓ select  ↵ run  esc close");
+    const frame = this.drawPanelFrame(buf, "Help", "");
     const total = COMMAND_CATALOG.length;
     this.helpSelection = Math.min(this.helpSelection, total - 1);
     renderHelpPanelView(buf, frame, buildHelpPanelData(this.helpSelection));
   }
 
-  private drawPanelFrame(buf: Buffer, title: string, titleRight: string): PanelFrame {
-    return drawPanelFrame(buf, title, titleRight);
+  private drawPanelFrame(buf: Buffer, title: string, titleRight: string, footerRows?: number, headerRows?: number): PanelFrame {
+    return drawPanelFrame(buf, title, titleRight, footerRows, headerRows);
   }
 
   private renderConfigHeaderInfo(buf: Buffer, frame: PanelFrame): void {
@@ -451,8 +439,10 @@ export class PanelController {
     renderConfigHeaderInfo(buf, frame, {
       model: this.cfg.model || "sonnet",
       thinking: this.cfg.thinkingLevel || "high",
-      panel: this.cfg.showPortfolioPanel === false ? "off" : "on",
+      overview: this.cfg.showPortfolioPanel === false ? "off" : "on",
+      artifactAuto: this.cfg.artifactGeneration.auto ? "on" : "off",
       activePortfolio: this.currentPortfolioName(),
+      source: this.currentSource(),
     });
   }
 
@@ -760,58 +750,84 @@ export class PanelController {
     if (!this.cfg) return [];
     return [
       {
-        label: "Basic",
+        label: "Agent Runtime",
         fields: [
-          { label: "Model", get: () => this.cfg?.model || "sonnet", set: (v) => { if (this.cfg) this.cfg.model = v; }, optionsFn: buildModelOptions },
-          { label: "Thinking", get: () => this.cfg?.thinkingLevel || "high", set: (v) => { if (this.cfg) this.cfg.thinkingLevel = v; }, options: THINKING_OPTIONS },
           {
-            label: "Portfolio",
-            get: () => this.currentPortfolioLabel(),
-            set: (v) => this.setCurrentPortfolio(v),
-            optionsFn: () => this.currentPortfolioOptions(),
+            label: "Model",
+            get: () => this.cfg?.model || "sonnet",
+            set: (v) => { if (this.cfg) this.cfg.model = v; },
+            optionsFn: () => buildModelOptions(this.cfg?.model),
           },
           {
-            label: "API Key",
+            label: "Thinking",
+            get: () => this.cfg?.thinkingLevel || "high",
+            set: (v) => { if (this.cfg) this.cfg.thinkingLevel = v; },
+            options: THINKING_OPTIONS,
+          },
+          {
+            label: "Provider Key",
             get: () => this.apiKeyLabel(),
             apply: (v) => this.saveProviderKey(v),
+            secret: true,
           },
           {
-            label: "Base URL",
+            label: "Provider URL",
             get: () => this.baseUrlLabel(),
             apply: (v) => this.saveBaseUrl(v),
           },
+        ],
+      },
+      {
+        label: "Research Data",
+        fields: [
           {
-            label: "Source",
+            label: "Market Data",
             get: () => this.currentSource(),
             set: (v) => { if (this.cfg) this.cfg.preferences.source = v as DataSource; },
             options: [...SOURCE_OPTIONS],
           },
           {
-            label: "Token",
+            label: "Data Token",
             get: () => this.dataSourceKeyLabel(this.currentSource()),
             apply: (v) => this.saveDataSourceKey(this.currentSource(), v),
+            secret: true,
           },
           {
-            label: "Codex Skills",
-            get: () => this.cfg?.skillIntegrations.codex ? "on" : "off",
-            set: (v) => { if (this.cfg) this.cfg.skillIntegrations.codex = v !== "off"; },
+            label: "Active Portfolio",
+            get: () => this.currentPortfolioLabel(),
+            set: (v) => this.setCurrentPortfolio(v),
+            optionsFn: () => this.currentPortfolioOptions(),
+          },
+        ],
+      },
+      {
+        label: "Workspace Experience",
+        fields: [
+          {
+            label: "External Skills",
+            get: () => this.cfg?.skillIntegrations.external ? "on" : "off",
+            set: (v) => { if (this.cfg) this.cfg.skillIntegrations.external = v !== "off"; },
             options: ENABLE_OPTIONS,
           },
           {
-            label: "Claude Skills",
-            get: () => this.cfg?.skillIntegrations.claude ? "on" : "off",
-            set: (v) => { if (this.cfg) this.cfg.skillIntegrations.claude = v !== "off"; },
+            label: "Overview Dock",
+            get: () => this.cfg?.showPortfolioPanel === false ? "off" : "on",
+            set: (v) => { if (this.cfg) this.cfg.showPortfolioPanel = v !== "off"; },
             options: ENABLE_OPTIONS,
           },
-          { label: "Panel", get: () => this.cfg?.showPortfolioPanel === false ? "off" : "on", set: (v) => { if (this.cfg) this.cfg.showPortfolioPanel = v !== "off"; }, options: ENABLE_OPTIONS },
-          { label: "Insight", get: () => this.cfg?.insightEnabled === false ? "off" : "on", set: (v) => { if (this.cfg) this.cfg.insightEnabled = v !== "off"; }, options: ENABLE_OPTIONS },
-                  ],
+          {
+            label: "Auto Artifacts",
+            get: () => this.cfg?.artifactGeneration.auto ? "on" : "off",
+            set: (v) => { if (this.cfg) this.cfg.artifactGeneration.auto = v !== "off"; },
+            options: ENABLE_OPTIONS,
+          },
+        ],
       },
     ];
   }
 
   private valueText(field: Field, active: boolean): string {
-    if (this.draft !== null && active) return `[${this.draft}|]`;
+    if (this.draft !== null && active) return `[${this.draftDisplay(field)}|]`;
     return `[${field.action ? ">" : ""}${field.pickRemove ? "▼ " : ""}${field.get()}]`;
   }
 
@@ -822,6 +838,12 @@ export class PanelController {
     const idx = opts.indexOf(field.get());
     field.set(opts[(idx + direction + opts.length) % opts.length]);
     this.data.saveSettings(this.cfg);
+  }
+
+  private draftDisplay(field: Field): string {
+    if (this.draft === null) return "";
+    if (!field.secret) return this.draft;
+    return "•".repeat(Math.min(24, this.draft.length));
   }
 
   private doctorWizardRows(): Row[] {
@@ -840,6 +862,7 @@ export class PanelController {
         label: "API Key",
         get: () => this.doctorApiKeyLabel(),
         apply: (v) => this.saveDoctorProviderKey(v),
+        secret: true,
       },
       {
         label: "Base URL",
@@ -858,6 +881,7 @@ export class PanelController {
         label: "Token",
         get: () => this.doctorDataSourceKeyLabel(),
         apply: (v) => this.saveDoctorDataSourceKey(v),
+        secret: true,
       },
       {
         label: "Save & Verify",
@@ -961,11 +985,11 @@ export class PanelController {
   }
 
   private toDoctorPanelView(doctor: DoctorResult): DoctorPanelView {
-    const actions = ["[Retry All]  press Enter or r"];
-    if (doctor.phases.some((phase) => phase.phase === "model")) actions.push("[Retry Model] press m");
-    if (doctor.phases.some((phase) => phase.phase === "tools")) actions.push("[Retry Tools] press t");
-    if (doctor.phases.some((phase) => phase.phase === "data")) actions.push("[Retry Data]  press d");
-    actions.push("[Configure]   press c");
+    const actionItems = ["r Retry all"];
+    if (doctor.phases.some((phase) => phase.phase === "model")) actionItems.push("m Model");
+    if (doctor.phases.some((phase) => phase.phase === "tools")) actionItems.push("t Tools");
+    if (doctor.phases.some((phase) => phase.phase === "data")) actionItems.push("d Data");
+    actionItems.push("c Configure");
     return {
       title: "WhyJ Doctor",
       status: doctor.overall,
@@ -982,7 +1006,7 @@ export class PanelController {
         action: phase.action,
         warnings: phase.warnings,
       })),
-      actions,
+      actions: [actionItems.join("  ·  ")],
       hints: doctor.hints,
       logPath: doctor.logPath,
     };

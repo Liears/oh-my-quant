@@ -43,7 +43,7 @@ export function buildResumePanelData(args: {
   const isCurrent = selected && meta && selected.id === meta.id;
   const footer = status || (sessions.length === 0
     ? "No saved sessions yet. Start a conversation first, then come back to /resume."
-    : `Showing ${sessions.length} session${sessions.length === 1 ? "" : "s"} · enter to resume`);
+    : `${sessions.length} session${sessions.length === 1 ? "" : "s"}`);
 
   const metaView = selected ? (() => {
     const label = isCurrent ? "Current" : "Selected";
@@ -132,7 +132,7 @@ export function buildPortfolioPanelData(args: {
     })),
     footer: items.length === 0
       ? "Add portfolio JSON files under .ohquant/portfolio/, then reopen /portfolio."
-      : (status || `↑↓ select  esc close  ·  ${items.length} portfolio${items.length === 1 ? "" : "s"}`),
+      : (status || `${items.length} portfolio${items.length === 1 ? "" : "s"}`),
   };
 }
 
@@ -162,8 +162,8 @@ export function buildArtifactPanelData(args: {
       selected: index === selection,
     })),
     footer: items.length === 0
-      ? "No artifacts yet. Press g to generate one from the current session."
-      : (status || `↑↓ select  ↵ restore  g generate  esc close  ·  ${items.length} artifact${items.length === 1 ? "" : "s"}`),
+      ? "No reports yet. Enable Auto Artifacts in /config, then complete a quant-analysis turn."
+      : (status || `${items.length} report${items.length === 1 ? "" : "s"}`),
   };
 }
 
@@ -193,6 +193,6 @@ export function buildHelpPanelData(selection: number): {
       { key: "1-9", desc: "Quick-select" },
       { key: "/", desc: "Slash command mode" },
     ],
-    footer: "↑↓ select  ↵ run  esc close",
+    footer: "",
   };
 }

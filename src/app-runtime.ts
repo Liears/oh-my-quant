@@ -1,6 +1,8 @@
 import { buildCommandHelpText } from "./cli/catalog.ts";
 import { executeCommand, parseCommand } from "./cli/registry.ts";
+import { generateCurrentSessionArtifact, restoreArtifactReport } from "./runtime/artifact-reports.ts";
 import { dispatchUserMessage, isAgentTurnActive } from "./agent/src/dispatch.ts";
+import { isQuantAnalysisRequest } from "./agent/src/context.ts";
 import { createAgent, updateSessionCtx, type QuantAgentSession } from "./agent/src/session.ts";
 import { skillPaths } from "./skill/index.ts";
 import { ensureDirs, loadSettings, loadPanelPortfolio } from "./storage/index.ts";
@@ -40,6 +42,7 @@ import {
 } from "./runtime/agent-events.ts";
 import { perfLog, perfNow } from "./perf.ts";
 import type { DoctorResult } from "./runtime/doctor-contract.ts";
+import type { CommandResult } from "./types/commands.ts";
 import {
   assistantEventHasVisibleOutput,
   assistantMessageHasVisibleOutput,
@@ -75,6 +78,8 @@ interface AppRuntimeCallbacks {
 type QuoteFetcher = OverviewQuoteFetcher;
 type HoldingFetcher = OverviewHoldingFetcher;
 type AgentFactory = () => QuantAgentSession;
+type AutoArtifactRunner = (agent: QuantAgentSession) => Promise<{ success: boolean; message: string }>;
+type ArtifactRestoreRunner = (reportId: string, agent: QuantAgentSession) => Promise<CommandResult>;
 
 const SHORT_MODEL: Record<string, string> = {
   "claude-sonnet-4-6": "sonnet",
@@ -84,6 +89,14 @@ const SHORT_MODEL: Record<string, string> = {
 };
 export function createRuntimeAgent(): QuantAgentSession {
   return createAgent({ skillPaths: skillPaths() });
+}
+
+async function runAutoArtifact(agent: QuantAgentSession): Promise<{ success: boolean; message: string }> {
+  return generateCurrentSessionArtifact({ agentSession: agent });
+}
+
+async function runArtifactRestore(reportId: string, agent: QuantAgentSession): Promise<CommandResult> {
+  return restoreArtifactReport(reportId, { agentSession: agent });
 }
 
 export class AppRuntime {
@@ -103,12 +116,16 @@ export class AppRuntime {
   private tpotTotalMs = 0;
   private tpotSamples = 0;
   private turnTtftRecorded = false;
+  private pendingAutoArtifactInput: string | null = null;
+  private autoArtifactRunning = false;
 
   constructor(
     private readonly callbacks: AppRuntimeCallbacks,
     private readonly quoteFetcher: QuoteFetcher = fetchOverviewQuotes,
     private readonly holdingFetcher: HoldingFetcher = fetchOverviewHoldings,
     private readonly agentFactory: AgentFactory = createRuntimeAgent,
+    private readonly autoArtifactRunner: AutoArtifactRunner = runAutoArtifact,
+    private readonly artifactRestoreRunner: ArtifactRestoreRunner = runArtifactRestore,
   ) {}
 
   async refreshOverviewPanel(): Promise<void> {
@@ -146,6 +163,7 @@ export class AppRuntime {
         scheduleMarketRefresh: () => this.scheduleMarketRefresh(),
       });
       this.refreshHudFromAgentState();
+      if (event.type === "agent_end") await this.maybeAutoGenerateArtifact();
     });
 
     void this.agent.waitForIdle()
@@ -187,6 +205,24 @@ export class AppRuntime {
 
   dispose(): void {
     this.agent?.abort();
+  }
+
+  /** Handle a report selected in the Artifact panel without routing through slash parsing. */
+  async restoreArtifact(reportId: string): Promise<void> {
+    if (!this.agent || this.slashRunning || isAgentTurnActive(this.agent)) return;
+    this.slashRunning = true;
+    this.setStatus({ kind: "info", text: "Restoring artifact session..." });
+    try {
+      const result = await this.artifactRestoreRunner(reportId, this.agent);
+      applyRuntimeCommandResult(result, this.commandResultContext());
+      this.refreshHudFromAgentState();
+    } catch (error) {
+      this.setStatus({ kind: "error", text: `Artifact restore failed · ${errorText(error)}` });
+    } finally {
+      this.slashRunning = false;
+      this.scheduleMarketRefresh();
+      if (!isAgentTurnActive(this.agent)) this.setActivity("ready");
+    }
   }
 
   private async collectCurrentSessionMeta(): Promise<CurrentSessionMeta | undefined> {
@@ -291,17 +327,42 @@ export class AppRuntime {
       this.setActivity("ready");
       return;
     }
+    this.pendingAutoArtifactInput = input;
     try {
       const startedAt = perfNow();
       await dispatchUserMessage(this.agent, input, input);
       perfLog("runtime.agent.dispatch", startedAt);
     } catch (err) {
+      this.pendingAutoArtifactInput = null;
       this.emitComposerQueue([]);
       const message = errorText(err);
       this.messages.push({ role: "error", text: formatAgentError("Agent", message) });
       this.emitMessages();
       this.setStatus({ kind: "error", text: agentStatusText(message) });
       if (!isAgentTurnActive(this.agent)) this.setActivity("ready");
+    }
+  }
+
+  private async maybeAutoGenerateArtifact(): Promise<void> {
+    const input = this.pendingAutoArtifactInput;
+    this.pendingAutoArtifactInput = null;
+    if (!input || this.autoArtifactRunning || !this.agent) return;
+
+    const settings = loadSettings();
+    if (!settings.artifactGeneration.auto || !isQuantAnalysisRequest(input)) return;
+
+    this.autoArtifactRunning = true;
+    this.setStatus({ kind: "info", text: "Generating artifact report..." });
+    try {
+      const result = await this.autoArtifactRunner(this.agent);
+      this.setStatus({
+        kind: result.success ? "info" : "error",
+        text: result.success ? `Artifact ready · ${result.message}` : `Artifact generation failed · ${result.message}`,
+      });
+    } catch (error) {
+      this.setStatus({ kind: "error", text: `Artifact generation failed · ${errorText(error)}` });
+    } finally {
+      this.autoArtifactRunning = false;
     }
   }
 

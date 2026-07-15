@@ -114,15 +114,13 @@ function resolveSkillSources(
   const homeRoot = resolve(userHome);
   const projectRoots = collectAncestorRoots(cwd).filter((root) => resolve(root) !== homeRoot);
   const userSources: SkillSource[] = [];
-  if (integrations.claude === true) {
+  if (integrations.external === true) {
     userSources.push(
       { path: join(userHome, ".claude", "skills"), scope: "user", source: "claude" },
       { path: join(userHome, ".agents", "skills"), scope: "user", source: "agents" },
       { path: join(userHome, ".pi", "agent", "skills"), scope: "user", source: "pi" },
+      { path: join(userHome, ".codex", "skills"), scope: "user", source: "codex" },
     );
-  }
-  if (integrations.codex === true) {
-    userSources.push({ path: join(userHome, ".codex", "skills"), scope: "user", source: "codex" });
   }
   const candidates: SkillSource[] = [
     ...projectRoots.flatMap((root) => ([

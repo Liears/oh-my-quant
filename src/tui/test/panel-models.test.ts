@@ -48,7 +48,7 @@ describe("panel models", () => {
     expect(data.meta?.usageBar).toContain("400/1,000");
     expect(data.meta?.stats).toContain("Msgs 10");
     expect(data.items[1]?.legacy).toBe(true);
-    expect(data.footer).toContain("Showing 2 sessions");
+    expect(data.footer).toBe("2 sessions");
   });
 
   it("builds resume panel data with historical JSONL context usage", () => {
@@ -161,11 +161,12 @@ describe("panel models", () => {
     expect(data.meta?.title).toContain("Analysis artifact");
     expect(data.meta?.details).toContain("sess-artifact-1");
     expect(data.items[0]?.stats).toContain("2KB");
-    expect(data.footer).toContain("1 artifact");
+    expect(data.footer).toContain("1 report");
   });
   it("builds help panel data with a selected command", () => {
     const data = buildHelpPanelData(0);
     expect(data.commands.some((cmd) => cmd.selected)).toBe(true);
     expect(data.hotkeys.some((key) => key.key === "Ctrl+P")).toBe(true);
+    expect(data.footer).toBe("");
   });
 });

@@ -12,10 +12,21 @@ export interface UserPreferences {
 }
 
 export interface SkillIntegrationSettings {
-  /** Load user-level Codex skills from ~/.codex/skills. */
-  codex: boolean;
-  /** Load user-level Claude/agent skills from ~/.claude/skills, ~/.agents/skills, and ~/.pi/agent/skills. */
-  claude: boolean;
+  /** Load user-level skills from Codex, Claude, Agents, and pi directories. */
+  external: boolean;
+  /** @deprecated Legacy input migrated to `external`. */
+  codex?: boolean;
+  /** @deprecated Legacy input migrated to `external`. */
+  claude?: boolean;
+}
+
+export type ArtifactGenerationMode = "manual" | "auto";
+
+export interface ArtifactGenerationSettings {
+  /** Generate and open a report after a completed quant-analysis turn. */
+  auto: boolean;
+  /** @deprecated v2 input migrated to `auto`. */
+  mode?: ArtifactGenerationMode;
 }
 
 export interface OhQuantSettings {
@@ -26,10 +37,10 @@ export interface OhQuantSettings {
   model: string;
   /** Thinking/reasoning level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" */
   thinkingLevel: string;
-  /** Whether the insight panel is shown and auto-derived from the conversation. */
-  insightEnabled: boolean;
   /** Whether the right-side overview/portfolio panel is visible. */
   showPortfolioPanel: boolean;
+  /** Artifact report generation policy. Auto mode also opens the generated report. */
+  artifactGeneration: ArtifactGenerationSettings;
   /** Optional user-level skill integrations. Project quant skills are always loaded. */
   skillIntegrations: SkillIntegrationSettings;
   /** Tool allow/deny lists */
@@ -39,15 +50,16 @@ export interface OhQuantSettings {
 }
 
 export const DEFAULT_SETTINGS: OhQuantSettings = {
-  version: 1,
+  version: 3,
   env: {},
   model: "sonnet",
   thinkingLevel: "high",
-  insightEnabled: true,
   showPortfolioPanel: true,
+  artifactGeneration: {
+    auto: false,
+  },
   skillIntegrations: {
-    codex: false,
-    claude: false,
+    external: false,
   },
   permissions: {},
   preferences: {

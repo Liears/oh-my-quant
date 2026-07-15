@@ -59,6 +59,10 @@ export async function startApp(): Promise<void> {
     }
   });
 
+  tui.onArtifactRestore((reportId) => {
+    void runtime.restoreArtifact(reportId);
+  });
+
   tui.onPanelRefresh(() => {
     void runtime.refreshOverviewPanel();
   });
