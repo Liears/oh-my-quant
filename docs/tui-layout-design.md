@@ -1,7 +1,7 @@
 # WhyJ Quant — TUI 布局设计
 
-> 最后更新：2026-06-17
-> 版本：**r9 — 区域划分：Analyzing / Overview / Composer / Modal Panels**
+> 最后更新：2026-07-15
+> 版本：**r10 — 区域划分：Analyzing / Overview / Composer / Modal Panels**
 
 本文档描述当前 frame-buffer TUI 布局和交互模型。代码级指南为 `src/tui/README.md`；本文档是视觉/布局契约。
 
@@ -21,7 +21,7 @@ Modal panels 是由 `src/tui/src/panel.ts` 中的 `PanelController` 持有的独
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ ▁▃▅▇█ WhyJ Quant  v1.1.2                    │
+│ ▁▃▅▇█ WhyJ Quant  v1.2.0                    │
 ├───────────────────────────────────────────────┬────────────────────────────┤
 │ ╭ ◉ Analyzing ──────────────────────────────╮ │ ╭ ◫ Overview ───────────╮ │
 │ │ ▏ 用户消息                                │ │ │ ▎ ▼ Core              │ │
@@ -106,6 +106,8 @@ Modal 交互一致：
 | `↑` / `↓` | 移动选择 |
 | `Enter` | 切换、应用、打开草稿或运行模式特定操作 |
 | `Esc` | 关闭草稿/选择器/面板 |
+
+面板顶部只保留能帮助当前决策的状态摘要，例如活动模型、推理级别、当前组合和数据源。边框操作提示只显示当前面板真正需要的少量快捷键；方向键、Enter、Esc 等符合终端习惯的通用操作不在正文重复说明。提示项之间保留足够空白，避免状态与操作文案挤成一行。
 
 ## 4. Analyze Display Panel
 
@@ -226,6 +228,9 @@ CODE(8)  name...                       pct(8)
 - Portfolio symbol 来自本地 portfolio 存储。
 - 实时报价在运行时刷新期间获取。
 - Market 和 source sections 追加在 portfolio sections 之后。
+- 每次刷新都有代次与超时边界；失败或超时会释放 `refreshing`，旧请求完成后不得覆盖新结果。
+- 刷新失败时保留最近一次成功面板；从未取得有效行情时显示 `--`，不得把缺失值渲染为 `0.00`。
+- `instrument: "fund"` 的六位开放式基金代码会在 provider 边界规范化为 `.OF`；ETF/LOF 仍走交易所代码路径。
 
 ## 6. Composer 输入框
 

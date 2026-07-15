@@ -226,6 +226,8 @@ await fetchLiveBars("000300.SH", "A", undefined, undefined, {
 
 最后一步是 Overview 不再因本地时钟领先于 provider 最新交易日而显示错误的"暂无数据"的原因。
 
+Overview 在调用前保留 portfolio 的 instrument 语义：标记为 `fund` 的六位开放式基金代码会补全 `.OF`，而 `5xxxxx`、`159xxx` ETF/LOF 继续使用交易所路由。provider 没有返回至少两个有效观察值时，UI 显示 `--`，不以零值冒充最新价或涨跌幅。
+
 ## 4. Agent loop 注入路径
 
 有两个注入层：工具注册和 prompt/context 注入。
@@ -287,6 +289,8 @@ await fetchLiveBars("000300.SH", "A", undefined, undefined, {
 4. `buildSourceSection(...)`
 
 这就是为什么即使 agent 本身没有显式叙述 provider，仍可以显示如 `AKShare · 东方财富 + Tushare` 这样的数据源归属。
+
+`AppRuntime` 为刷新分配递增代次并设置超时。失败或超时会结束 refreshing 状态并保留最近一次成功面板；较旧请求即使稍后完成，也不能覆盖较新的刷新结果。
 
 ## 5. 测试覆盖
 

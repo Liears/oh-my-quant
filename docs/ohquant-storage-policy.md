@@ -99,9 +99,9 @@ Artifacts 将 WhyJ Quant agent session 导出为自包含、可交互、可分�
 |------|-----|
 | 路径 | `.ohquant/artifacts/{session-id}.html` |
 | 类别 | artifact |
-| 格式 | 单文件 HTML，内联 CSS + JS，零外部依赖 |
+| 格式 | 单文件 HTML，内联 CSS + 报告 JS；ECharts 5.6 从固定 CDN 地址加载 |
 | 大小 | 无硬限制；Phase 1 截断至最近 50 条消息 |
-| CSP | 严格：无 fetch / XHR / WebSocket；图片可以 `<img>` 外链但不内嵌 base64 |
+| 网络 | 报告本身不发起数据 fetch / XHR / WebSocket；图表运行时需要访问固定的 ECharts CDN |
 | 生成 | 由 `src/artifact/src/generator.ts` 从 session JSONL 派生 |
 | 版本 | 快照模式，不自动更新；重新导出即覆盖 |
 

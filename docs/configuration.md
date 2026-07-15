@@ -19,6 +19,8 @@ WhyJ Quant 的配置单一真源是 `.ohquant/settings.json`。交互模式使�
 | Workspace Experience | `Overview Dock` | `showPortfolioPanel` | `true` | 显示右侧 Overview dock；关闭后 Analyzing 面板使用完整终端宽度。 |
 | Workspace Experience | `Auto Artifacts` | `artifactGeneration.auto` | `false` | 开启后在量化分析 turn 完整结束时生成 Dashboard + Trajectory 并打开浏览器；关闭时不自动生成。`/artifact` 始终只浏览、恢复和打开已有报告。 |
 
+`Auto Artifacts` 只对自然语言量化研究请求生效。运行时会在 turn 完成、session JSONL 已写入后生成报告；证券、基金或组合分析会要求 agent 先形成可审计的技术与风险指标链。仅打开设置、恢复 session 或执行普通本地命令不会生成报告。
+
 ## Market Data 与凭证
 
 | Market Data | 主要市场 | Data Token |

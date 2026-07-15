@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.2.0] - 2026-07-15
+
+### Added
+
+- 新增量化研究 Dashboard：内置 K 线/成交量/MACD、NAV 与收益曲线、风险收益指标、因子图、数据覆盖度和会话统计；图表颜色与 WhyJ TUI 主题 token 保持一致。
+- 新增完整 Trajectory 复原：按 Turn 统计 calls、returns、skills 和 outputs，保留用户/模型输入、assistant 输出、thinking、compact、Tool/Bash/Skill 名称、Call ID、调用参数、完整返回与源 JSONL 定位信息。
+- 新增 Artifact 自动生成配置。`/config` 中开启 `Auto Artifacts` 后，量化分析 turn 在 `agent_end` 持久化完成后生成 Dashboard + Trajectory，并自动打开浏览器预览。
+- 新增研究对象标题推断，报告标题优先使用名称与证券/基金代码；无法识别时使用中性的“量化研究报告”。
+- 新增 Artifact 恢复索引和上下文 note，使恢复后的 agent 能继续理解“这个报告”或“刚才的 artifact”。
+
+### Changed
+
+- `/artifact` 收敛为无参数的一级命令，只负责浏览、恢复和打开已有报告；生成模式不再作为 Slash Command 的二级选项。
+- Settings 按 `Agent Runtime`、`Research Data`、`Workspace Experience` 三组规整；面板说明与操作提示进一步精简并增加可读间距。
+- Codex、Claude、Agents 与 pi 的用户级 skill 集成合并为单一 `External Skills` 开关，项目量化 skills 始终可用。
+- Slash command 目录、Composer 建议、Help 与 CLI 帮助共享统一 catalog，公开描述保持短而一致。
+- Agent 的证券、基金与组合研究流程内置技术因子和风险指标要求；有有效收益序列时保留波动率、VaR/CVaR、最大回撤、偏度、峰度与风险调整收益，供 Dashboard 解析。
+- Source provider 改为可注入 adapter 和分层 fallback；AKShare 普通 A 股日线依次尝试东方财富、新浪、腾讯，上层仍可继续降级到 Tushare。
+
+### Fixed
+
+- 修复 Overview 刷新失败或超时后长期停留在 `refreshing` 的问题；刷新状态可恢复，过期请求结果不会覆盖较新的数据，并保留最近一次成功面板。
+- 修复组合中的开放式基金被误判为交易所证券、只得到全零行情的问题；基金代码会保留 `.OF` provider 语义，无有效数据时显示 `--`。
+- 修复 Artifact 恢复时来源 session 已不存在仍继续打开的问题；报告列表和恢复前都会校验并删除孤立 HTML/metadata。
+- 修复 resume 后 TUI 结构化表格和工具输出丢失，以及 Artifact Trajectory 未完整展示 Tool、Bash、Skill 调用及返回细节的问题。
+- 修复报告标题沿用用户第一句话、K 线缺失或误用 Trajectory 数据生成金融图表等问题。
+
+### Verification
+
+- 覆盖 Artifact 生成/恢复/孤立报告清理、Trajectory schema 兼容、K 线渲染、开放式基金报价、Overview 超时恢复与竞态保护的回归测试。
+- 发布前执行 `bun run test`、`bun run typecheck`、`bun run check:architecture`、`bun run build` 与 npm pack dry-run。
+
 ## [1.1.2] - 2026-07-10
 
 ### Changed
@@ -50,6 +82,4 @@
 
 - npm 包名：`whyj-quant`
 - CLI binary：`whyj`
-- 版本号：`1.1.2`
-- 发布前建议执行：`bun run typecheck`、`bun test src/`、`bun run build`
-- 如需重新建立 Git tag，建议在确认工作区 clean 后创建新的 `v1.1.2` tag；旧 tag 可保留为历史，不纳入本次发布说明。
+- 首发版本：`0.1.0`

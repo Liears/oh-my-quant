@@ -6,11 +6,15 @@
 
 ![WhyJ Quant terminal homepage](./docs/assets/terminal.png)
 
-## What's New in 1.1.2
+## What's New in 1.2.0
 
-- HUD 简化为更专业的终端状态栏，只保留 Ctx、TTFT、TPOT、T 四个核心指标。
-- TTFT 与 TPOT 改为跨多轮会话的平均值，更适合观察模型整体响应表现。
-- 底部状态栏进一步收紧间距，信息密度更高，视觉上更接近专业交易终端。
+- Artifact 升级为华尔街终端风格的量化 Dashboard：K 线、NAV/收益曲线、风险收益指标、因子与数据覆盖度各司其职，并统一使用 WhyJ TUI 主题色。
+- Trajectory 按 Turn 完整复原用户输入、模型输入、Tool/Bash/Skill calls、Call ID、returns、thinking/compact 与最终 outputs；命令和关键结果会重点高亮。
+- `/artifact` 收敛为报告浏览与恢复入口；`Auto Artifacts` 只在 `/config` 开启，量化 turn 完成后自动生成并打开浏览器，失效报告会在展示前清理。
+- Overview 刷新链路可从失败和超时中恢复，开放式基金代码保留 `.OF` 语义；无有效行情时显示 `--`，不再伪造 `0.00`。
+- Slash command、Settings 与外部 Skills 配置统一为简洁的一层语义，Codex/Claude/Agents/pi 用户级 skills 合并到单一 `External Skills` 开关。
+
+完整变更见 [CHANGELOG](./CHANGELOG.md)。
 
 ## Quick Start
 

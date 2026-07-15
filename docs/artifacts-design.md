@@ -1,14 +1,21 @@
-对，这个应该单独提升为 **Trajectory / Traj 设计**，而不是只做一个简单的 `trace.ts` 折叠面板。
+# WhyJ Quant Artifact 与 Trajectory 设计
 
-你原文里已经提到 Artifact 会捕获 `Tool execution traces (tool name, arguments, results)`，并且架构里已经有 `trace.ts` 作为“工具调用追踪折叠面板”；数据流也已经包含“提取 tool call/result 对”；后面还提到 `Chart | Raw` 中的 Raw 模式要保留 agent 原始输出文本 trajectory。
+> 当前实现基线：WhyJ Quant 1.2.0
 
-但现在要升级一下：
+Artifact 报告由两个职责明确的一级视图组成：
+
+- **Dashboard** 只呈现量化研究结果：K 线/OHLCV、NAV 与收益曲线、风险收益指标、因子、benchmark 和数据覆盖度。K 线位于 Dashboard 主图区域，蜡烛、涨跌、网格和背景直接使用 WhyJ TUI 主题 token。
+- **Trajectory** 只呈现执行审计：每个 Turn 的 calls、returns、skills、outputs 数量，以及用户输入、模型输入、assistant 输出、thinking/compact、Tool/Bash/Skill 名称、Call ID、参数和完整返回。用户命令与关键结果使用独立高亮样式。
+
+报告标题从研究对象名称和代码推断，不使用用户输入的第一句话。`/artifact` 只浏览、恢复和打开已有报告；自动生成由 `/config` 的 `Auto Artifacts` 控制，并在量化 turn 完成后自动打开浏览器。列表展示和恢复前都会清理来源 session 已失效的报告。
+
+Trajectory 是独立的审计层，不是简单的 `trace.ts` 工具折叠面板：
 
 > **Trace 只记录工具调用。Trajectory 记录 Agent 完成任务的全过程。**
 
 这里需要注意一个边界：不要暴露模型底层隐藏思维链原文，而是暴露 **可审计的执行轨迹**，包括：计划、观察、工具调用、工具结果、决策摘要、证据引用、失败重试、最终结论。这样既能反映 Agent 的工作过程，又不会把不可控的内部推理原文直接泄露出来。
 
-下面这段可以直接补进你的设计文档。
+后续章节同时记录当前数据契约与演进方向；实现事实以本节、`src/artifact/README.md` 和回归测试为准。
 
 ## Trajectory Design
 

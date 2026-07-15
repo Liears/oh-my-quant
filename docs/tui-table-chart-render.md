@@ -96,7 +96,7 @@ TUI 仍然渲染纯文本。当前实现不增加独立 widget 层，但会在 `
 
 ### TUI structured render 契约
 
-文件：[src/tui/src/render-lines.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/tui/src/render-lines.ts)
+文件：[src/tui/src/render-lines.ts](../src/tui/src/render-lines.ts)
 
 TUI 对 assistant/tool preview 的纯文本做轻量确定性解析：
 
@@ -117,7 +117,7 @@ TUI 对 assistant/tool preview 的纯文本做轻量确定性解析：
 
 ### 色彩和 theme 边界
 
-文件：[src/tui/src/styles.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/tui/src/styles.ts)
+文件：[src/tui/src/styles.ts](../src/tui/src/styles.ts)
 
 当前颜色不是散落在 parser 里的硬编码业务判断，而是通过语义 token 集中管理：
 
@@ -132,14 +132,14 @@ TUI 对 assistant/tool preview 的纯文本做轻量确定性解析：
 
 ### 1. 用户轮次注入
 
-文件：[src/agent/src/context.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/src/context.ts)
+文件：[src/agent/src/context.ts](../src/agent/src/context.ts)
 
 - `injectTurnContext(input, ctx)` 先追加 session context
 - 如果请求看起来是对比型，则追加一个小的 `render guidance` 块
 
 ### 2. Session 级别执行
 
-文件：[src/agent/src/session.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/src/session.ts)
+文件：[src/agent/src/session.ts](../src/agent/src/session.ts)
 
 Session facade 对以下路径应用相同的策略：
 
@@ -152,7 +152,7 @@ Session facade 对以下路径应用相同的策略：
 
 ### 3. App runtime 简化
 
-文件：[src/app-runtime.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/app-runtime.ts)
+文件：[src/app-runtime.ts](../src/app-runtime.ts)
 
 `AppRuntime` 不再预先注入 prompt 文本。原始用户输入被转发，session 层持有所有 prompt augmentation。这避免了重复或偏离的注入逻辑。
 
@@ -203,15 +203,15 @@ Session 传递原始指令加上一个小的 skill 侧附加说明：
 
 覆盖：
 
-- [src/agent/test/context.test.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/test/context.test.ts)
+- [src/agent/test/context.test.ts](../src/agent/test/context.test.ts)
   - 结构化输出请求收到渲染引导
   - 普通对话请求不会收到
   - skill invocation 收到紧凑渲染引导
-- [src/agent/test/session.test.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/test/session.test.ts)
+- [src/agent/test/session.test.ts](../src/agent/test/session.test.ts)
   - `prompt()`、`followUp()` 和 `skill()` 全部通过注入的引导
-- [src/app-runtime.test.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/app-runtime.test.ts)
+- [src/app-runtime.test.ts](../src/app-runtime.test.ts)
   - skill banner 出现后，不再重复渲染同名 `SKILL.<name>` user line
-- [src/tui/test/render.test.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/tui/test/render.test.ts)
+- [src/tui/test/render.test.ts](../src/tui/test/render.test.ts)
   - skill 行渲染为 `SKILL.<name>` 命名空间
   - 仅包含分隔线的表头行会被吸收到完整三线表结构中
   - 无显式表头 divider 时，第一行数据不会被误加粗

@@ -1,6 +1,6 @@
 # Artifact 模块
 
-Session JSONL → 双栏 HTML 仪表盘生成器。左侧 Dashboard 展示会话消息和结构化数据检测（K线图、指标卡、因子、基准对比），右侧 Dock 面板展示会话统计、风险指标和外部数据源链接。Trajectory 标签页展示 Agent 执行轨迹。
+Session JSONL → 双视图 HTML 研究报告生成器。Dashboard 只展示量化结构化数据（K 线、NAV/收益曲线、指标卡、因子、基准对比与数据覆盖度）；Trajectory 按 Turn 展示完整执行轨迹。右侧 Dock 汇总模型、turn/tool/skill 计数、风险指标和数据源。标题从研究对象与代码推断，不沿用用户第一句话。
 
 ## 结构
 
@@ -74,14 +74,17 @@ Session JSONL
 
 基于 `docs/artifacts-design.md` Section 7-8，从 session JSONL 构建结构化执行轨迹：
 
-- **12 种事件类型**: user_request, task_understanding, plan, step_start, tool_call, tool_result, observation, decision, retry, warning, artifact_write, final_answer
+- **Turn 分组**：每轮显示 calls、returns、skills、outputs 数量，并保留 model input、thinking 与 compaction。
+- **完整调用链**：Tool、Bash、Skill 均保留名称、Call ID、参数、返回详情、错误状态和源 JSONL 定位。
+- **重点高亮**：用户输入中的命令和 assistant/tool 输出中的关键结果使用独立语义样式。
 - **敏感字段脱敏**: api_key, token, secret, password, cookie, authorization 等自动替换为 `****`
-- **时间线渲染**: traj-weaver 风格，左侧色带区分角色 (coral=user, teal=assistant, amber=tool)
+- **时间线渲染**: 左侧色带区分 user、assistant、tool、bash 与 skill，同时显示捕获完整度。
 
 ## 关键约定
 
-- ECharts 5.6 CDN 渲染所有图表 (candlestick, line, bar, radar)
+- ECharts 5.6 CDN 渲染 candlestick、bar 与 radar；NAV 概览使用内联 SVG。
 - 三窗格 K线布局: K线 38% + MACD 20% + 成交量 12% + 底部 dataZoom
+- K 线蜡烛、网格、背景、涨跌色直接使用 `src/types/theme-colors.ts` 的 WhyJ 主题 token
 - 所有曲线使用 `smooth: true` + `areaStyle` 渐变填充
 - 图表内置 Chart/Raw 切换（图形 / 原始数据表）
 - 雪球 (danjuanfunds.com) 和同花顺 (fund.10jqka.com.cn) 链接在 dock Sources 面板中自动生成
@@ -92,7 +95,7 @@ Session JSONL
 ### 通过 CLI
 
 ```bash
-whyj /artifact                       # TUI 中打开已有报告面板；非 TUI 时列出已有报告
+whyj -c "/artifact"                 # 非 TUI 列出已有报告；交互模式直接输入 /artifact
 ```
 
 `/artifact` 不接受二级命令或参数。新报告只由 `/config` 中的 `Auto Artifacts` 控制：开启后，量化分析 turn 完成时生成并自动打开浏览器。TUI Artifacts 面板中，`Enter` 通过内部运行时动作恢复选中的 artifact session 并打开报告。恢复或生成成功后，agent session 会收到隐藏上下文 note，后续“这个报告 / 刚才的 artifact”等引用会指向当前选中的报告。公开命令措辞见 [`docs/slash-commands.md`](../../docs/slash-commands.md)。

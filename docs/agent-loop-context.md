@@ -33,7 +33,7 @@
 
 ### 1. 原始用户输入从 `AppRuntime` 进入
 
-文件：[src/app-runtime.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/app-runtime.ts)
+文件：[src/app-runtime.ts](../src/app-runtime.ts)
 
 `runAgentPrompt(input)` 通过以下方式转发原始用户输入：
 
@@ -43,7 +43,7 @@
 
 ### 2. Dispatch 选择 turn 模式
 
-文件：[src/agent/src/dispatch.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/src/dispatch.ts)
+文件：[src/agent/src/dispatch.ts](../src/agent/src/dispatch.ts)
 
 - idle -> `prompt()`
 - 正在 streaming 且无待处理工具 -> `followUp()`
@@ -53,7 +53,7 @@
 
 ### 3. Session 持有 turn injection
 
-文件：[src/agent/src/session.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/src/session.ts)
+文件：[src/agent/src/session.ts](../src/agent/src/session.ts)
 
 - `prompt()` -> `injectTurnContext(input, sessionCtx)`
 - `followUp()` -> `injectTurnContext(extractMessageText(message), sessionCtx)`
@@ -64,7 +64,7 @@
 
 ## Session Context 字段
 
-文件：[src/agent/src/context.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/src/context.ts)
+文件：[src/agent/src/context.ts](../src/agent/src/context.ts)
 
 `injectSessionContext()` 追加一个轻量元数据块：
 
@@ -103,7 +103,7 @@ recent_tool_state:
 
 ## System Prompt 路径
 
-文件：[src/agent/src/context.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/src/context.ts)
+文件：[src/agent/src/context.ts](../src/agent/src/context.ts)
 
 `buildSystemPrompt()` 组装：
 
@@ -130,7 +130,7 @@ recent_tool_state:
 
 ## Turn 级渲染引导
 
-文件：[src/agent/src/context.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/src/context.ts)
+文件：[src/agent/src/context.ts](../src/agent/src/context.ts)
 
 `injectTurnContext()` 执行：
 
@@ -172,7 +172,7 @@ recent_tool_state:
 
 ## 工具到形状的恢复路径
 
-文件：[src/agent/src/session.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/src/session.ts)
+文件：[src/agent/src/session.ts](../src/agent/src/session.ts)
 
 在工具生命周期事件期间：
 
@@ -203,10 +203,10 @@ recent_tool_state:
 
 文件：
 
-- [src/cli/handlers/system.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/cli/handlers/system.ts)
-- [src/agent/src/pi/harness/compaction/compaction.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/src/pi/harness/compaction/compaction.ts)
-- [src/app-runtime.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/app-runtime.ts)
-- [src/tui/src/render.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/tui/src/render.ts)
+- [src/cli/handlers/system.ts](../src/cli/handlers/system.ts)
+- [src/agent/src/pi/harness/compaction/compaction.ts](../src/agent/src/pi/harness/compaction/compaction.ts)
+- [src/app-runtime.ts](../src/app-runtime.ts)
+- [src/tui/src/render.ts](../src/tui/src/render.ts)
 
 ### 运行时路径
 
@@ -284,7 +284,7 @@ TUI 现在将 compaction 展示为显式活动，而不仅是静默的 slash 命
 
 ## Skill 路径
 
-文件：[src/agent/src/context.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/src/context.ts)
+文件：[src/agent/src/context.ts](../src/agent/src/context.ts)
 
 `injectSkillContext()` 向显式 skill 运行追加一个小的结构化输出契约。
 
@@ -300,8 +300,8 @@ TUI 优先使用原始显示文本而非注入文本。
 
 文件：
 
-- [src/agent/src/dispatch.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/src/dispatch.ts)
-- [src/app-runtime.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/app-runtime.ts)
+- [src/agent/src/dispatch.ts](../src/agent/src/dispatch.ts)
+- [src/app-runtime.ts](../src/app-runtime.ts)
 
 相关行为：
 
@@ -349,5 +349,5 @@ TUI 优先使用原始显示文本而非注入文本。
 
 相关测试：
 
-- [src/agent/test/context.test.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/test/context.test.ts)
-- [src/agent/test/session.test.ts](/abs/path/C:/Users/yangjing/Project/oh-my-quant/src/agent/test/session.test.ts)
+- [src/agent/test/context.test.ts](../src/agent/test/context.test.ts)
+- [src/agent/test/session.test.ts](../src/agent/test/session.test.ts)

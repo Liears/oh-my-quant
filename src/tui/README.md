@@ -84,6 +84,8 @@ Thinking content is preserved after finalization when non-empty, but empty think
 
 The Overview dock is hidden when the terminal is narrower than 78 columns or when settings disable it. Text has terminal control codes stripped, then is wrapped and clipped to region boundaries so streamed thinking cannot bleed into the dock. Slash suggestions stay inside Composer so they do not overlap the `◉ Analyzing` panel or the TUI activity rows above it. In compact density, Composer is tall enough to show 5 slash suggestion rows by default.
 
+Overview refreshes are generation-aware and timeout-bounded: stale completions cannot overwrite newer data, failure releases the refreshing state, and the last successful panel remains visible. Missing quotes render as `--`, while open-fund entries preserve `.OF` semantics at the provider boundary.
+
 ## Input Model
 
 `QuantTui` reads raw stdin chunks and uses `nextInputAction()` to produce normalized key or mouse actions.
@@ -106,12 +108,13 @@ Slash suggestions and the Help panel share the canonical `name` + `desc` catalog
 
 Panels are owned by `PanelController` and draw as centered modals over the app:
 
-- Config: model, thinking level, API keys, data sources, active portfolio, Overview toggle.
+- Config: model, thinking level, API keys, data sources, active portfolio, External Skills, Overview and Auto Artifacts toggles.
 - Resume/session: local session list and resume actions.
 - Portfolio: local portfolio list and selection.
+- Artifacts: valid report list; selection restores the source session, rebuilds its trajectory, and opens the report in the browser.
 - Help: read-only command and key reference.
 
-Panel key handling intercepts input before Composer behavior. Most panels use `Up/Down`, `Enter`, and `Esc`.
+Panel key handling intercepts input before Composer behavior. Most panels use `Up/Down`, `Enter`, and `Esc`. Headers keep only decision-relevant state; border hints stay short and do not repeat conventional terminal behavior in the panel body.
 
 ## Tests
 
