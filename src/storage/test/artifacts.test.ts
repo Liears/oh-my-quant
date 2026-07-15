@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   saveArtifact,
   loadArtifact,
   loadArtifactMeta,
   listArtifacts,
+  pruneUnrestorableArtifacts,
   deleteArtifact,
   artifactPath,
 } from "../src/artifacts.ts";
@@ -36,9 +37,22 @@ describe("artifact storage CRUD", () => {
     const meta = loadArtifactMeta(sessionId);
     expect(meta).not.toBeNull();
     expect(meta!.sessionId).toBe(sessionId);
+    expect(meta!.sourceSessionId).toBe(sessionId);
     expect(meta!.title).toBe("Test Artifact");
     expect(meta!.messageCount).toBe(5);
     expect(meta!.bytes).toBe(html.length);
+  });
+
+  it("keeps artifact and source session ids separate", () => {
+    saveArtifact("report-001", "<html>Report</html>", {
+      title: "Detached report",
+      sourceSessionId: "session-001",
+    });
+
+    const meta = loadArtifactMeta("report-001");
+    expect(meta?.sessionId).toBe("report-001");
+    expect(meta?.sourceSessionId).toBe("session-001");
+    expect(meta?.refreshedAt).toBeTruthy();
   });
 
   it("returns null for non-existent artifact", () => {
@@ -108,5 +122,21 @@ describe("artifact storage CRUD", () => {
 
   it("listArtifacts returns empty array when no artifacts exist", () => {
     expect(listArtifacts()).toEqual([]);
+  });
+
+  it("prunes reports with missing HTML, metadata, or source sessions", () => {
+    saveArtifact("valid-report", "<html>valid</html>", { sourceSessionId: "valid-session" });
+    saveArtifact("orphan-report", "<html>orphan</html>", { sourceSessionId: "missing-session" });
+    saveArtifact("missing-html", "<html>gone</html>", { sourceSessionId: "valid-session" });
+    rmSync(artifactPath("missing-html"));
+    writeFileSync(join(OHQ, "artifacts", "missing-meta.html"), "<html>unindexed</html>", "utf-8");
+
+    const result = pruneUnrestorableArtifacts(new Set(["valid-session"]));
+
+    expect(result.artifacts.map((artifact) => artifact.sessionId)).toEqual(["valid-report"]);
+    expect(result.removedIds.sort()).toEqual(["missing-html", "missing-meta", "orphan-report"]);
+    expect(loadArtifact("orphan-report")).toBeNull();
+    expect(loadArtifactMeta("missing-html")).toBeNull();
+    expect(loadArtifact("missing-meta")).toBeNull();
   });
 });

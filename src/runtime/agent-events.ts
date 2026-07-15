@@ -76,6 +76,7 @@ export function handleAgentEvent(event: RuntimeAgentEvent, ctx: AgentEventRuntim
         {
           role: "tool",
           tool: {
+            toolCallId: typeof event.toolCallId === "string" ? event.toolCallId : undefined,
             name: event.toolName,
             label: formatToolLine(event.toolName, args),
             args: args ?? "",
@@ -90,14 +91,23 @@ export function handleAgentEvent(event: RuntimeAgentEvent, ctx: AgentEventRuntim
       break;
     }
     case "tool_execution_update": {
-      const { messages, changed } = updateLatestToolResult(ctx.messages, extractTextFromResult(event.partialResult));
+      const { messages, changed } = updateToolResult(
+        ctx.messages,
+        event.toolCallId,
+        extractTextFromResult(event.partialResult),
+      );
       if (!changed) break;
       ctx.setMessages(messages);
       ctx.emitMessages();
       break;
     }
     case "tool_execution_end": {
-      const { messages, changed } = completeLatestTool(ctx.messages, event.result, Boolean(event.isError));
+      const { messages, changed } = completeTool(
+        ctx.messages,
+        event.toolCallId,
+        event.result,
+        Boolean(event.isError),
+      );
       if (!changed) break;
       ctx.setMessages(messages);
       ctx.emitMessages();
@@ -131,9 +141,79 @@ export function pushLocalCommandMessage(messages: UIMessage[], text: string, rol
 }
 
 export function syncMessagesFromAgentState(agentMessages: unknown[]): UIMessage[] {
-  return agentMessages
-    .map((message) => toUiMessage(message))
-    .filter((message): message is UIMessage => message !== null);
+  const messages: UIMessage[] = [];
+  const toolIndexes = new Map<string, number>();
+
+  for (const rawMessage of agentMessages) {
+    const message = rawMessage as Record<string, unknown>;
+    if (message.role === "assistant") {
+      const uiMessage = toUiMessage(message);
+      if (uiMessage?.text?.trim()) messages.push(uiMessage);
+
+      const content = Array.isArray(message.content) ? message.content : [];
+      for (const rawPart of content) {
+        if (!rawPart || typeof rawPart !== "object") continue;
+        const part = rawPart as Record<string, unknown>;
+        if (part.type !== "toolCall" || typeof part.name !== "string") continue;
+        const toolCallId = typeof part.id === "string" ? part.id : "";
+        const args = formatToolArgs(part.arguments, { truncate: false }) ?? "";
+        const index = messages.length;
+        messages.push({
+          role: "tool",
+          tool: {
+            toolCallId: toolCallId || undefined,
+            name: part.name,
+            label: formatToolLine(part.name, args),
+            args,
+            status: "running",
+            startedAt: typeof message.timestamp === "number" ? message.timestamp : 0,
+          },
+        });
+        if (toolCallId) toolIndexes.set(toolCallId, index);
+      }
+      continue;
+    }
+
+    if (message.role === "toolResult") {
+      const toolCallId = typeof message.toolCallId === "string" ? message.toolCallId : "";
+      const index = toolCallId ? toolIndexes.get(toolCallId) : undefined;
+      const result = Boolean(message.isError) ? extractToolError(message) : extractTextFromResult(message);
+      const existing = index === undefined ? undefined : messages[index];
+      if (existing?.role === "tool" && existing.tool) {
+        const isError = Boolean(message.isError);
+        messages[index!] = {
+          ...existing,
+          tool: {
+            ...existing.tool,
+            status: isError ? "error" : "done",
+            result,
+            label: formatCompletedToolLine(existing.tool.name, existing.tool.args, result, isError),
+          },
+        };
+      } else {
+        const name = typeof message.toolName === "string" ? message.toolName : "tool";
+        const isError = Boolean(message.isError);
+        messages.push({
+          role: "tool",
+          tool: {
+            toolCallId: toolCallId || undefined,
+            name,
+            label: formatCompletedToolLine(name, "", result, isError),
+            args: "",
+            status: isError ? "error" : "done",
+            startedAt: typeof message.timestamp === "number" ? message.timestamp : 0,
+            result,
+          },
+        });
+      }
+      continue;
+    }
+
+    const uiMessage = toUiMessage(message);
+    if (uiMessage) messages.push(uiMessage);
+  }
+
+  return messages;
 }
 
 export function startAssistantMessage(messages: UIMessage[], now: () => number = Date.now): { messages: UIMessage[]; changed: boolean } {
@@ -250,32 +330,46 @@ export function removeTrailingThinkingAfterAssistant(messages: UIMessage[]): UIM
   return messages.filter((msg, idx) => idx <= lastAssistant || msg.role !== "thinking");
 }
 
-function updateLatestToolResult(messages: UIMessage[], result: string): { messages: UIMessage[]; changed: boolean } {
-  const last = messages[messages.length - 1];
-  if (last?.role !== "tool" || !last.tool) return { messages, changed: false };
+function updateToolResult(messages: UIMessage[], toolCallId: unknown, result: string): { messages: UIMessage[]; changed: boolean } {
+  const index = findToolMessageIndex(messages, toolCallId);
+  if (index < 0) return { messages, changed: false };
+  const current = messages[index]!;
   return {
-    messages: [
-      ...messages.slice(0, -1),
-      { ...last, tool: { ...last.tool, result } },
-    ],
+    messages: messages.map((message, messageIndex) => messageIndex === index
+      ? { ...current, tool: { ...current.tool!, result } }
+      : message),
     changed: true,
   };
 }
 
-function completeLatestTool(messages: UIMessage[], result: unknown, isError: boolean): { messages: UIMessage[]; changed: boolean } {
-  const last = messages[messages.length - 1];
-  if (last?.role !== "tool" || !last.tool) return { messages, changed: false };
+function completeTool(messages: UIMessage[], toolCallId: unknown, result: unknown, isError: boolean): { messages: UIMessage[]; changed: boolean } {
+  const index = findToolMessageIndex(messages, toolCallId);
+  if (index < 0) return { messages, changed: false };
+  const current = messages[index]!;
   const resultText = isError ? extractToolError(result) : extractTextFromResult(result);
   const tool = {
-    ...last.tool,
+    ...current.tool!,
     status: isError ? "error" as const : "done" as const,
     result: resultText,
-    label: formatCompletedToolLine(last.tool.name, last.tool.args, resultText, isError),
+    label: formatCompletedToolLine(current.tool!.name, current.tool!.args, resultText, isError),
   };
   return {
-    messages: [...messages.slice(0, -1), { ...last, tool }],
+    messages: messages.map((message, messageIndex) => messageIndex === index ? { ...current, tool } : message),
     changed: true,
   };
+}
+
+function findToolMessageIndex(messages: UIMessage[], toolCallId: unknown): number {
+  if (typeof toolCallId === "string" && toolCallId) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === "tool" && messages[i]?.tool?.toolCallId === toolCallId) return i;
+    }
+    return -1;
+  }
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === "tool" && messages[i]?.tool?.status === "running") return i;
+  }
+  return -1;
 }
 
 function shouldSuppressSkillEcho(messages: UIMessage[], text: string): boolean {

@@ -1,0 +1,22 @@
+/** Shared visual tokens for the frame-buffer TUI and HTML artifacts. */
+export const WHYJ_THEME = {
+  gold: "#E8B339",
+  goldHighlight: "#F2C95A",
+  cashDark: "#947618",
+  cashWarm: "#F4CD68",
+  cream: "#F2EEE6",
+  muted: "#9B968C",
+  bodyCopy: "#A09880",
+  authorCopy: "#8A8478",
+  hairline: "#2B2722",
+  stepDim: "#3C3730",
+  positive: "#1E9F4D",
+  negative: "#E5494D",
+  marketUp: "#E5494D",
+  marketDown: "#1E9F4D",
+  codeDim: "#7A7368",
+  thinking: "#7F807D",
+  canvas: "#0B0B0C",
+  selectionFg: "#0D0B0A",
+  selectionBg: "#C9A227",
+} as const;

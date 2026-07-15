@@ -66,9 +66,10 @@ export {
   listArtifacts,
   loadArtifact,
   loadArtifactMeta,
+  pruneUnrestorableArtifacts,
   saveArtifact,
 } from "./src/artifacts.ts";
-export type { ArtifactMeta } from "./src/artifacts.ts";
+export type { ArtifactMeta, ArtifactPruneResult } from "./src/artifacts.ts";
 export { listBenchmarkResults, saveBenchmarkResult } from "./src/benchmark-results.ts";
 export type { SavedBenchmarkResult } from "./src/benchmark-results.ts";
 export { insightCacheMtimeMs, loadInsightCache, saveInsightCache } from "./src/insights.ts";

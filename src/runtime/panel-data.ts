@@ -1,6 +1,5 @@
 import {
   hasWhyjEnvValue,
-  listArtifacts,
   listLocalPortfolios,
   listStoredSessions,
   loadPanelPortfolio,
@@ -16,6 +15,7 @@ import {
   type SyncedPanelPortfolio,
   type WhyjEnvAliasKey,
 } from "../storage/index.ts";
+import { listRestorableArtifactReports } from "./artifact-reports.ts";
 import type { OhQuantSettings } from "../types/config.ts";
 
 export type {
@@ -54,7 +54,7 @@ export function createStoragePanelDataService(): PanelDataService {
     saveSettings,
     listStoredSessions,
     listLocalPortfolios,
-    listArtifacts,
+    listArtifacts: listRestorableArtifactReports,
     loadPanelPortfolio,
     syncPanelPortfolioFromLocalPortfolio,
     hasWhyjEnvValue,

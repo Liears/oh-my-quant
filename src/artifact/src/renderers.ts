@@ -5,6 +5,7 @@
 import { esc } from "./template.ts";
 import type { KlineData, FactorBar, FactorSeries, Card, ScoreTable } from "./types.ts";
 import type { NavLineData } from "./detectors.ts";
+import { WHYJ_THEME } from "../../types/theme-colors.ts";
 
 // ── ECharts K-line render (multi-timeframe with tabs) ──
 
@@ -76,39 +77,150 @@ export function renderEchartsKline(kls: KlineData[]): string {
   const tabsHtml = tfLabels.map((tf, i) =>
     `<button class="klt-btn${i === 0 ? " on" : ""}" data-tf="${esc(tf)}">${esc(tf)}</button>`
   ).join("");
+  const firstSeries = tfData[defaultTf] ?? computeKlineSeries(firstKl);
+  const kpisHtml = renderKlineKpis(firstKl, firstSeries);
+  const fallbackSvg = renderStaticKlineSvg(firstKl, firstSeries);
 
   return `<div class="ec-box">
     <div class="ec-hdr"><span>K-line (${firstKl.rows.length})</span>
       <span class="klt-tabs">${tabsHtml}</span>
       <span class="tgl"><button class="tgl-btn on" onclick="toggleView(this,'chart')">Chart</button><button class="tgl-btn" onclick="toggleView(this,'raw')">Raw</button></span>
     </div>
-    <div class="ec-body"><div id="${id}" style="width:100%;height:520px"></div></div>
+    ${kpisHtml}
+    <div class="ec-body"><div id="${id}" class="kline-stage">${fallbackSvg}</div></div>
     <div class="ec-raw"><pre>${rawText}</pre></div>
     <details class="ind-glossary"><summary>指标说明</summary><div class="ig-body"><div class="ig-item"><span class="ig-name">K线</span><span class="ig-desc">蜡烛图, 显示开/收/高/低价, 阳线红涨阴线绿跌</span></div><div class="ig-item"><span class="ig-name">MA5(5日均)</span><span class="ig-desc">5日移动平均线, 反映超短期价格趋势</span></div><div class="ig-item"><span class="ig-name">MA10(10日均)</span><span class="ig-desc">10日移动平均线, 短期趋势参考</span></div><div class="ig-item"><span class="ig-name">MA20(20日均)</span><span class="ig-desc">20日移动平均线, 中期趋势生命线</span></div><div class="ig-item"><span class="ig-name">MA60(60日均)</span><span class="ig-desc">60日移动平均线, 长期趋势, 牛熊分界线</span></div><div class="ig-item"><span class="ig-name">DIF(快线)</span><span class="ig-desc">差离值 = EMA12 - EMA26, 反映短期动量</span></div><div class="ig-item"><span class="ig-name">DEA(慢线)</span><span class="ig-desc">信号线 = DIF的9日EMA, DIF上穿DEA为金叉看涨</span></div><div class="ig-item"><span class="ig-name">MACD(柱线)</span><span class="ig-desc">(DIF-DEA)*2, 红柱多头绿柱空头, 长短反映动能强弱</span></div><div class="ig-item"><span class="ig-name">Vol</span><span class="ig-desc">成交量, 放量上涨确认趋势, 缩量上涨警惕背离</span></div></div></details>
   </div>
-  <script>(function(){var d=document.getElementById('${id}');if(!d||typeof echarts==='undefined')return;var tfData=${json};var bm=${bmJson};var bm2=${bm2Json};var curTf='${esc(defaultTf)}';var ch=echarts.init(d,'dark');var up='#E5494D',dn='#1E9F4D';
+  <script>(function(){var d=document.getElementById('${id}');if(!d||typeof echarts==='undefined')return;d.innerHTML='';var tfData=${json};var bm=${bmJson};var bm2=${bm2Json};var curTf='${esc(defaultTf)}';var ch=echarts.init(d,'dark');var up='${WHYJ_THEME.marketUp}',dn='${WHYJ_THEME.marketDown}',gold='${WHYJ_THEME.gold}',cream='${WHYJ_THEME.cream}',muted='${WHYJ_THEME.muted}',hairline='${WHYJ_THEME.hairline}',canvas='${WHYJ_THEME.canvas}';
 	function buildOption(c){
 	  var ohlcData=c.ohlc.map(function(d){return d});
 	  var legendData=['K线','MA5(5日均)','MA10(10日均)','MA20(20日均)','MA60(60日均)','DIF(快线)','DEA(慢线)','MACD(柱线)'];
 	  var series=[
 	    {name:'K线',type:'candlestick',xAxisIndex:0,yAxisIndex:0,data:ohlcData,itemStyle:{color:up,color0:dn,borderColor:up,borderColor0:dn}},
-	    {name:'MA5(5日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma5,smooth:true,lineStyle:{color:'#F5F5F5',width:0.8},symbol:'none',connectNulls:false},
-	    {name:'MA10(10日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma10,smooth:true,lineStyle:{color:'#D4AF37',width:0.8},symbol:'none',connectNulls:false},
-	    {name:'MA20(20日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma20,smooth:true,lineStyle:{color:'#E5494D',width:1},symbol:'none',connectNulls:false},
-	    {name:'MA60(60日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma60,smooth:true,lineStyle:{color:'#5DB8A6',width:0.8},symbol:'none',connectNulls:false},
-	    {name:'DIF(快线)',type:'line',xAxisIndex:1,yAxisIndex:1,data:c.dif,smooth:true,lineStyle:{color:'#F5F5F5',width:0.8},symbol:'none',connectNulls:false},
-	    {name:'DEA(慢线)',type:'line',xAxisIndex:1,yAxisIndex:1,data:c.dea,smooth:true,lineStyle:{color:'#D4AF37',width:0.8},symbol:'none',connectNulls:false},
+	    {name:'MA5(5日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma5,smooth:true,lineStyle:{color:cream,width:1},symbol:'none',connectNulls:false},
+	    {name:'MA10(10日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma10,smooth:true,lineStyle:{color:gold,width:1},symbol:'none',connectNulls:false},
+	    {name:'MA20(20日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma20,smooth:true,lineStyle:{color:up,width:1.2},symbol:'none',connectNulls:false},
+	    {name:'MA60(60日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma60,smooth:true,lineStyle:{color:dn,width:1},symbol:'none',connectNulls:false},
+	    {name:'DIF(快线)',type:'line',xAxisIndex:1,yAxisIndex:1,data:c.dif,smooth:true,lineStyle:{color:cream,width:1},symbol:'none',connectNulls:false},
+	    {name:'DEA(慢线)',type:'line',xAxisIndex:1,yAxisIndex:1,data:c.dea,smooth:true,lineStyle:{color:gold,width:1},symbol:'none',connectNulls:false},
 	    {name:'MACD(柱线)',type:'bar',xAxisIndex:1,yAxisIndex:1,data:c.macd.map(function(v,i){if(v===null)return'-';return{value:v,itemStyle:{color:v>=0?up:dn}}})}
 	  ];
 	  if(bm){legendData.push(bm.label);series.push({name:bm.label,type:'line',xAxisIndex:0,yAxisIndex:0,data:bm.closes,smooth:true,lineStyle:{color:'#F0D77A',width:2},symbol:'none',emphasis:{focus:'series',lineStyle:{width:3}},z:2,label:{show:true,position:'right',fontSize:8,color:'#F0D77A',formatter:function(p){return p.dataIndex===p.data.length-1?bm.label:''}}});} if(bm2){legendData.push(bm2.label);series.push({name:bm2.label,type:'line',xAxisIndex:0,yAxisIndex:0,data:bm2.closes,smooth:true,lineStyle:{color:'#5B9BD5',width:2},symbol:'none',emphasis:{focus:'series',lineStyle:{width:3}},z:2,label:{show:true,position:'right',fontSize:8,color:'#5B9BD5',formatter:function(p){return p.dataIndex===p.data.length-1?bm2.label:''}}});}
 	  if(c.hasVol){series.push({name:'Vol',type:'bar',xAxisIndex:2,yAxisIndex:2,data:c.vols.map(function(v,i){return{value:v,itemStyle:{color:ohlcData[i]&&ohlcData[i][1]>=ohlcData[i][0]?up:dn}}}),barWidth:'60%'});}
-	  return {animation:true,tooltip:{trigger:'axis',axisPointer:{type:'cross'}},legend:{data:legendData,bottom:0,textStyle:{fontSize:9,color:'#A6A6A6'}},grid:[{left:'8%',right:'2%',top:'3%',height:'38%'},{left:'8%',right:'2%',top:'46%',height:'20%'},{left:'8%',right:'2%',top:'70%',height:'12%'}],xAxis:[{data:c.dates,gridIndex:0,axisLabel:{fontSize:9,color:'#A6A6A6'},axisLine:{lineStyle:{color:'#242424'}}},{data:c.dates,gridIndex:1,axisLabel:{show:false},axisLine:{lineStyle:{color:'#242424'}},axisTick:{show:false}},{data:c.dates,gridIndex:2,axisLabel:{show:false},axisLine:{lineStyle:{color:'#242424'}},axisTick:{show:false}}],yAxis:[{gridIndex:0,scale:true,axisLabel:{fontSize:9,color:'#A6A6A6'},splitLine:{lineStyle:{color:'#242424',type:'dashed'}}},{gridIndex:1,axisLabel:{fontSize:8,color:'#A6A6A6'},splitLine:{lineStyle:{color:'#242424',type:'dashed'}}},{gridIndex:2,axisLabel:{fontSize:8,color:'#A6A6A6'},splitLine:{show:false}}],dataZoom:[{type:'slider',xAxisIndex:[0,1,2],start:0,end:100,height:14,bottom:2,borderColor:'#242424',backgroundColor:'#111',fillerColor:'rgba(212,175,55,0.1)',handleStyle:{color:'#D4AF37'},textStyle:{fontSize:8,color:'#A6A6A6'}},{type:'inside',xAxisIndex:[0,1,2]}],series:series};
+	  return {animation:true,backgroundColor:'transparent',textStyle:{color:cream,fontFamily:'Cascadia Code,monospace'},tooltip:{trigger:'axis',backgroundColor:canvas,borderColor:hairline,textStyle:{color:cream},axisPointer:{type:'cross',lineStyle:{color:gold},crossStyle:{color:gold}}},legend:{data:legendData,bottom:0,textStyle:{fontSize:9,color:muted}},grid:[{left:'8%',right:'2%',top:'3%',height:'38%'},{left:'8%',right:'2%',top:'46%',height:'20%'},{left:'8%',right:'2%',top:'70%',height:'12%'}],xAxis:[{data:c.dates,gridIndex:0,axisLabel:{fontSize:9,color:muted},axisLine:{lineStyle:{color:hairline}}},{data:c.dates,gridIndex:1,axisLabel:{show:false},axisLine:{lineStyle:{color:hairline}},axisTick:{show:false}},{data:c.dates,gridIndex:2,axisLabel:{show:false},axisLine:{lineStyle:{color:hairline}},axisTick:{show:false}}],yAxis:[{gridIndex:0,scale:true,axisLabel:{fontSize:9,color:muted},splitLine:{lineStyle:{color:hairline,type:'dashed'}}},{gridIndex:1,axisLabel:{fontSize:8,color:muted},splitLine:{lineStyle:{color:hairline,type:'dashed'}}},{gridIndex:2,axisLabel:{fontSize:8,color:muted},splitLine:{show:false}}],dataZoom:[{type:'slider',xAxisIndex:[0,1,2],start:0,end:100,height:14,bottom:2,borderColor:hairline,backgroundColor:canvas,fillerColor:'rgba(232,179,57,0.12)',handleStyle:{color:gold},textStyle:{fontSize:8,color:muted}},{type:'inside',xAxisIndex:[0,1,2]}],series:series};
 	}
 	ch.setOption(buildOption(tfData[curTf]||tfData['日K']));
 	// Timeframe tab switching
 	var box=d.parentElement.parentElement;
 	if(box){box.querySelectorAll('.klt-btn').forEach(function(b){b.addEventListener('click',function(){var tf=b.getAttribute('data-tf');if(!tf||tf===curTf)return;curTf=tf;box.querySelectorAll('.klt-btn').forEach(function(x){x.classList.remove('on');});b.classList.add('on');ch.setOption(buildOption(tfData[tf]||tfData['日K']),true);});});}
 	window.addEventListener('resize',function(){ch.resize();});})();</script>`;
+}
+
+function renderKlineKpis(kl: KlineData, series: ReturnType<typeof computeKlineSeries>): string {
+  const last = kl.rows.at(-1)!;
+  const previous = kl.rows.at(-2);
+  const change = previous && previous.close !== 0 ? (last.close - previous.close) / previous.close * 100 : 0;
+  const rangeHigh = Math.max(...kl.rows.map((row) => row.high));
+  const rangeLow = Math.min(...kl.rows.map((row) => row.low));
+  const ma5 = lastNumber(series.ma5);
+  const ma20 = lastNumber(series.ma20);
+  const macd = lastNumber(series.macd);
+  const cards = [
+    ["最新价", formatPrice(last.close), change >= 0 ? "up" : "down"],
+    ["涨跌幅", `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`, change >= 0 ? "up" : "down"],
+    ["区间高点", formatPrice(rangeHigh), "neutral"],
+    ["区间低点", formatPrice(rangeLow), "neutral"],
+    ["MA5", ma5 === null ? "—" : formatPrice(ma5), "gold"],
+    ["MA20", ma20 === null ? "—" : formatPrice(ma20), "up"],
+    ["MACD", macd === null ? "—" : macd.toFixed(2), macd !== null && macd >= 0 ? "up" : "down"],
+  ];
+  return `<div class="kline-kpis">${cards.map(([label, value, tone]) =>
+    `<div class="kline-kpi"><span>${label}</span><b class="${tone}">${value}</b></div>`
+  ).join("")}</div>`;
+}
+
+function renderStaticKlineSvg(kl: KlineData, series: ReturnType<typeof computeKlineSeries>): string {
+  const rows = kl.rows.slice(-60);
+  const offset = kl.rows.length - rows.length;
+  const width = 1000;
+  const height = 520;
+  const left = 72;
+  const right = 974;
+  const priceTop = 30;
+  const priceBottom = 348;
+  const volumeTop = 390;
+  const volumeBottom = 458;
+  const lows = rows.map((row) => row.low);
+  const highs = rows.map((row) => row.high);
+  const rawMin = Math.min(...lows);
+  const rawMax = Math.max(...highs);
+  const padding = Math.max((rawMax - rawMin) * 0.08, Math.abs(rawMax) * 0.002, 1);
+  const min = rawMin - padding;
+  const max = rawMax + padding;
+  const priceY = (value: number) => priceBottom - (value - min) / Math.max(max - min, 1) * (priceBottom - priceTop);
+  const step = (right - left) / Math.max(rows.length, 1);
+  const candleWidth = Math.max(3, Math.min(12, step * 0.58));
+  const maxVolume = Math.max(...rows.map((row) => row.vol ?? 0), 1);
+  const grid = Array.from({ length: 6 }, (_, index) => {
+    const ratio = index / 5;
+    const y = priceTop + ratio * (priceBottom - priceTop);
+    const price = max - ratio * (max - min);
+    return `<line x1="${left}" y1="${y.toFixed(1)}" x2="${right}" y2="${y.toFixed(1)}" class="k-grid"/><text x="${left - 10}" y="${(y + 4).toFixed(1)}" text-anchor="end" class="k-axis">${formatPrice(price)}</text>`;
+  }).join("");
+  const candles = rows.map((row, index) => {
+    const x = left + step * (index + 0.5);
+    const openY = priceY(row.open);
+    const closeY = priceY(row.close);
+    const highY = priceY(row.high);
+    const lowY = priceY(row.low);
+    const rising = row.close >= row.open;
+    const cls = rising ? "k-up" : "k-down";
+    const bodyY = Math.min(openY, closeY);
+    const bodyHeight = Math.max(1.5, Math.abs(openY - closeY));
+    const volume = row.vol ?? 0;
+    const volumeHeight = volume / maxVolume * (volumeBottom - volumeTop);
+    return `<g class="${cls}"><line x1="${x.toFixed(1)}" y1="${highY.toFixed(1)}" x2="${x.toFixed(1)}" y2="${lowY.toFixed(1)}"/><rect x="${(x - candleWidth / 2).toFixed(1)}" y="${bodyY.toFixed(1)}" width="${candleWidth.toFixed(1)}" height="${bodyHeight.toFixed(1)}"/><rect class="k-volume" x="${(x - candleWidth / 2).toFixed(1)}" y="${(volumeBottom - volumeHeight).toFixed(1)}" width="${candleWidth.toFixed(1)}" height="${volumeHeight.toFixed(1)}"/></g>`;
+  }).join("");
+  const dateLabels = rows.map((row, index) => ({ row, index })).filter(({ index }) => index === 0 || index === rows.length - 1 || index % Math.max(1, Math.floor(rows.length / 5)) === 0).map(({ row, index }) => {
+    const x = left + step * (index + 0.5);
+    return `<text x="${x.toFixed(1)}" y="482" text-anchor="middle" class="k-axis">${esc(row.date.slice(-5))}</text>`;
+  }).join("");
+  const ma5 = renderSvgLine(series.ma5.slice(offset), priceY, left, step, "k-ma5");
+  const ma10 = renderSvgLine(series.ma10.slice(offset), priceY, left, step, "k-ma10");
+  const ma20 = renderSvgLine(series.ma20.slice(offset), priceY, left, step, "k-ma20");
+  return `<svg class="kline-fallback" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(kl.timeframe || "日K")} K-line chart">
+    <rect width="${width}" height="${height}" class="k-bg"/><g>${grid}</g><line x1="${left}" y1="${volumeBottom}" x2="${right}" y2="${volumeBottom}" class="k-grid"/>
+    <g>${candles}</g><path d="${ma5}" class="k-ma k-ma5"/><path d="${ma10}" class="k-ma k-ma10"/><path d="${ma20}" class="k-ma k-ma20"/>
+    <g>${dateLabels}</g><g class="k-legend"><circle cx="730" cy="504" r="3" class="k-ma5-dot"/><text x="738" y="508">MA5</text><circle cx="795" cy="504" r="3" class="k-ma10-dot"/><text x="803" y="508">MA10</text><circle cx="870" cy="504" r="3" class="k-ma20-dot"/><text x="878" y="508">MA20</text></g>
+  </svg>`;
+}
+
+function renderSvgLine(
+  values: (number | null)[],
+  priceY: (value: number) => number,
+  left: number,
+  step: number,
+  _className: string,
+): string {
+  let started = false;
+  return values.map((value, index) => {
+    if (value === null) { started = false; return ""; }
+    const x = left + step * (index + 0.5);
+    const command = started ? "L" : "M";
+    started = true;
+    return `${command}${x.toFixed(1)},${priceY(value).toFixed(1)}`;
+  }).join(" ");
+}
+
+function lastNumber(values: (number | null)[]): number | null {
+  for (let index = values.length - 1; index >= 0; index--) {
+    if (values[index] !== null) return values[index]!;
+  }
+  return null;
+}
+
+function formatPrice(value: number): string {
+  return Math.abs(value) >= 1000 ? value.toFixed(2) : value.toFixed(2).replace(/\.00$/, "");
 }
 
 // ── ECharts bar chart render ──

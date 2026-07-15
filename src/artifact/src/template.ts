@@ -8,7 +8,7 @@ import { artifactThemeCss } from "./theme.ts";
 
 export interface ArtifactTemplateInput {
   title: string; sessionId: string; model?: string; quantModel?: string; messageCount: number;
-  createdAt: string; bodyHtml: string; dockHtml: string; trajectoryHtml: string; generatedAt: string;
+  createdAt: string; dashboardHtml?: string; bodyHtml: string; dockHtml: string; trajectoryHtml: string; generatedAt: string;
   /** External reference URLs (雪球, 同花顺, etc.) */
   sourceUrls?: { label: string; url: string }[];
 }
@@ -28,40 +28,52 @@ export function renderArtifactTemplate(input: ArtifactTemplateInput): string {
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"></script>
 </head>
 <body>
+<div class="ambient-grid"></div>
 <div class="app">
 
 <header class="app-hdr">
-  <span class="hdr-dot"></span>
-  <span class="brand">WhyJ Quant</span>
-  <span class="hdr-tag accent">${esc(input.quantModel || "whyj-quant")}</span>
-  <span class="hdr-tag">${esc(input.model || "ai")}</span>
+  <div class="brand-lockup"><span class="brand-mark">WJ</span><span><b>WHYJ QUANT</b><small>RESEARCH SYSTEM</small></span></div>
   <span class="hdr-sp"></span>
-  <span class="hdr-tag">${esc(input.createdAt.slice(0,10))}</span>
   <nav class="app-tabs">
     <button class="tab-btn on" data-tab="dash">Dashboard</button>
     <button class="tab-btn" data-tab="traj">Trajectory</button>
   </nav>
-  <button class="thm-btn" onclick="toggleTheme()">☀/☾</button>
+  <span class="hdr-sp"></span>
+  <span class="market-status"><i></i> REPORT READY</span>
+  <button class="thm-btn" onclick="toggleTheme()" aria-label="Toggle theme">◐</button>
 </header>
 
-<main class="app-main tab-panel" id="tab-dash">
-  <section class="app-conv"><div class="conv-inner">${input.bodyHtml}</div></section>
-  <aside class="app-dock">${input.dockHtml}</aside>
+<main class="tab-panel dashboard-shell" id="tab-dash">
+  <section class="report-hero">
+    <div class="hero-copy">
+      <div class="hero-kicker"><span>INVESTMENT INTELLIGENCE</span><span>${esc(input.createdAt.slice(0,10))}</span></div>
+      <h1>${esc(input.title)}</h1>
+      <p>基于会话证据、量化工具与模型推理生成的可审计研究报告。</p>
+      <div class="hero-meta">
+        <span><b>${input.messageCount}</b> messages</span>
+        <span><b>${esc(input.model || "ai")}</b> model</span>
+        <span><b>${esc(input.sessionId.slice(0,8))}</b> session</span>
+      </div>
+    </div>
+    <div class="hero-sigil" aria-hidden="true"><span>WHYJ</span><b>Q</b><small>QUANT RESEARCH</small></div>
+  </section>
+  <section class="command-center"><div class="section-label"><span>01</span> RESEARCH COMMAND CENTER</div>${input.dashboardHtml ?? ""}</section>
+  <div class="app-main">
+    <section class="app-conv"><div class="section-label"><span>02</span> RESEARCH NARRATIVE</div><div class="conv-inner">${input.bodyHtml}</div></section>
+    <aside class="app-dock"><div class="section-label"><span>03</span> ANALYTICS</div>${input.dockHtml}</aside>
+  </div>
 </main>
 
-<main class="app-main tab-panel" id="tab-traj" style="display:none">
+<main class="tab-panel trajectory-shell" id="tab-traj" style="display:none">
+  <section class="trajectory-head"><div><span class="eyebrow">EXECUTION AUDIT</span><h2>Research trajectory</h2><p>从请求、工具调用到最终观察的完整证据链。</p></div><span class="session-stamp">${esc(input.sessionId)}</span></section>
   <section class="app-conv app-conv-full"><div class="conv-inner">${input.trajectoryHtml}</div></section>
 </main>
 
 <footer class="app-st">
   <span class="st-dot"></span>
-  <span>${esc(input.quantModel || "whyj-quant")}</span>
-  <span>·</span>
-  <span>${esc(input.model || "ai")}</span>
+  <span>WHYJ / ${esc(input.quantModel || "whyj-quant")}</span>
   <span class="st-sp"></span>
-  <span>${input.messageCount} msgs</span>
-  <span>·</span>
-  <span>${esc(input.generatedAt.slice(0,19))}</span>
+  <span>GENERATED ${esc(input.generatedAt.slice(0,19).replace("T", " "))}</span>
 </footer>
 
 </div>
@@ -79,20 +91,24 @@ var ttEl=null;
 function tt(){if(!ttEl){ttEl=D.createElement('div');ttEl.className='whyj-tt';D.body.appendChild(ttEl);}return ttEl;}
 
 /* Tabs */
+function activateTab(tab,updateHash){
+  if(tab!=='dash'&&tab!=='traj')return;
+  D.querySelectorAll('.tab-btn').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-tab')===tab);});
+  D.querySelectorAll('.tab-panel').forEach(function(p){p.style.display=p.id==='tab-'+tab?'':'none';});
+  if(updateHash){try{history.replaceState(null,'','#'+tab);}catch(e){W.location.hash=tab;}}
+  setTimeout(function(){
+    if(typeof echarts==='undefined')return;
+    var cs=D.querySelectorAll('.tab-panel:not([style*=\"display:none\"]) .ec-box > div > [id]');
+    cs.forEach(function(d){var i=echarts.getInstanceByDom(d);if(i)i.resize();});
+  },100);
+}
 D.querySelectorAll('.tab-btn').forEach(function(b){
   b.addEventListener('click',function(){
     var tab=b.getAttribute('data-tab');if(!tab)return;
-    D.querySelectorAll('.tab-btn').forEach(function(x){x.classList.remove('on');});
-    b.classList.add('on');
-    D.querySelectorAll('.tab-panel').forEach(function(p){p.style.display='none';});
-    var panel=D.getElementById('tab-'+tab);if(panel)panel.style.display='';
-    // Resize ECharts after tab switch
-    setTimeout(function(){
-      var cs=D.querySelectorAll('.tab-panel:not([style*=\"display:none\"]) .ec-box > div > [id]');
-      cs.forEach(function(d){var i=echarts.getInstanceByDom(d);if(i)i.resize();});
-    },100);
+    activateTab(tab,true);
   });
 });
+activateTab(W.location.hash==='#traj'?'traj':'dash',false);
 
 /* Theme */
 W.toggleTheme=function(){

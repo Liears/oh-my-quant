@@ -8,7 +8,13 @@ export function toUiMessage(message: unknown): UIMessage | null {
   const role = (message as { role?: string }).role;
   const text = extractAgentMessageText(message);
   if (role === "user" || role === "displayUser") return { role: "user", text };
-  if (role === "assistant") return { role: "assistant", text };
+  if (role === "assistant") {
+    const content = (message as { content?: unknown }).content;
+    const assistantText = Array.isArray(content)
+      ? extractAssistantText({ content })
+      : text;
+    return { role: "assistant", text: assistantText };
+  }
   return null;
 }
 

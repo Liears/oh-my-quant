@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { generateArtifact } from "../src/generator.ts";
+import { WHYJ_THEME } from "../../types/theme-colors.ts";
 import { escapeHtml, renderArtifactTemplate, type ArtifactTemplateInput } from "../src/template.ts";
 
 const OHQ = join(process.cwd(), ".ohquant-test-artifact-gen");
@@ -135,6 +136,36 @@ describe("generateArtifact", () => {
     expect(result!.html).toContain("My Custom Title");
   });
 
+  it("derives the title from the researched object and code, not the first prompt sentence", () => {
+    const path = writeSessionFile("test-research-title-001", [
+      userMsg("帮我看一下近期走势，并给出风险提示"),
+      assistantMsg("# 中际旭创（300308）技术分析\n\n最新价格与风险指标如下。"),
+    ]);
+
+    const result = generateArtifact({ sessionPath: path });
+
+    expect(result).not.toBeNull();
+    expect(result!.title).toBe("中际旭创 (300308)");
+    expect(result!.title).not.toContain("帮我看一下");
+  });
+
+  it("uses a neutral report title when no research object and code can be identified", () => {
+    const path = writeSessionFile("test-research-title-002", [userMsg("你好"), assistantMsg("你好，有什么可以帮你？")]);
+    const result = generateArtifact({ sessionPath: path });
+    expect(result?.title).toBe("量化研究报告");
+  });
+
+  it("rejects sentence fragments when identifying the researched object", () => {
+    const path = writeSessionFile("test-research-title-003", [
+      userMsg("分析固态电池方向"),
+      assistantMsg("成功拿到（002460）数据。现在对动量最强的（002074.SZ）继续观察。重点对象：赣锋锂业（002460.SZ）。"),
+    ]);
+    const result = generateArtifact({ sessionPath: path });
+    expect(result?.title).toBe("赣锋锂业 (002460.SZ)");
+    expect(result?.title).not.toContain("拿到");
+    expect(result?.title).not.toContain("动量最强");
+  });
+
   it("extracts model name from first assistant message", () => {
     const sessionId = "test-session-004";
     const path = writeSessionFile(sessionId, [
@@ -255,6 +286,23 @@ describe("generateArtifact", () => {
     expect(result!.html).toContain("echarts");
     expect(result!.html).toContain("candlestick");
     expect(result!.html).toContain("3920.5");
+    expect(result!.html).toContain("kline-fallback");
+    expect(result!.html).toContain("kline-kpis");
+    expect(result!.html).toContain("aria-label=\"日K K-line chart\"");
+    expect(result!.html).toContain("K-LINE / OHLCV");
+    expect(result!.html).toContain('class="board-panel board-primary"');
+    expect(result!.html.indexOf('class="board-panel board-primary"')).toBeLessThan(result!.html.indexOf('class="kline-fallback"'));
+    expect(result!.html.indexOf('class="kline-fallback"')).toBeLessThan(result!.html.indexOf('class="app-main"'));
+    expect(result!.html).toContain("最新价");
+    expect(result!.html).toContain("MACD");
+    expect(result!.html).toContain("累计收益");
+    expect(result!.html).toContain("年化波动率");
+    expect(result!.html).toContain("VaR (95%)");
+    expect(result!.html).toContain("最大回撤");
+    expect(result!.html).not.toContain("NO QUANT METRICS");
+    expect(result!.html).toContain(`var up='${WHYJ_THEME.marketUp}',dn='${WHYJ_THEME.marketDown}'`);
+    expect(result!.html).toContain(`gold='${WHYJ_THEME.gold}'`);
+    expect(result!.html).toContain(`hairline='${WHYJ_THEME.hairline}'`);
   });
 
   it("does NOT render K-line for non-OHLC tables", () => {
@@ -271,6 +319,30 @@ describe("generateArtifact", () => {
     expect(result!.html).not.toContain("candlestick");
   });
 
+  it("renders a financial performance chart in the command center for NAV series", () => {
+    const sessionId = "test-nav-dashboard-001";
+    const path = writeSessionFile(sessionId, [
+      userMsg("展示基金净值走势"),
+      assistantMsg([
+        "日期        净值    基准    沪深300",
+        "2026-06-15  1.0000  1.0000  1.0000",
+        "2026-06-16  1.0180  1.0060  1.0040",
+        "2026-06-17  1.0120  1.0090  1.0010",
+        "2026-06-18  1.0350  1.0110  1.0080",
+      ].join("\n")),
+    ]);
+
+    const result = generateArtifact({ sessionPath: path });
+
+    expect(result).not.toBeNull();
+    expect(result!.html).toContain("RESEARCH COMMAND CENTER");
+    expect(result!.html).toContain("aria-label=\"Fund performance line chart\"");
+    expect(result!.html).toContain("nav-product");
+    expect(result!.html).toContain("LATEST NAV");
+    expect(result!.html).toContain("data-quant-dashboard=\"true\"");
+    expect(result!.html).toContain("data-chart-state=\"available\"");
+  });
+
   it("renders plain text as paragraphs when no structured pattern detected", () => {
     const sessionId = "test-plain-001";
     const path = writeSessionFile(sessionId, [
@@ -284,6 +356,16 @@ describe("generateArtifact", () => {
     // CSS class is defined in theme, check that HTML class attribute is absent
     expect(result!.html).not.toContain('class="mgrid"');
     expect(result!.html).not.toContain('class="tw"');
+    // A dashboard without market data must remain quant-only and must not
+    // repurpose trajectory activity as a financial chart.
+    expect(result!.html).toContain("RESEARCH COMMAND CENTER");
+    expect(result!.html).toContain("NO PRICE SERIES");
+    expect(result!.html).toContain("NO QUANT METRICS");
+    expect(result!.html).toContain("data-chart-state=\"empty\"");
+    expect(result!.html).toContain("data-quant-dashboard=\"true\"");
+    expect(result!.html).not.toContain("aria-label=\"Research activity chart by turn\"");
+    expect(result!.html).not.toContain('class="tool-donut"');
+    expect(result!.html).not.toContain("AUDIT CAPTURE");
   });
 });
 

@@ -92,13 +92,10 @@ Session JSONL
 ### 通过 CLI
 
 ```bash
-whyj /artifact                       # TUI 中打开 Artifacts 面板；非 TUI 时为当前活跃 session 生成 artifact
-whyj /artifact --generate            # 为当前活跃 session 生成 artifact，并写入 artifact_export 上下文
-whyj /artifact --title "我的分析"   # 自定义标题
-whyj /artifact --open <session-id>   # 恢复该 artifact 对应的 session，并打开 HTML 报告
+whyj /artifact                       # TUI 中打开已有报告面板；非 TUI 时列出已有报告
 ```
 
-TUI Artifacts 面板中，`Enter` 默认恢复选中的 artifact session；`g` 从当前 session 生成新 artifact。恢复或生成成功后，agent session 会收到隐藏上下文 note，后续“这个报告 / 刚才的 artifact”等引用会指向当前选中的报告。
+`/artifact` 不接受二级命令或参数。新报告只由 `/config` 中的 `Auto Artifacts` 控制：开启后，量化分析 turn 完成时生成并自动打开浏览器。TUI Artifacts 面板中，`Enter` 通过内部运行时动作恢复选中的 artifact session 并打开报告。恢复或生成成功后，agent session 会收到隐藏上下文 note，后续“这个报告 / 刚才的 artifact”等引用会指向当前选中的报告。公开命令措辞见 [`docs/slash-commands.md`](../../docs/slash-commands.md)。
 
 ### 通过 API
 

@@ -78,6 +78,49 @@ describe("runtime agent event reducer", () => {
       .toEqual([{ role: "thinking", text: "done", thinkingLive: false, startedAt: 1 }]);
   });
 
+  it("replays persisted tool calls and table results when resuming a session", () => {
+    const messages = syncMessagesFromAgentState([
+      { role: "user", content: "compare" },
+      {
+        role: "assistant",
+        timestamp: 10,
+        content: [
+          { type: "thinking", thinking: "hidden" },
+          { type: "toolCall", id: "call-a", name: "check_risk", arguments: { symbol: "AAA" } },
+          { type: "toolCall", id: "call-b", name: "check_risk", arguments: { symbol: "BBB" } },
+        ],
+      },
+      {
+        role: "toolResult",
+        toolCallId: "call-b",
+        toolName: "check_risk",
+        content: [{ type: "text", text: "symbol  risk\n------  ----\nBBB     low" }],
+        isError: false,
+        timestamp: 11,
+      },
+      {
+        role: "toolResult",
+        toolCallId: "call-a",
+        toolName: "check_risk",
+        content: [{ type: "text", text: "symbol  risk\n------  ----\nAAA     high" }],
+        isError: false,
+        timestamp: 12,
+      },
+      { role: "assistant", content: [{ type: "text", text: "Comparison complete." }] },
+    ]);
+
+    expect(messages).toHaveLength(4);
+    expect(messages[1]).toEqual(expect.objectContaining({
+      role: "tool",
+      tool: expect.objectContaining({ toolCallId: "call-a", status: "done", result: expect.stringContaining("AAA") }),
+    }));
+    expect(messages[2]).toEqual(expect.objectContaining({
+      role: "tool",
+      tool: expect.objectContaining({ toolCallId: "call-b", status: "done", result: expect.stringContaining("BBB") }),
+    }));
+    expect(messages[3]).toEqual({ role: "assistant", text: "Comparison complete." });
+  });
+
   it("handles tool lifecycle and queue events through the runtime context", () => {
     let messages: UIMessage[] = [];
     const activities: AppState["activity"][] = [];
@@ -113,5 +156,28 @@ describe("runtime agent event reducer", () => {
     expect(activities).toEqual(["running tool", "ready"]);
     expect(queues).toEqual([["next"], []]);
     expect(refreshes).toBe(1);
+  });
+
+  it("matches parallel tool results by tool call id", () => {
+    let messages: UIMessage[] = [];
+    const ctx = {
+      get messages() { return messages; },
+      thinkingText: "",
+      setMessages: (next: UIMessage[]) => { messages = next; },
+      emitMessages: () => {},
+      setActivity: () => {},
+      setStatus: () => {},
+      emitComposerQueue: () => {},
+      scheduleMarketRefresh: () => {},
+      now: () => 10,
+    };
+
+    handleAgentEvent({ type: "tool_execution_start", toolCallId: "a", toolName: "check_risk", args: { symbol: "AAA" } }, ctx);
+    handleAgentEvent({ type: "tool_execution_start", toolCallId: "b", toolName: "check_risk", args: { symbol: "BBB" } }, ctx);
+    handleAgentEvent({ type: "tool_execution_end", toolCallId: "a", result: { content: [{ text: "AAA result" }] }, isError: false }, ctx);
+    handleAgentEvent({ type: "tool_execution_end", toolCallId: "b", result: { content: [{ text: "BBB result" }] }, isError: false }, ctx);
+
+    expect(messages.map((message) => message.tool?.result)).toEqual(["AAA result", "BBB result"]);
+    expect(messages.map((message) => message.tool?.status)).toEqual(["done", "done"]);
   });
 });

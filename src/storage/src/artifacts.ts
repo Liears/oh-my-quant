@@ -11,11 +11,20 @@ import { emitFileEvent } from "./fs-events.ts";
 import { ensureDirs, resolveArtifactsDir } from "./dirs.ts";
 
 export interface ArtifactMeta {
+  /** Artifact file id (kept as sessionId for backward compatibility). */
   sessionId: string;
+  /** Source JSONL session. May differ from the artifact file id. */
+  sourceSessionId?: string;
   createdAt: string;
+  refreshedAt?: string;
   title: string;
   messageCount: number;
   bytes: number;
+}
+
+export interface ArtifactPruneResult {
+  artifacts: ArtifactMeta[];
+  removedIds: string[];
 }
 
 function artifactsDir(): string {
@@ -34,7 +43,11 @@ export function artifactPath(sessionId: string): string {
   return join(artifactsDir(), `${sessionId}.html`);
 }
 
-export function saveArtifact(sessionId: string, html: string, meta?: { title?: string; messageCount?: number }): void {
+export function saveArtifact(
+  sessionId: string,
+  html: string,
+  meta?: { title?: string; messageCount?: number; sourceSessionId?: string },
+): void {
   ensureDirs();
   ensureArtifactsDir();
   const path = artifactPath(sessionId);
@@ -45,7 +58,9 @@ export function saveArtifact(sessionId: string, html: string, meta?: { title?: s
   const existingMeta = loadArtifactMetaFile(sidecarPath);
   const merged: ArtifactMeta = {
     sessionId,
+    sourceSessionId: meta?.sourceSessionId ?? existingMeta?.sourceSessionId ?? sessionId,
     createdAt: existingMeta?.createdAt ?? now,
+    refreshedAt: now,
     title: meta?.title ?? existingMeta?.title ?? sessionId,
     messageCount: meta?.messageCount ?? existingMeta?.messageCount ?? 0,
     bytes: Buffer.byteLength(html, "utf-8"),
@@ -97,6 +112,47 @@ export function listArtifacts(): ArtifactMeta[] {
   }
   emitFileEvent({ operation: "READ", path: dir, detail: "artifact index" });
   return metas.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/**
+ * Remove artifact files that can no longer be restored.
+ *
+ * An artifact is restorable only when its HTML and valid sidecar metadata are
+ * both present and the referenced source JSONL session still exists. Artifact
+ * files are derived outputs, so removing an orphan is safe.
+ */
+export function pruneUnrestorableArtifacts(validSourceSessionIds: ReadonlySet<string>): ArtifactPruneResult {
+  const dir = artifactsDir();
+  if (!existsSync(dir)) return { artifacts: [], removedIds: [] };
+
+  const ids = new Set<string>();
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    if (entry.name.endsWith(".meta.json")) ids.add(entry.name.slice(0, -".meta.json".length));
+    else if (entry.name.endsWith(".html")) ids.add(entry.name.slice(0, -".html".length));
+  }
+
+  const artifacts: ArtifactMeta[] = [];
+  const removedIds: string[] = [];
+  for (const id of ids) {
+    const meta = loadArtifactMeta(id);
+    const sourceSessionId = meta?.sourceSessionId ?? meta?.sessionId;
+    const valid = meta?.sessionId === id
+      && existsSync(artifactPath(id))
+      && typeof sourceSessionId === "string"
+      && validSourceSessionIds.has(sourceSessionId);
+    if (valid) {
+      artifacts.push(meta);
+      continue;
+    }
+    if (deleteArtifact(id)) removedIds.push(id);
+  }
+
+  emitFileEvent({ operation: "READ", path: dir, detail: "validated artifact index" });
+  return {
+    artifacts: artifacts.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    removedIds,
+  };
 }
 
 export function deleteArtifact(sessionId: string): boolean {

@@ -17,6 +17,7 @@ export interface GenCtx {
   dashBody: string[]; trajBody: string[];
   metrics: Card[]; scores: ScoreTable | null;
   factors: FactorBar[]; klines: KlineData[];
+  navCharts: NavLineData[];
   compareFactors: FactorSeries[];
   stats: SessionStats;
 }
@@ -36,16 +37,26 @@ export interface FactorBar { label: string; pct: number; value: string; up: bool
 export interface FactorSeries { name: string; factors: FactorBar[] }
 export interface KlineData { header: string[]; rows: OhlcRow[]; timeframe?: string }
 export interface OhlcRow { date: string; open: number; high: number; low: number; close: number; vol?: number }
+export interface NavLineData { header: string[]; rows: NavRow[] }
+export interface NavRow { date: string; nav: number; bm?: number; hs300?: number }
 
 // ── Session parsing ──
 
 export type RawEntry = { type: string } & Record<string, unknown>;
-export interface ContentBlock { type?: string; text?: string; thinking?: string; name?: string; arguments?: unknown }
+export interface ContentBlock { type?: string; id?: string; text?: string; thinking?: string; name?: string; arguments?: unknown }
 
 // ── Trajectory (docs/artifacts-design.md section 7-8) ──
 
 export type TrajectoryEventType =
   | "user_request"
+  | "model_input"
+  | "assistant_thinking"
+  | "context_compaction"
+  | "raw_content"
+  | "model_input"
+  | "assistant_thinking"
+  | "context_compaction"
+  | "raw_content"
   | "task_understanding"
   | "plan"
   | "step_start"
@@ -64,6 +75,8 @@ export interface TrajectoryEvent {
   sessionId: string;
   parentId?: string;
   stepId?: string;
+  /** One-based user turn; zero is pre-conversation context. */
+  turnIndex?: number;
   timestamp: string;
   type: TrajectoryEventType;
   title: string;
@@ -71,18 +84,34 @@ export interface TrajectoryEvent {
   tool?: TrajectoryToolPayload;
   evidence?: TrajectoryEvidence[];
   raw?: unknown;
+  /** Exact location and generation metadata from the persisted JSONL source. */
+  source?: TrajectorySourceRef;
   status?: "pending" | "running" | "success" | "error" | "skipped";
   latencyMs?: number;
   visibility: "public" | "debug" | "hidden";
   redaction?: RedactionInfo;
 }
 
+export interface TrajectorySourceRef {
+  entryId?: string;
+  parentId?: string | null;
+  role?: string;
+  blockIndex?: number;
+  blockType?: string;
+  stopReason?: string;
+  model?: string;
+  provider?: string;
+  usage?: unknown;
+}
+
 export interface TrajectoryToolPayload {
   callId: string;
   name: string;
+  kind?: "tool" | "bash" | "skill";
   args: unknown;
   argsPreview?: string;
   resultPreview?: unknown;
+  resultDetails?: unknown;
   error?: { name: string; message: string; stack?: string };
 }
 
@@ -112,12 +141,21 @@ export interface TrajectoryDocument {
 
 export interface TrajectorySummary {
   totalEvents: number;
+  turnCount: number;
+  sourceEntryCount: number;
+  sourceMessageCount: number;
+  sourceContentBlockCount: number;
+  capturedContentBlockCount: number;
+  thinkingCount: number;
+  compactionCount: number;
   toolCallCount: number;
+  skillCallCount: number;
   successToolCallCount: number;
   failedToolCallCount: number;
   retryCount: number;
   warningCount: number;
   totalLatencyMs?: number;
   toolsUsed: string[];
+  skillsUsed: string[];
   evidenceCount: number;
 }

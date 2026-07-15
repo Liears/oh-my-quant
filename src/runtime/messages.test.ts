@@ -21,6 +21,10 @@ describe("runtime message extraction", () => {
   it("converts persisted session messages to UI messages", () => {
     expect(toUiMessage({ role: "user", content: "question" })).toEqual({ role: "user", text: "question" });
     expect(toUiMessage({ role: "assistant", content: [{ type: "text", text: "answer" }] })).toEqual({ role: "assistant", text: "answer" });
+    expect(toUiMessage({
+      role: "assistant",
+      content: [{ type: "thinking", thinking: "private plan" }, { type: "text", text: "visible answer" }],
+    })).toEqual({ role: "assistant", text: "visible answer" });
     expect(toUiMessage({ role: "system", content: "skip" })).toBeNull();
   });
 

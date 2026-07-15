@@ -21,6 +21,8 @@ export type { SkillState };
 export type { HudMetrics };
 
 export interface ToolState {
+  /** Stable agent call id used to match parallel tool updates/results. */
+  toolCallId?: string;
   name: string;
   /** Human-readable label with data provider, e.g. "Tushare · Daily OHLCV". */
   label: string;
