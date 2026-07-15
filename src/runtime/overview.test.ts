@@ -41,6 +41,23 @@ describe("runtime overview service", () => {
     expect(overviewProviderSymbol({ code: "000001", name: "平安银行", instrument: "security" })).toBe("000001");
   });
 
+  it("routes every bare code in the semiconductor fund portfolio through the open-fund provider", () => {
+    const funds = [
+      ["022364", "永赢科技智选发起A"],
+      ["016372", "信澳匠心严选一年持有A"],
+      ["022184", "富国全球科技互联网C"],
+      ["001986", "前海开源人工智能主题"],
+      ["008021", "华富人工智能ETF联接C"],
+      ["008888", "华夏国证半导体芯片ETF联接C"],
+      ["018345", "华夏中证机器人ETF发起式联接C"],
+      ["673060", "西部利得景瑞灵活A"],
+      ["040015", "华安动态灵活配置A"],
+    ] as const;
+
+    expect(funds.map(([code, name]) => overviewProviderSymbol({ code, name, instrument: "fund" })))
+      .toEqual(funds.map(([code]) => `${code}.OF`));
+  });
+
   it("propagates instrument hints while collecting overview symbols", () => {
     expect(collectOverviewSymbols({
       symbols: [{ code: "022364", name: "永赢科技智选发起A", instrument: "fund" }],

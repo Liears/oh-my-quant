@@ -22,6 +22,22 @@ function writePortfolio(fileName: string, body: unknown): void {
 }
 
 describe("local portfolio discovery", () => {
+  it("preserves whether a local portfolio came from funds or stocks", () => {
+    writePortfolio("holdings_funds.json", {
+      name: "基金组合",
+      funds: [{ code: "022364", name: "永赢科技智选发起A" }],
+    });
+    writePortfolio("holdings_stocks.json", {
+      name: "股票组合",
+      stocks: [{ code: "000001", name: "平安银行" }],
+    });
+
+    const byName = new Map(listLocalPortfolios().map((portfolio) => [portfolio.name, portfolio.instrument]));
+
+    expect(byName.get("基金组合")).toBe("fund");
+    expect(byName.get("股票组合")).toBe("security");
+  });
+
   it("dedupes identical portfolios and prefers the configured active file", () => {
     const portfolio = {
       name: "精英4组合（精简自13只·WhyJ Quant优化）",

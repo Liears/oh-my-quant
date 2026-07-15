@@ -130,6 +130,22 @@ describe("pullBarsFromProviders", () => {
     expect(replacement.mock.calls[0]?.[0]).toMatchObject({ symbol: "600000.SH", market: "A" });
   });
 
+  it("preserves open-fund suffixes while normalizing exchange-traded symbols", async () => {
+    const seen: string[] = [];
+    const provider = async (request: { symbol: string }) => {
+      seen.push(request.symbol);
+      return SAMPLE_BARS;
+    };
+    const providers = aShareProviders(provider, async () => []);
+
+    await pullBarsFromProviders("022364.OF", "A", undefined, undefined, "akshare", providers);
+    await pullBarsFromProviders("159995", "A", undefined, undefined, "akshare", providers);
+    await pullBarsFromProviders("510300", "A", undefined, undefined, "akshare", providers);
+    await pullBarsFromProviders("000001", "A", undefined, undefined, "akshare", providers);
+
+    expect(seen).toEqual(["022364.OF", "159995.SZ", "510300.SH", "000001.SZ"]);
+  });
+
   it("supports custom order and redacts provider diagnostics", async () => {
     const providers = aShareProviders(
       async () => SAMPLE_BARS,
@@ -202,6 +218,24 @@ describe("fetchBars", () => {
 });
 
 describe("fetchLiveBars", () => {
+  it("keeps the open-fund symbol on the date-window retry path", async () => {
+    const seen: string[] = [];
+    const akshare = async (request: { symbol: string; start?: string; end?: string }) => {
+      seen.push(`${request.symbol}:${request.start || "all"}:${request.end || "all"}`);
+      return request.start ? [] : SAMPLE_BARS;
+    };
+
+    const result = await fetchLiveBars("022364.OF", "A", "2030-01-01", "2030-01-31", {
+      providers: aShareProviders(akshare, async () => []),
+    });
+
+    expect(result.source).toBe("akshare");
+    expect(seen).toEqual([
+      "022364.OF:2030-01-01:2030-01-31",
+      "022364.OF:all:all",
+    ]);
+  });
+
   it("falls through the live path when AKShare is empty", async () => {
     const result = await fetchLiveBars("000300.SH", "A", undefined, undefined, {
       deps: runtimeDeps(),

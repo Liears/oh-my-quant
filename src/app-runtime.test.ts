@@ -861,18 +861,22 @@ description: Use for crypto market analysis.
     });
     savePanelPortfolio({
       updated: "2026-07-15",
-      symbols: [{ code: "022364", name: "永赢科技智选发起A", added: "2026-07-15" }],
+      symbols: [
+        { code: "022364", name: "永赢科技智选发起A", added: "2026-07-15" },
+        { code: "000001", name: "平安银行", added: "2026-07-15" },
+      ],
       groups: [{ id: "default", name: "聚焦半导体", symbolCodes: ["022364"] }],
     });
-    const instrumentsSeen: Array<string | undefined> = [];
+    const instrumentsSeen = new Map<string, string | undefined>();
     const h = harness(async () => [], async (entries) => {
-      instrumentsSeen.push(...entries.map((entry) => entry.instrument));
+      for (const entry of entries) instrumentsSeen.set(entry.code, entry.instrument);
       return [];
     });
 
     await h.runtime.refreshOverviewPanel();
 
-    expect(instrumentsSeen).toEqual(["fund"]);
+    expect(instrumentsSeen.get("022364")).toBe("fund");
+    expect(instrumentsSeen.get("000001")).toBeUndefined();
   });
 
   it("refreshes overview panel after /clear", async () => {

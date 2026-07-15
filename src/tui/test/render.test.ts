@@ -1130,6 +1130,21 @@ describe("portfolio display", () => {
     expect(rows.some(r => r.includes("000001") && r.includes("上证指数"))).toBe(true);
   });
 
+  it("renders unavailable overview values as a dash instead of a fake zero", () => {
+    const buf = new Buffer(120, 32);
+    const L = layout(120, 32);
+    const sections: PanelSection[] = [
+      { kind: "holdings", title: "Portfolio", rows: [{ code: "022364", name: "永赢科技智选发起A", price: Number.NaN, pct: Number.NaN }] },
+    ];
+    drawPortfolio(buf, L.portfolio, sections, false);
+    const rendered = buf.toPlain().map(row => row.slice(L.portfolio.x)).join("\n");
+
+    expect(rendered).toContain("022364");
+    expect(rendered).toContain("--");
+    expect(rendered).not.toContain("0.00%");
+    expect(rendered).not.toContain("NaN");
+  });
+
   it("reports scroll position via overviewMaxScrollTop", () => {
     const rows = Array.from({ length: 30 }, (_, i) => holding(`${i}`, `Fund${i}`, i - 15));
     const sections: PanelSection[] = [{ kind: "holdings", title: "All", rows }];
