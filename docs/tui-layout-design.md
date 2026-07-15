@@ -35,7 +35,7 @@ Modal panels 是由 `src/tui/src/panel.ts` 中的 `PanelController` 持有的独
 ├────────────────────────────────────────────────────────────────────────────┤
 │ ╭ ⌘ Composer ─────────── ↑↓ select · ↹ accept ─────────────────────────╮ │
 │ │ /co▏                                                                 │ │
-│ │ > /config  Show or open config panel                               │ │
+│ │ > /config  Open runtime, research-data, and workspace settings     │ │
 │ │   /resume  List or restore saved sessions                          │ │
 │ │   /portfolio  List, compare, and switch local portfolios           │ │
 │ ╰────────────────────────────────────────────────────────────────────────╯ │
@@ -253,17 +253,17 @@ Composer 从不持有命令执行。它仅向 `AppRuntime` 返回提交的文本
 Slash 建议在 Composer 内部、输入行下方绘制为紧凑内联列表。它们不浮动到上方的 `◉ Analyzing` 面板中。
 
 ```text
-╭ ⌘ Composer ──────────────────────────╮
-│ /co▏                                 │
-│ > /config  Show or open config panel│
-│   /resume  List or restore sessions │
-│   /help    Show commands and hotkeys│
-╰──────────────────────────────────────╯
+╭ ⌘ Composer ─────────────────────────────────────╮
+│ /co▏                                            │
+│ > /config  Review and edit runtime settings     │
+│   /resume  Browse and restore saved sessions    │
+│   /help    Browse commands and shortcuts        │
+╰─────────────────────────────────────────────────╯
 ```
 
 规则：
 
-- 顶层 slash 元数据来自 `src/cli/catalog.ts`。
+- 顶层 slash 元数据来自 `src/runtime/command-catalog.ts`；完整目录与行为见 [Slash Command 参考](./slash-commands.md)。
 - Watchlist 代码/名称补全来自 `src/tui/src/watchlist.ts`。
 - 活跃建议使用 `> ` 前缀；非活跃行为普通缩进文本。
 - 不渲染嵌套弹窗边框、标题行或 `1/N` 索引后缀。

@@ -107,8 +107,7 @@ async function runOneShot(input: string, json: boolean) {
 }
 
 function writeHelp(json: boolean) {
-  const slashCommands = COMMAND_CATALOG.filter((command) => !command.compatibility).map((command) => command.name);
-  const compatibility = COMMAND_CATALOG.filter((command) => command.compatibility).map((command) => command.name);
+  const slashCommands = COMMAND_CATALOG.map((command) => command.name);
   const help = {
     name: "whyj",
     description: "WhyJ Quant interactive AI-powered quantitative analysis terminal",
@@ -119,7 +118,7 @@ function writeHelp(json: boolean) {
       { command: "whyj --json -c \"/portfolio\"", description: "Run one slash command and emit a stable JSON envelope" },
     ],
     slashCommands,
-    compatibility,
+    slashCommandDetails: COMMAND_CATALOG,
   };
   if (json) writeJson({ ok: true, command: "help", data: help });
   else console.log([
@@ -132,10 +131,7 @@ function writeHelp(json: boolean) {
     "  whyj --json -c \"/portfolio\"",
     "",
     "Slash commands:",
-    `  ${help.slashCommands.join("  ")}`,
-    "",
-    "Compatibility aliases:",
-    `  ${help.compatibility.join("  ")}`,
+    ...help.slashCommandDetails.map((command) => `  ${command.name.padEnd(12)} ${command.desc}`),
   ].join("\n"));
 }
 

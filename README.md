@@ -34,41 +34,49 @@ bun run src/index.ts
 Q > /config
 ```
 
-在 `Config` 里设置：
+Settings 面板按语义分成三组：
 
-- `API Key`: AI Agent provider key
-- `Source`: 行情来源
-- `Source Key`: 对应数据源密钥
-- `Codex Skills` / `Claude Skills`: 是否把用户级 Codex/Claude skills 集成进 WhyJ Quant。默认关闭，只加载项目内核心量化 skills。
+- `Agent Runtime`：Model、Thinking、Provider Key、Provider URL。
+- `Research Data`：Market Data、Data Token、Active Portfolio。
+- `Workspace Experience`：External Skills、Overview Dock、Auto Artifacts。
+
+面板只显示设置项与当前值；完整字段语义、默认值和迁移规则见 [WhyJ Quant 配置参考](./docs/configuration.md)。
 
 也可以直接写入默认配置文件 `.ohquant/settings.json`：
 
 ```json
 {
-  "version": 1,
+  "version": 3,
   "env": {
     "WHYJ_QUANT_API_KEY": "sk-...",
     "WHYJ_QUANT_BASE_URL": "https://api.deepseek.com/anthropic",
     "WHYJ_QUANT_AUTH_TOKEN": "sk-...",
+    "WHYJ_QUANT_CONTEXT_WINDOW": "1000000",
+    "WHYJ_QUANT_COMPACT_TRIGGER_TOKENS": "800000",
     "WHYJ_QUANT_TUSHARE_TOKEN": "your_token",
     "WHYJ_QUANT_FINANCIAL_DATASETS_KEY": "your_key",
     "WHYJ_QUANT_LLMQUANT_API_KEY": "your_key"
   },
   "model": "sonnet",
-  "thinkingLevel": "high"
+  "thinkingLevel": "high",
+  "showPortfolioPanel": true,
+  "artifactGeneration": { "auto": false },
+  "skillIntegrations": { "external": false }
 }
 ```
 
-外部 skill 集成开关保存在 `.ohquant/settings.json`：
+模型上下文相关变量：
 
-```json
-{
-  "skillIntegrations": {
-    "codex": false,
-    "claude": false
-  }
-}
-```
+| 环境变量 | 作用 | 示例 |
+|----------|------|------|
+| `WHYJ_QUANT_CONTEXT_WINDOW` | 当前模型支持的上下文 token 总量；覆盖模型注册表/fallback 元数据，并用于底栏容量与占用百分比 | `"1000000"` |
+| `WHYJ_QUANT_COMPACT_TRIGGER_TOKENS` | 当前上下文估算达到该 token 数后，在下一次 prompt 发送前自动 compact | `"800000"` |
+
+两个值都应写成正整数字符串。compact 阈值独立于模型窗口；若配置值大于 context window，运行时会将其限制为 context window。未配置 compact 阈值时，默认使用 `contextWindow - 16384`。
+
+模型选择校验：如果 `env` 中配置了 `WHYJ_DEFAULT_SONNET_MODEL`、`WHYJ_DEFAULT_OPUS_MODEL` 或 `WHYJ_DEFAULT_HAIKU_MODEL`，顶层 `model` 必须是对应别名（`sonnet` / `opus` / `haiku`）或其中一个映射值。其他值会在 settings 加载/保存时强制回退到第一个已配置别名，优先级为 sonnet、opus、haiku。未配置任何角色映射时，仍允许直接模型 ID。
+
+`External Skills` 默认关闭，只加载项目量化 skills；开启后统一加载用户级 Codex、Claude、Agents 和 pi skills。
 
 配置完成后直接提问：
 
@@ -90,19 +98,24 @@ Shell-level commands:
 
 Slash commands:
 
-| 命令 | 说明 |
-|------|------|
-| `/portfolio` | 本地组合对比面板 |
-| `/resume` | 恢复历史 session |
-| `/compact` | 压缩当前 session |
-| `/config` | 配置面板 |
-| `/doctor` | 检查 runtime、auth 来源和修复 hints |
-| `/skill` | 查看、安装和运行 skills |
-| `/artifact` | 生成分析报告；在 TUI 面板中选择 artifact 默认恢复对应 session |
-| `/clear` | 清空当前对话 |
-| `/help` | 命令参考 |
+| 命令 | 一级描述 | 结果 |
+|---|---|---|
+| `/compact` | Compact current session context | 压缩当前 session，可附带关注点 |
+| `/resume` | Browse and restore saved sessions | 浏览并恢复历史 session |
+| `/portfolio` | Browse and select local portfolios | 浏览并选择本地 portfolio |
+| `/config` | Review and edit runtime settings | 查看或编辑 Settings |
+| `/doctor` | Configure and diagnose runtime | 首次配置或诊断 runtime readiness |
+| `/skill` | Discover, inspect, and run skills | 发现、查看和运行 skills |
+| `/help` | Browse commands and shortcuts | 查看命令与快捷键 |
+| `/clear` | Clear conversation and reset agent | 清空对话并重置 agent |
+| `/artifact` | Browse, restore, and open reports | 浏览报告，恢复来源 session 并在浏览器打开 |
+| `/exit` | Exit WhyJ Quant | 退出 WhyJ Quant |
 
 无 `/` 前缀直接输入自然语言 → AI Agent 分析。因子、回测、风险与策略评分由 agent 调用内置 Quant tools（`Quant.Factor`、`Quant.Backtest`、`Quant.Risk`、`Quant.Benchmark`）完成；行情拉取与缓存由 agent 通过已配置的 `Source` 自动处理。
+
+报告自动生成默认关闭，只能在 `/config` 面板通过 `Auto Artifacts` 开启。开启后，量化研究类 turn 完成并写入完整调用轨迹时自动生成 Dashboard + Trajectory，同时打开浏览器预览；`/artifact` 本身只负责浏览、恢复和打开已有报告。
+
+完整的 TUI/非 TUI 行为、参数与兼容边界见 [Slash Command 参考](./docs/slash-commands.md)。
 
 ## Dev
 
@@ -150,9 +163,11 @@ bun run src/index.ts -- --json doctor
 - [Agent Loop Context Assembly](./docs/agent-loop-context.md) — model-input vs UI-text assembly path
 - [Module Architecture](./docs/module-architecture.md) — repo-level module boundaries and dependency direction
 - [Storage Policy](./docs/ohquant-storage-policy.md) — local filesystem split: durable settings, cache, artifacts, forbidden state
+- [Configuration Reference](./docs/configuration.md) — Settings 面板、JSON 字段、默认值、凭证和兼容迁移
 
 ### CLI & UX
 
+- [Slash Command Reference](./docs/slash-commands.md) — 一级目录、执行结果、参数和 TUI/非 TUI 行为
 - [CLI Design & Reference](./docs/interactive-cli-design.md) — slash commands, `src/cli/` module, implementation plan
 - [Doctor, Config, and UX Guidelines](./docs/doctor-design-and-hints.md) — doctor checks, config flow, UX interaction, errors, guidance
 

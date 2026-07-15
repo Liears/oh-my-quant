@@ -115,7 +115,7 @@ JSON envelope（稳定格式）：
 
 | 文件 | 用途 |
 |------|---------|
-| `catalog.ts` | `COMMAND_CATALOG`、`SLASH_COMMANDS`、`buildCommandHelpText()` |
+| `catalog.ts` | 从 runtime catalog 重导出 `COMMAND_CATALOG`、`SLASH_COMMANDS`、`buildCommandHelpText()` |
 | `types.ts` | `ParsedCommand`、`CommandResult`、`CommandEffect`、`CommandContext` |
 | `doctor.ts` | 共享 doctor 报告、文本格式化、认证来源提示 |
 | `params.ts` | `runQuantTool()`、`normalizeToolParams()` |
@@ -127,10 +127,10 @@ JSON envelope（稳定格式）：
 消费者：
 
 - `src/app-runtime.ts` — 通过 `executeCommand()` 进行 slash dispatch，应用 `CommandEffect`
-- `src/tui/src/input.ts` — 从 `COMMAND_CATALOG` 获取 composer autocomplete（subcommands + actions）
-- `src/index.ts` — one-shot 模式 + shell `--help` slash list
+- `src/tui/src/input.ts` — 从 `COMMAND_CATALOG` 获取一级 composer autocomplete；skill 名称使用独立上下文建议
+- `src/index.ts` — one-shot 模式 + shell `--help` 的名称与描述列表
 
-Composer 自动补全：Level 1/2 来自 `catalog.ts`；flag 值（`--symbol`、`--name`）来自 `input.ts` 中的 watchlist。详见 `docs/tui-layout-design.md`。
+一级目录的单一真源是 `src/runtime/command-catalog.ts`，schema 固定为 `name` + `desc`。参数由命令 parser/handler 处理，不作为二级 composer 菜单；`/skill:name` 是独立的上下文型 skill 建议。详见 [Slash Command 参考](./slash-commands.md)。
 
 Agent / skill / session 内部机制：`docs/agent-system-spec.md`。
 
@@ -163,6 +163,23 @@ CLI 只暴露一个自然语言 agent 入口，但后端模型传输方式对错
 
 ## 7. Slash 命令参考
 
+一级描述同时服务于 composer 建议、TUI Help、`/help` 和 `whyj --help`：
+
+| 命令 | 统一描述 |
+|---|---|
+| `/compact` | Compact current session context |
+| `/resume` | Browse and restore saved sessions |
+| `/portfolio` | Browse and select local portfolios |
+| `/config` | Review and edit runtime settings |
+| `/doctor` | Configure and diagnose runtime |
+| `/skill` | Discover, inspect, and run skills |
+| `/help` | Browse commands and shortcuts |
+| `/clear` | Clear conversation and reset agent |
+| `/artifact` | Browse, restore, and open reports |
+| `/exit` | Exit WhyJ Quant |
+
+完整的 TUI/非 TUI 行为、参数、兼容别名与 Artifact 边界统一维护在 [Slash Command 参考](./slash-commands.md)，本设计文档不再维护第二份行为清单。
+
 量化分析有意不暴露为 slash 命令。使用自然语言，让 agent 调用内置工具：
 
 ```
@@ -178,27 +195,6 @@ CLI 只暴露一个自然语言 agent 入口，但后端模型传输方式对错
 - `Quant.Backtest`：SMA crossover backtest
 - `Quant.Risk`：年化波动率、VaR/CVaR、最大回撤、偏度、峰度
 - `Quant.Benchmark`：策略评分和 dashboard 数据
-
-### `/portfolio` — 本地组合面板
-
-```
-/portfolio
-```
-
-只读本地组合对比面板。文件编辑由 agent 处理，而非 slash 命令。
-
-### 系统
-
-```
-/help      命令参考（来自 catalog）
-/clear     清空对话 + 重置 agent
-/exit      退出
-/config    设置面板（API keys、模型、数据源）
-/doctor    运行时、配置、认证来源检查、脱敏值指纹和设置提示
-/resume    恢复面板 / 恢复之前的 session
-/compact   压缩当前 session
-/portfolio 本地组合对比面板
-```
 
 ### AI Agent（无 `/` 前缀）
 

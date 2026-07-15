@@ -160,26 +160,8 @@ export function buildSuggestions(value: string, watchlist: CodeEntry[], skills: 
 
   if (!value.startsWith("/")) return [];
 
-  const subMatch = value.match(/^(\/\S+)\s+(\S*)$/);
-  if (subMatch) {
-    const entry = COMMAND_CATALOG.find((c) => c.name === subMatch[1]);
-    const partial = subMatch[2].toLowerCase();
-    if (entry?.subcommands?.length) {
-      return entry.subcommands
-        .filter((sub) => !partial || sub.toLowerCase().startsWith(partial))
-        .slice(0, 8)
-        .map((sub) => ({ label: sub, fill: `${entry.name} ${sub} ` }));
-    }
-  }
-
   const exact = COMMAND_CATALOG.find((c) => c.name === value);
   if (exact) {
-    if (exact.actions?.length) return [...exact.actions];
-    if (exact.subcommands?.length) {
-      return exact.subcommands
-        .slice(0, 8)
-        .map((sub) => ({ label: sub, fill: `${exact.name} ${sub} ` }));
-    }
     // /skill — show all skills as suggestions
     if (exact.name === "/skill") {
       return skills.map(skillSuggestion);
@@ -192,5 +174,5 @@ export function buildSuggestions(value: string, watchlist: CodeEntry[], skills: 
   if (catalogMatches.length === 1 && catalogMatches[0].name === "/skill") {
     return skills.map(skillSuggestion);
   }
-  return catalogMatches.map((c) => ({ label: `${c.name}  ${c.help}`, fill: c.name }));
+  return catalogMatches.map((c) => ({ label: `${c.name}  ${c.desc}`, fill: c.name }));
 }

@@ -35,6 +35,23 @@ function decode(bytes: Uint8Array): string {
 }
 
 describe("CLI doctor command", () => {
+  it("prints the canonical slash descriptions in text and JSON help", () => {
+    const textResult = runCli(["--help"]);
+    expect(textResult.exitCode).toBe(0);
+    const text = decode(textResult.stdout);
+    expect(text).toContain("/compact     Compact current session context");
+    expect(text).toContain("/artifact    Browse, restore, and open reports");
+
+    const jsonResult = runCli(["--json", "--help"]);
+    expect(jsonResult.exitCode).toBe(0);
+    const body = JSON.parse(decode(jsonResult.stdout));
+    expect(body.data.slashCommands).toContain("/artifact");
+    expect(body.data.slashCommandDetails).toContainEqual({
+      name: "/artifact",
+      desc: "Browse, restore, and open reports",
+    });
+  });
+
   it("emits stable JSON for whyj --json doctor", () => {
     const result = runCli(["--json", "doctor"]);
     expect(result.exitCode).toBe(0);

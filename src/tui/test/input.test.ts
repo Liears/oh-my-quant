@@ -80,6 +80,12 @@ describe("buildSuggestions", () => {
     expect(buildSuggestions("/config", watchlist)).toEqual([]);
   });
 
+  it("does not expose artifact second-level options", () => {
+    expect(buildSuggestions("/artifact", watchlist)).toEqual([]);
+    expect(buildSuggestions("/artifact ", watchlist)).toEqual([]);
+    expect(buildSuggestions("/artifact generate", watchlist)).toEqual([]);
+  });
+
   it("does not suggest removed quant slash command arguments", () => {
     expect(buildSuggestions("/factor analyze --symbol 000", watchlist)).toEqual([]);
   });

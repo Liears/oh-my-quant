@@ -17,6 +17,8 @@
 
 单一真源：`.ohquant/settings.json`
 
+用户入口统一称为 `Settings`，命令仍为 `/config`。面板按 `Agent Runtime`、`Research Data`、`Workspace Experience` 分组，字段名称与 JSON 映射以 [WhyJ Quant 配置参考](./configuration.md) 为准。不要在 README、Doctor 或 TUI 中为同一字段使用另一套别名。
+
 推荐字段：
 
 ```json
@@ -110,9 +112,13 @@ Agent 仍在启动中。您的消息已保留在 composer 中；请稍后重新�
 
 1. 确认配置来源是 `.ohquant/settings.json`，而非项目根目录的 `.env`。
 2. 确认 `WHYJ_QUANT_BASE_URL` 和模型标签指向同一 provider 族。
-3. 确认 URL 尾段与协议匹配：`/anthropic` -> Anthropic Messages，`/v1` -> OpenAI-compatible。
-4. 确认工具重放形状与 provider 匹配：OpenAI-compatible 的 `assistant.tool_calls` vs Anthropic 的 `tool_use` 后跟 `user.tool_result`。
-5. 如果模型仍然失败，在暴露原始 provider 文本前在错误副本中呈现不匹配信息。
+3. 如果存在 `WHYJ_DEFAULT_*_MODEL` 映射，确认顶层 `model` 是角色别名或精确等于其中一个映射值。
+4. 确认 Doctor provider probe 使用解析后的原始模型 ID，与 Agent 请求一致；终端清理后的显示标签不能用于网络请求。
+5. 确认 `WHYJ_QUANT_CONTEXT_WINDOW` 是当前模型真实支持的正整数 token 数，而不是期望值或 compact 阈值。
+6. 确认 `WHYJ_QUANT_COMPACT_TRIGGER_TOKENS` 是独立的正整数，并且不高于 context window。
+7. 确认 URL 尾段与协议匹配：`/anthropic` -> Anthropic Messages，`/v1` -> OpenAI-compatible。
+8. 确认工具重放形状与 provider 匹配：OpenAI-compatible 的 `assistant.tool_calls` vs Anthropic 的 `tool_use` 后跟 `user.tool_result`。
+9. 如果模型仍然失败，在暴露原始 provider 文本前在错误副本中呈现不匹配信息。
 
 已验证的真实 provider smoke：
 
@@ -138,10 +144,12 @@ Agent 仍在启动中。您的消息已保留在 composer 中；请稍后重新�
 
 Slash 命令应有从命令到下一步操作的清晰路径。
 
-命令引导：
+一级名称与描述以 [Slash Command 参考](./slash-commands.md) 为准。本节只记录诊断与恢复路径，不维护另一份命令目录。
+
+恢复引导：
 
 - `/help`：仅命令目录和快捷键。
-- `/config`：解释当前模型、API key、base URL、活跃组合和配置路径。
+- `/config`：按 Agent、Provider、Research、Data keys、Workspace 和 Path 输出当前规范化设置；TUI 中打开只保留设置项、当前值和顶部概览的 Settings 面板。
 - `/portfolio`：在 TUI 中打开本地组合面板；在 TUI 外，列出可用组合。
 - `/portfolio use <name|file|index>`：切换活跃的本地组合。
 - `/resume`：在 TUI 中打开恢复面板；在 TUI 外，列出已保存的 sessions。

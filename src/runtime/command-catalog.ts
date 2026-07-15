@@ -1,29 +1,19 @@
-export interface CommandAction {
-  label: string;
-  fill: string;
-}
-
 export interface CommandCatalogEntry {
   name: string;
   desc: string;
-  help: string;
-  example?: string;
-  compatibility?: boolean;
-  subcommands?: readonly string[];
-  actions?: readonly CommandAction[];
 }
 
 export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
-  { name: "/compact", desc: "Compact", help: "Compact session with optional focus instructions", example: "/compact focus on signals" },
-  { name: "/resume", desc: "Resume", help: "List or restore saved sessions", example: "/resume" },
-  { name: "/portfolio", desc: "Portfolio", help: "List, compare, and switch local portfolios", example: "/portfolio" },
-  { name: "/config", desc: "Config", help: "Show or open config panel", example: "/config" },
-  { name: "/doctor", desc: "Doctor", help: "Check config, auth sources, runtime readiness, and setup hints", example: "/doctor" },
-  { name: "/skill", desc: "Skill", help: "List, inspect, and run skills", example: "/skill" },
-  { name: "/help", desc: "Help", help: "Show commands and hotkeys" },
-  { name: "/clear", desc: "Clear", help: "Clear conversation and reset agent" },
-  { name: "/artifact", desc: "Artifact", help: "Generate dashboards and restore artifact sessions", example: "/artifact" },
-  { name: "/exit", desc: "Exit", help: "Exit WhyJ Quant" },
+  { name: "/compact", desc: "Compact current session context" },
+  { name: "/resume", desc: "Browse and restore saved sessions" },
+  { name: "/portfolio", desc: "Browse and select local portfolios" },
+  { name: "/config", desc: "Review and edit runtime settings" },
+  { name: "/doctor", desc: "Configure and diagnose runtime" },
+  { name: "/skill", desc: "Discover, inspect, and run skills" },
+  { name: "/help", desc: "Browse commands and shortcuts" },
+  { name: "/clear", desc: "Clear conversation and reset agent" },
+  { name: "/artifact", desc: "Browse, restore, and open reports" },
+  { name: "/exit", desc: "Exit WhyJ Quant" },
 ];
 
 export const SLASH_COMMANDS = COMMAND_CATALOG.map((command) => command.name);

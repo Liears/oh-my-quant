@@ -62,11 +62,19 @@ src/storage/
 | `authToken` | `WHYJ_QUANT_AUTH_TOKEN` |
 | `apiKey` | `WHYJ_QUANT_API_KEY` |
 | `baseUrl` | `WHYJ_QUANT_BASE_URL` |
+| `contextWindow` | `WHYJ_QUANT_CONTEXT_WINDOW` |
+| `compactTriggerTokens` | `WHYJ_QUANT_COMPACT_TRIGGER_TOKENS` |
 | `tushareToken` | `WHYJ_QUANT_TUSHARE_TOKEN`, `TUSHARE_TOKEN` |
 | `financialDatasetsKey` | `WHYJ_QUANT_FINANCIAL_DATASETS_KEY`, `FINANCIAL_DATASETS_KEY` |
 | `llmquantApiKey` | `WHYJ_QUANT_LLMQUANT_API_KEY`, `LLMQUANT_API_KEY` |
 
 `canonicalizeWhyjEnv()` 用于 settings normalize 时，将用户配置（可能包含旧别名）映射到统一的 `WHYJ_QUANT_*` 主键名。透传非 WhyJ 前缀的自定义键。
+
+`WHYJ_QUANT_CONTEXT_WINDOW` 和 `WHYJ_QUANT_COMPACT_TRIGGER_TOKENS` 都以 token 为单位，并作为字符串保存在 settings `env` 中。前者属于模型能力元数据，后者属于 session 自动 compaction 策略。运行时仅接受正整数；自动 compact 阈值不会扩大模型窗口，超过窗口时会被限制为窗口大小。
+
+用户可见字段、默认值和旧配置迁移规则统一记录在 [WhyJ Quant 配置参考](./configuration.md)。外部 skill 使用单一 `skillIntegrations.external` 开关；旧 `codex` / `claude` 字段仅作为迁移输入。
+
+settings normalization 还校验顶层 `model`：存在 `WHYJ_DEFAULT_SONNET_MODEL`、`WHYJ_DEFAULT_OPUS_MODEL` 或 `WHYJ_DEFAULT_HAIKU_MODEL` 时，`model` 必须是已配置角色别名或映射值。不匹配时按 sonnet、opus、haiku 顺序强制选择第一个可用别名，并在加载或保存时写回规范化配置。没有角色映射时不限制直接模型 ID。
 
 ## Session 上下文用量
 
@@ -76,6 +84,8 @@ src/storage/
 - 调用 `buildSessionContext()` + `estimateContextTokens()` 估算 token 数
 - 通过 `getModels()` 查找对应模型的 context window
 - 返回 `StoredSessionContextUsage`（tokens / contextWindow / percent）
+
+这里计算的是已保存 session 的离线摘要，因此只依据 session 中记录的模型 ID。当前活动 session 的底栏与自动 compact 由 agent runtime 计算，并会应用 settings 中的 `WHYJ_QUANT_CONTEXT_WINDOW`；不要把这两个展示路径混为一谈。
 
 此计算依赖 `agent/src/pi/` 中的 session 模型和 compaction 工具，是 storage → agent 方向的单向引用。
 
@@ -99,17 +109,20 @@ Artifacts 将 WhyJ Quant agent session 导出为自包含、可交互、可分�
 
 `src/storage/src/artifacts.ts`：
 
-- `saveArtifact(sessionId: string, html: string, meta?: { title?: string; messageCount?: number }): void` — 写入 HTML 文件和 sidecar metadata，发出 WRITE 事件
+- `saveArtifact(sessionId: string, html: string, meta?: { title?: string; messageCount?: number; sourceSessionId?: string }): void` — 写入 HTML 文件和 sidecar metadata，发出 WRITE 事件
 - `loadArtifact(sessionId: string): string | null` — 读取 HTML 文件
 - `loadArtifactMeta(sessionId: string): ArtifactMeta | null` — 读取 sidecar metadata
 - `listArtifacts(): ArtifactMeta[]` — 列出所有已生成的 artifact，含 sessionId、createdAt、title、messageCount、bytes
+- `pruneUnrestorableArtifacts(validSourceSessionIds): ArtifactPruneResult` — 删除缺失 HTML、metadata 或源 JSONL session 的孤立 artifact
 - `deleteArtifact(sessionId: string): boolean` — 删除 HTML 文件，发出 DELETE 事件
 
 ### 命令与上下文语义
 
-- `/artifact --generate` 从当前 agent session JSONL 生成 HTML，保存到 `.ohquant/artifacts/{session-id}.html`，并向当前 session 写入隐藏 `artifact_export` context note。
-- `/artifact --open {session-id}` 在有 agent session 的运行时默认恢复对应 JSONL session，打开 HTML 报告，并写入隐藏 `artifact_restore` context note；纯 CLI fallback 无 agent session 时只打开 HTML。
-- TUI Artifacts 面板的 `Enter` 触发 `/artifact --open {session-id}`，因此默认行为是恢复选中的 artifact session；`g` 生成当前 session 的新 artifact。
+- `artifactGeneration.auto: true` 在量化分析 `agent_end` 后从当前 agent session JSONL 生成 HTML，确保完整 turn 已写入 Trajectory，保存报告、写入隐藏 `artifact_export` context note，并自动打开浏览器。
+- `/artifact` 在 TUI 中只打开已有报告选择器；纯 CLI 模式列出已有报告，不生成新报告。
+- TUI Artifacts 面板的 `Enter` 直接触发内部 `restoreArtifact` 动作：恢复报告对应的 JSONL session、重建 Trajectory、打开 HTML，并写入隐藏 `artifact_restore` context note。
+- 打开 Artifacts 面板或在纯 CLI 中列出报告时会先校验源 JSONL；孤立报告会自动删除。恢复前再次校验，失效报告不会打开浏览器或产生 session 恢复错误。
+- `/artifact` 不接受报告 ID、生成选项或模式选项；面板也不提供生成或模式切换快捷键。
 - `artifact_export` / `artifact_restore` note 记录 title、sessionId、HTML 路径、bytes 和 messageCount，供后续 agent turn 解析“这个报告”“刚才选中的 artifact”等指代。
 
 ### 可缓存性
@@ -117,7 +130,7 @@ Artifacts 将 WhyJ Quant agent session 导出为自包含、可交互、可分�
 Artifact 文件是**显式制品**（artifact class），不可缓存但可安全重算：
 
 - 可从 session JSONL 完全重新生成（幂等）
-- 用户或 agent 主动触发生成，非自动缓存
+- 仅在用户开启 `Auto Artifacts` 后由量化分析流程生成，非自动缓存
 - 不包含个人持仓或私密财务数据（仅复制 session 中已有的对话内容）
 - 不提交 git（`.ohquant/` 已在 `.gitignore` 中排除）
 

@@ -47,8 +47,9 @@ WhyJ Quant 默认不加载用户级 Codex/Claude skill，避免 `docx`、`figma`
 
 ```
 /config
-  → Codex Skills   on/off   # ~/.codex/skills
-  → Claude Skills  on/off   # ~/.claude/skills, ~/.agents/skills, ~/.pi/agent/skills
+  → External Skills  on/off
+      off  # 仅项目量化 skills
+      on   # 额外加载 ~/.codex/skills、~/.claude/skills、~/.agents/skills、~/.pi/agent/skills
 ```
 
 对应 `.ohquant/settings.json`：
@@ -56,11 +57,12 @@ WhyJ Quant 默认不加载用户级 Codex/Claude skill，避免 `docx`、`figma`
 ```json
 {
   "skillIntegrations": {
-    "codex": false,
-    "claude": false
+    "external": false
   }
 }
 ```
+
+旧的 `codex` / `claude` 开关会在 settings 加载时合并迁移为 `external`。完整配置语义见 [WhyJ Quant 配置参考](./configuration.md)。
 
 启用后，这些用户级 skill 会进入 `/skill` 列表和 `<available_skills>`。保持关闭时，只有项目内 `.agents/skills`、`.pi/skills` 和 `.ohquant/skills` 中的量化 skill 可见。
 

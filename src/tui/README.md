@@ -97,10 +97,10 @@ Important interactions:
 - Mouse wheel: scrolls the region under the cursor.
 - Mouse drag: scrolls, or selects text when Shift is held.
 - `Ctrl+Shift+C`: copy current selection.
-- `Ctrl+P` or `/config`: open the config panel.
+- `Ctrl+P` or `/config`: open the compact Settings panel.
 - `Esc`: clear input/suggestions or close active panel.
 
-Slash suggestions come from `src/cli/catalog.ts`; top-level command matches use the longer `help` text rather than the short label. Symbol/name suggestions come from the local watchlist.
+Slash suggestions and the Help panel share the canonical `name` + `desc` catalog from `src/runtime/command-catalog.ts`. Exact top-level commands submit directly; only the contextual `/skill:name` flow expands into skill suggestions. Symbol/name suggestions come from the local watchlist.
 
 ## Panels
 

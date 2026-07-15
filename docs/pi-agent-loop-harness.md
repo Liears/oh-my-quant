@@ -9,6 +9,8 @@
 
 这篇文档面向维护 WhyJ Quant agent runtime 的工程师。它不是 API 手册，而是一篇实现导读：解释 vendored pi 的 `agent-loop` 与 `AgentHarness` 如何协作，为什么 `/compact` 必须等待 idle，为什么 TUI 只能消费事件而不能自己判断完整生命周期，以及 WhyJ Quant 的 wrapper 应该遵守哪些边界。
 
+用户可见的一级命令描述与完整命令行为统一见 [Slash Command 参考](./slash-commands.md)；本文只说明 session-control 命令与 agent loop 的实现关系。
+
 相关代码：
 
 | 模块 | 文件 |
@@ -414,7 +416,20 @@ AgentHarnessError("compaction", "Nothing to compact")
 
 所以 `Nothing to compact` 是正常 no-op，不是系统错误。WhyJ CLI/TUI 应该把它显示成 info，而不是 `ERR`。
 
-### 6.2 生成摘要
+### 6.2 WhyJ Quant 自动触发层
+
+pi harness 负责执行 compaction，但 WhyJ Quant 的 session facade 负责决定何时自动调用它：
+
+```text
+current context tokens >= WHYJ_QUANT_COMPACT_TRIGGER_TOKENS
+  -> harness.compact()
+  -> refresh session context
+  -> send the new prompt
+```
+
+`WHYJ_QUANT_CONTEXT_WINDOW` 表示模型支持的总上下文，用于模型元数据和 UI；`WHYJ_QUANT_COMPACT_TRIGGER_TOKENS` 是独立的策略阈值。两者均为正整数 token 数。若未配置触发阈值，session facade 使用 `contextWindow - 16384`；若阈值大于窗口，则限制为窗口大小。自动检查只在新 prompt 前执行，手动 `/compact` 仍直接进入 `AgentHarness.compact()`。
+
+### 6.3 生成摘要
 
 如果可以 compact：
 
@@ -445,7 +460,7 @@ modifiedFiles
 session.appendCompaction(summary, firstKeptEntryId, tokensBefore, details)
 ```
 
-### 6.3 WhyJ `/compact` 的正确调用方式
+### 6.4 WhyJ `/compact` 的正确调用方式
 
 正确：
 

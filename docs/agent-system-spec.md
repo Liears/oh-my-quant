@@ -35,9 +35,12 @@ src/agent/
     dispatch.test.ts  prompt/steer/followUp 路由
 
 src/cli/
-  catalog.ts          Slash 命令目录（帮助文本、自动补全、one-shot help）
+  catalog.ts          重导出 runtime Slash catalog，供 CLI 消费
   registry.ts         parseCommand()、executeCommand()、slash handlers
   registry.test.ts    Parser 测试
+
+src/runtime/
+  command-catalog.ts  一级 Slash 名称与描述的单一真源（TUI、帮助、one-shot）
 
 src/tools/
   registry.ts         内置工具注册、显示元数据、CLI 查找、启用的 agent 工具顺序
@@ -104,10 +107,40 @@ settings.json "model": "glm-5.2"
 ```
 
 关键规则：
-- **不剥离后缀**：`deepseek-v4-pro[1m]` 原样发送给 DeepSeek API
+- **不剥离后缀**：`glm-5.2[1m]`、`deepseek-v4-pro[1m]` 等模型 ID 原样写入 provider request payload；`[1m]` 是模型代码的一部分，不是显示注释
 - **不验证存在性**：模型名是否被 API 接受由 API 自身校验，不在客户端验证
-- **用户直接模型名优先**：用户在 settings.json 或 Config Panel 填写的模型名直接作为 API `model` 字段
+- **映射存在时强制对应**：配置了任一 `WHYJ_DEFAULT_{SONNET|OPUS|HAIKU}_MODEL` 后，顶层 `model` 必须是对应角色别名或某个映射值；其他值会被 settings normalization 强制改为第一个已配置别名
+- **无映射时保留直接模型**：未配置任何角色映射时，用户填写的直接模型 ID 仍原样作为 API `model` 字段
 - **WHYJ_DEFAULT_*_MODEL** 环境变量可覆盖短别名（sonnet/opus/haiku）到任意模型名
+- **上下文窗口独立配置**：`WHYJ_QUANT_CONTEXT_WINDOW` 覆盖模型元数据中的 context window，用于底栏容量和上下文占用计算
+- **自动压缩阈值独立配置**：`WHYJ_QUANT_COMPACT_TRIGGER_TOKENS` 指定新 prompt 前触发自动 compaction 的 token 数；未配置时仍使用 `contextWindow - 16384`
+
+两个变量都位于 `.ohquant/settings.json` 的 `env` 对象中，值为正整数字符串：
+
+```json
+{
+  "env": {
+    "WHYJ_QUANT_CONTEXT_WINDOW": "1000000",
+    "WHYJ_QUANT_COMPACT_TRIGGER_TOKENS": "800000"
+  }
+}
+```
+
+解析规则：
+
+1. settings 中的值优先于同名进程环境变量。
+2. `WHYJ_QUANT_CONTEXT_WINDOW` 在模型解析完成后覆盖 `model.contextWindow`，因此底栏、上下文百分比和默认 compact 阈值使用同一个窗口值。
+3. `WHYJ_QUANT_COMPACT_TRIGGER_TOKENS` 不改变模型可接受的最大上下文，只控制自动 compact 的触发点。
+4. 自动检查发生在发送新 prompt 之前，使用当前 session transcript 的估算 token 数；达到阈值时先 compact，再发送本轮输入。
+5. 非正整数或非纯数字值会被忽略。compact 阈值高于 context window 时会被限制为 context window。
+
+顶层模型规范化规则：
+
+1. `model: "sonnet"` 且存在 `WHYJ_DEFAULT_SONNET_MODEL`：有效，请求使用该映射值。
+2. `model` 精确等于任一角色映射值：有效，请求使用该直接值。
+3. 已配置角色映射，但 `model` 与别名和映射值都不匹配：强制回退到第一个已配置别名，顺序为 sonnet、opus、haiku，并由 `loadSettings()` / `saveSettings()` 写回文件。
+4. 未配置任何角色映射：保持直接模型 ID 的兼容行为。
+5. Doctor 网络探测使用与 Agent 相同的原始解析后模型 ID；终端安全清理只用于显示，不能改变请求模型。Anthropic provider 最终序列化字段始终是 `model: model.id`。
 
 故障排查清单：
 
@@ -206,6 +239,7 @@ Compaction 不再是 `src/agent/src/session.ts` 中的本地启发式方法。Wh
 - compaction 摘要和 branch summary 作为显式 session-tree entries 存储
 - `displayUser` 在 token 估算、cut-point 选择、turn-start 发现、摘要序列化和 branch navigation/editor restore 期间被视为 user-equivalent 消息
 - 当前 adapter 为测试和小工具暴露 token 估算 helper，但权威 compaction 行为位于 vendored pi 代码中
+- session facade 在每个新 prompt 前读取 `WHYJ_QUANT_COMPACT_TRIGGER_TOKENS`；当前 context 估算达到阈值时，先调用 harness `compact()` 并刷新 session context，再进入正常 prompt loop
 
 ## 8. Session 持久化
 
@@ -245,11 +279,13 @@ App 挂载
 
 ```json
 {
-  "version": 1,
+  "version": 3,
   "env": {
     "WHYJ_QUANT_API_KEY": "sk-...",
     "WHYJ_QUANT_BASE_URL": "https://api.deepseek.com/anthropic",
-    "WHYJ_QUANT_AUTH_TOKEN": "sk-..."
+    "WHYJ_QUANT_AUTH_TOKEN": "sk-...",
+    "WHYJ_QUANT_CONTEXT_WINDOW": "1000000",
+    "WHYJ_QUANT_COMPACT_TRIGGER_TOKENS": "800000"
   },
   "model": "sonnet",
   "thinkingLevel": "off",
@@ -257,7 +293,7 @@ App 挂载
 }
 ```
 
-模型凭证优先读取 `WHYJ_QUANT_API_KEY`，缺失时回退到 `WHYJ_QUANT_AUTH_TOKEN`。这两个键都从 `.ohquant/settings.json` 的 `env` 块读取；`WHYJ_QUANT_BASE_URL` 用于决定当前走 Anthropic Messages 还是 OpenAI-compatible 路径。
+模型凭证优先读取 `WHYJ_QUANT_API_KEY`，缺失时回退到 `WHYJ_QUANT_AUTH_TOKEN`。这两个键都从 `.ohquant/settings.json` 的 `env` 块读取；`WHYJ_QUANT_BASE_URL` 用于决定当前走 Anthropic Messages 还是 OpenAI-compatible 路径。`WHYJ_QUANT_CONTEXT_WINDOW` 描述模型容量，`WHYJ_QUANT_COMPACT_TRIGGER_TOKENS` 描述自动压缩策略，两者不要合并为同一个阈值。
 
 ## 11. 洞察系统与提示
 

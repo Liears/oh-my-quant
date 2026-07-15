@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { readFileSync } from "node:fs";
 import { buildCommandHelpText, COMMAND_CATALOG } from "./catalog.ts";
 import { executeCommand, isLocalSlashCommand, parseCommand } from "./registry.ts";
 
@@ -263,11 +264,34 @@ describe("executeCommand", () => {
 });
 
 describe("catalog", () => {
+  it("keeps one descriptive entry for every public slash command", () => {
+    expect(COMMAND_CATALOG).toEqual([
+      { name: "/compact", desc: "Compact current session context" },
+      { name: "/resume", desc: "Browse and restore saved sessions" },
+      { name: "/portfolio", desc: "Browse and select local portfolios" },
+      { name: "/config", desc: "Review and edit runtime settings" },
+      { name: "/doctor", desc: "Configure and diagnose runtime" },
+      { name: "/skill", desc: "Discover, inspect, and run skills" },
+      { name: "/help", desc: "Browse commands and shortcuts" },
+      { name: "/clear", desc: "Clear conversation and reset agent" },
+      { name: "/artifact", desc: "Browse, restore, and open reports" },
+      { name: "/exit", desc: "Exit WhyJ Quant" },
+    ]);
+    for (const entry of COMMAND_CATALOG) {
+      expect(Object.keys(entry).sort()).toEqual(["desc", "name"]);
+      expect(entry.desc.length).toBeGreaterThanOrEqual(15);
+      expect(entry.desc.length).toBeLessThanOrEqual(40);
+      expect(entry.desc).toMatch(/^[A-Z]/);
+      expect(entry.desc.endsWith(".")).toBe(false);
+    }
+  });
+
   it("renders compact command help text", () => {
     const help = buildCommandHelpText();
     expect(help).toContain("Commands");
     expect(help).toContain("/config");
     expect(help).toContain("/doctor");
+    expect(help).toContain("Browse, restore, and open reports");
     expect(help).not.toContain("/factor");
     expect(help).not.toContain("/backtest");
     expect(help).not.toContain("/risk");
@@ -276,14 +300,19 @@ describe("catalog", () => {
     expect(help).not.toContain("Commands:");
   });
 
-  it("lists portfolio management commands", () => {
+  it("keeps portfolio as a single catalog entry", () => {
     const portfolio = COMMAND_CATALOG.find((entry) => entry.name === "/portfolio");
-    expect(portfolio?.subcommands).toBeUndefined();
+    expect(portfolio).toEqual({ name: "/portfolio", desc: "Browse and select local portfolios" });
   });
 
-  it("keeps resume as a direct command without subcommands", () => {
+  it("keeps resume as a single catalog entry", () => {
     const resume = COMMAND_CATALOG.find((entry) => entry.name === "/resume");
-    expect(resume?.subcommands).toBeUndefined();
+    expect(resume).toEqual({ name: "/resume", desc: "Browse and restore saved sessions" });
+  });
+
+  it("keeps artifact as a single panel entry", () => {
+    const artifact = COMMAND_CATALOG.find((entry) => entry.name === "/artifact");
+    expect(artifact).toEqual({ name: "/artifact", desc: "Browse, restore, and open reports" });
   });
 
   it("does not list /session in the public slash catalog", () => {
@@ -292,5 +321,24 @@ describe("catalog", () => {
 
   it("lists doctor in the public slash catalog", () => {
     expect(COMMAND_CATALOG.some((entry) => entry.name === "/doctor")).toBe(true);
+  });
+
+  it("keeps the user-facing command references aligned with the catalog", () => {
+    const references = [
+      readFileSync("README.md", "utf8"),
+      readFileSync("docs/slash-commands.md", "utf8"),
+      readFileSync("docs/interactive-cli-design.md", "utf8"),
+    ];
+    for (const entry of COMMAND_CATALOG) {
+      for (const reference of references) {
+        expect(reference).toContain(`\`${entry.name}\``);
+        expect(reference).toContain(entry.desc);
+      }
+    }
+
+    const manual = references[1];
+    expect(manual).toContain("`/artifact` 不接受参数或子命令");
+    expect(manual).toContain("只能在 `/config` 中开启 `Auto Artifacts`");
+    expect(manual).toContain("`/session` 仅作为旧输入兼容别名");
   });
 });

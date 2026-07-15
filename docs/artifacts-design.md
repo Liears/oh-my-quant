@@ -501,14 +501,13 @@ compact
 
 Artifact 命令语义：
 
+公开命令目录与跨界约束以 [Slash Command 参考](./slash-commands.md) 为准。
+
 ```bash id="gmyiai"
-/artifact                         # TUI 中打开 Artifacts 面板；非 TUI 时生成当前 session artifact
-/artifact --generate              # 显式生成当前 session artifact
-/artifact --title "我的分析"     # 生成时覆盖标题
-/artifact --open <session-id>     # 恢复该 artifact 对应的 session，并打开 HTML 报告
+/artifact                         # TUI 中打开 Artifacts 面板；非 TUI 时列出已有报告
 ```
 
-当前实现内置 trajectory 渲染；生成成功会写入 `artifact_export` 隐藏上下文，恢复成功会写入 `artifact_restore` 隐藏上下文。
+`/artifact` 不接受任何子命令或参数。用户在面板中选中报告后，TUI 直接向运行时发送结构化恢复动作，不拼接新的 Slash Command。生成策略同样不属于 `/artifact`：只在 `/config` 的 `Auto Artifacts` 开启后，由量化分析 turn 的 `agent_end` 流程内部生成并打开浏览器。当前实现内置 trajectory 渲染；生成成功会写入 `artifact_export` 隐藏上下文，恢复成功会写入 `artifact_restore` 隐藏上下文。
 
 ### 13. Trajectory 采集策略
 
