@@ -30,6 +30,11 @@ afterEach(() => {
 });
 
 describe("panel-portfolio storage", () => {
+  it("accepts open-fund provider symbols without accepting arbitrary suffixes", () => {
+    expect(isValidPanelSymbol("022364.OF")).toBe(true);
+    expect(isValidPanelSymbol("022364.BAD")).toBe(false);
+  });
+
   it("loads and saves symbols", () => {
     savePanelPortfolio({
       updated: "",

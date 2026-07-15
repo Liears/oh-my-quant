@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildOverviewPanelSections, collectOverviewSymbols, MARKET_INDICES } from "./overview.ts";
+import { buildOverviewPanelSections, collectOverviewSymbols, MARKET_INDICES, overviewProviderSymbol } from "./overview.ts";
 
 describe("runtime overview service", () => {
   it("builds grouped portfolio, market, and source sections from overview rows", () => {
@@ -23,7 +23,7 @@ describe("runtime overview service", () => {
       kind: "group",
       groupId: "group-1",
       title: "核心组合",
-      rows: [{ code: "510300", name: "沪深300ETF", price: 0, pct: 0 }],
+      rows: [{ code: "510300", name: "沪深300ETF", price: Number.NaN, pct: Number.NaN }],
       collapsed: false,
     });
     expect(sections.some((section) => section.title === "Market")).toBe(true);
@@ -32,5 +32,19 @@ describe("runtime overview service", () => {
       title: "Source",
       rows: expect.arrayContaining([{ label: "数据", value: "2026-06-30" }]),
     });
+  });
+
+  it("keeps open-fund identity when preparing provider symbols", () => {
+    expect(overviewProviderSymbol({ code: "022364", name: "永赢科技智选发起A", instrument: "fund" })).toBe("022364.OF");
+    expect(overviewProviderSymbol({ code: "159995", name: "芯片ETF", instrument: "fund" })).toBe("159995");
+    expect(overviewProviderSymbol({ code: "510300", name: "沪深300ETF", instrument: "fund" })).toBe("510300");
+    expect(overviewProviderSymbol({ code: "000001", name: "平安银行", instrument: "security" })).toBe("000001");
+  });
+
+  it("propagates instrument hints while collecting overview symbols", () => {
+    expect(collectOverviewSymbols({
+      symbols: [{ code: "022364", name: "永赢科技智选发起A", instrument: "fund" }],
+      groups: [],
+    })).toEqual([{ code: "022364", name: "永赢科技智选发起A", instrument: "fund" }]);
   });
 });

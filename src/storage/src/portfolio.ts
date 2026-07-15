@@ -14,6 +14,7 @@ import type { DailyFile, HoldingsFile } from "../../types/data.ts";
 export interface PortfolioSymbol {
   code: string;
   name: string;
+  instrument?: "fund" | "security";
 }
 
 export { loadPanelPortfolio, savePanelPortfolio, panelPortfolioPath } from "./panel-portfolio.ts";
@@ -33,7 +34,7 @@ export function loadHoldings(_variant = "live"): HoldingsFile {
 export function collectPanelPortfolioSymbols(portfolio: PanelPortfolioFile): PortfolioSymbol[] {
   const byCode = new Map<string, PortfolioSymbol>();
   for (const entry of portfolio.symbols) {
-    byCode.set(entry.code, { code: entry.code, name: entry.name || entry.code });
+    byCode.set(entry.code, { code: entry.code, name: entry.name || entry.code, instrument: entry.instrument });
   }
   for (const group of portfolio.groups ?? []) {
     for (const code of group.symbolCodes) {
@@ -79,6 +80,7 @@ export function syncPanelPortfolioFromLocalPortfolio(identifier: string): Synced
       code: fund.code,
       name: fund.name || fund.code,
       added: today,
+      instrument: portfolio.instrument,
     }));
   const codes = symbols.map((symbol) => symbol.code);
   savePanelPortfolio({

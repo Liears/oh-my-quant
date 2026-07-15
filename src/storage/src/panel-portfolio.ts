@@ -12,6 +12,7 @@ export interface PanelPortfolioEntry {
   code: string;
   name: string;
   added: string;
+  instrument?: "fund" | "security";
 }
 
 export interface PortfolioGroup {
@@ -62,6 +63,7 @@ export function importLegacyHoldings(): PanelPortfolioFile {
         code: fund.code,
         name: fund.name || fund.code,
         added: today,
+        instrument: "fund" as const,
       }));
     const groups = symbols.length > 0 ? [{ id: "default", name: "Default", symbolCodes: symbols.map(s => s.code) }] : [];
     return { updated: today, symbols, groups };
@@ -70,11 +72,10 @@ export function importLegacyHoldings(): PanelPortfolioFile {
   }
 }
 
-/** Valid Overview symbol: 6-digit A-share/fund code or exchange-suffixed ticker. */
+/** Valid Overview symbol: 6-digit A-share/fund code or provider-suffixed ticker. */
 export function isValidPanelSymbol(code: string): boolean {
-  const base = code.split(".")[0] || code;
-  if (/^\d{6}$/.test(base)) return true;
-  if (/^\d{6}\.(SH|SZ|BJ)$/i.test(code)) return true;
+  if (/^\d{6}$/.test(code)) return true;
+  if (/^\d{6}\.(SH|SZ|BJ|OF)$/i.test(code)) return true;
   return false;
 }
 

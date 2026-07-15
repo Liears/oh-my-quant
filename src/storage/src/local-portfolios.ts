@@ -13,6 +13,8 @@ export interface LocalPortfolioSummary {
   focusSectors: string[];
   strategy: string;
   riskTag: string;
+  /** Source schema of the holdings; bare fund codes need an .OF provider hint. */
+  instrument: "fund" | "security";
   holdings: FundHolding[];
 }
 
@@ -37,6 +39,7 @@ export function listLocalPortfolios(): LocalPortfolioSummary[] {
           stocks?: RawHolding[];
           focusSectors?: string[];
         };
+        const isFundPortfolio = Array.isArray(raw.funds);
         const rawHoldings = Array.isArray(raw.funds) ? raw.funds
           : Array.isArray(raw.stocks) ? raw.stocks
           : [];
@@ -61,6 +64,7 @@ export function listLocalPortfolios(): LocalPortfolioSummary[] {
           focusSectors,
           strategy: assessment.strategy,
           riskTag: assessment.riskTag,
+          instrument: isFundPortfolio ? "fund" : "security",
           holdings,
         } satisfies LocalPortfolioSummary;
       } catch {

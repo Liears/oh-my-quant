@@ -1,10 +1,12 @@
 export function fmtPrice(p: number): string {
+  if (!Number.isFinite(p)) return "--";
   if (p >= 10000) return p.toLocaleString("en-US", { maximumFractionDigits: 2 });
   if (p >= 1) return p.toFixed(2);
   return p.toFixed(2);
 }
 
 export function fmtPct(p: number): string {
+  if (!Number.isFinite(p)) return "--";
   if (Math.abs(p) < 0.001) return "0.00%";
   return `${p > 0 ? "+" : ""}${p.toFixed(2)}%`;
 }

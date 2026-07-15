@@ -4,7 +4,7 @@ import type { PanelSection } from "../tui/src/types.ts";
 import type { Bar } from "../types/data.ts";
 import { baseCode, inferMarket, isAIndexSymbol, type MarketSymbol } from "../market/symbols.ts";
 
-export type OverviewSymbolEntry = MarketSymbol & { name: string };
+export type OverviewSymbolEntry = MarketSymbol & { name: string; instrument?: "fund" | "security" };
 export type OverviewQuote = { code: string; name: string; price: number; pct: number };
 export type OverviewHolding = { code: string; name: string; price: number; pct: number };
 
@@ -63,7 +63,7 @@ export async function fetchOverviewQuotes(entries: OverviewSymbolEntry[], meta: 
 export async function fetchOverviewHoldings(entries: OverviewSymbolEntry[], meta: OverviewPullMeta): Promise<OverviewHolding[]> {
   return Promise.all(entries.map(async (entry) => {
     try {
-      const bars = await fetchQuoteBars(entry.code, meta);
+      const bars = await fetchQuoteBars(entry, meta);
       const row = holdingFromBars(entry, bars);
       if (row) return row;
     } catch {
@@ -72,8 +72,8 @@ export async function fetchOverviewHoldings(entries: OverviewSymbolEntry[], meta
     return {
       code: baseCode(entry.code),
       name: entry.name || entry.code,
-      price: 0,
-      pct: 0,
+      price: Number.NaN,
+      pct: Number.NaN,
     };
   }));
 }
@@ -82,9 +82,9 @@ export function collectOverviewSymbols(portfolio: OverviewPortfolio): OverviewSy
   const entries = new Map<string, OverviewSymbolEntry>();
   for (const entry of portfolio.symbols) {
     const name = entry.name || entry.code;
-    entries.set(entry.code, { code: entry.code, name });
+    entries.set(entry.code, { code: entry.code, name, instrument: entry.instrument });
     const normalizedCode = baseCode(entry.code);
-    if (!entries.has(normalizedCode)) entries.set(normalizedCode, { code: normalizedCode, name });
+    if (!entries.has(normalizedCode)) entries.set(normalizedCode, { code: normalizedCode, name, instrument: entry.instrument });
   }
   for (const group of portfolio.groups ?? []) {
     for (const code of group.symbolCodes) {
@@ -107,8 +107,8 @@ function buildPortfolioSections(
   const fallbackRows = portfolioSymbols.map((entry) => ({
     code: baseCode(entry.code),
     name: entry.name || entry.code,
-    price: 0,
-    pct: 0,
+    price: Number.NaN,
+    pct: Number.NaN,
   }));
   const fallbackByCode = new Map<string, OverviewHolding>();
   for (const row of fallbackRows) fallbackByCode.set(row.code, row);
@@ -118,8 +118,8 @@ function buildPortfolioSections(
     return rowsByCode.get(code) || rowsByCode.get(normalizedCode) || fallbackByCode.get(code) || fallbackByCode.get(normalizedCode) || {
       code: normalizedCode,
       name: portfolioSymbols.find((symbol) => symbol.code === code || symbol.code === normalizedCode)?.name || code,
-      price: 0,
-      pct: 0,
+      price: Number.NaN,
+      pct: Number.NaN,
     };
   };
 
@@ -157,7 +157,7 @@ function buildSourceSection(meta: OverviewPullMeta, refreshedAt: Date): PanelSec
 async function fetchQuotesFromBars(entries: OverviewSymbolEntry[], meta: OverviewPullMeta): Promise<OverviewQuote[]> {
   return Promise.all(entries.map(async (entry) => {
     try {
-      const bars = await fetchQuoteBars(entry.code, meta);
+      const bars = await fetchQuoteBars(entry, meta);
       const quote = quoteFromBars(entry, bars);
       if (quote) return quote;
     } catch {
@@ -166,8 +166,8 @@ async function fetchQuotesFromBars(entries: OverviewSymbolEntry[], meta: Overvie
     return {
       code: baseCode(entry.code),
       name: entry.name || entry.code,
-      price: 0,
-      pct: 0,
+      price: Number.NaN,
+      pct: Number.NaN,
     };
   }));
 }
@@ -197,7 +197,8 @@ async function fetchAIndexSpotQuotes(entries: OverviewSymbolEntry[], meta: Overv
   }
 }
 
-async function fetchQuoteBars(symbol: string, meta: OverviewPullMeta): Promise<Bar[]> {
+async function fetchQuoteBars(entry: OverviewSymbolEntry, meta: OverviewPullMeta): Promise<Bar[]> {
+  const symbol = overviewProviderSymbol(entry);
   const market = inferMarket(symbol);
   const end = new Date().toISOString().slice(0, 10);
   const start = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -205,6 +206,15 @@ async function fetchQuoteBars(symbol: string, meta: OverviewPullMeta): Promise<B
   meta.sources.push(source);
   if (asOfDate) meta.asOfDates.push(asOfDate);
   return bars.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Preserve portfolio instrument semantics before generic source normalization guesses an exchange. */
+export function overviewProviderSymbol(entry: OverviewSymbolEntry): string {
+  const symbol = entry.code.trim();
+  if (entry.instrument !== "fund" || !/^\d{6}$/u.test(symbol)) return symbol;
+  // Exchange-traded funds use exchange routes even when stored without a suffix.
+  if (/^(?:5\d{5}|159\d{3})$/u.test(symbol)) return symbol;
+  return `${symbol}.OF`;
 }
 
 function quoteFromBars(entry: OverviewSymbolEntry, bars: Bar[]): OverviewQuote | null {

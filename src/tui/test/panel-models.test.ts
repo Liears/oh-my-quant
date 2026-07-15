@@ -111,6 +111,7 @@ describe("panel models", () => {
           updated: "2026-06-18T00:00:00.000Z",
           strategy: "Core",
           riskTag: "Medium",
+          instrument: "fund",
           count: 3,
           focusSectors: ["AI"],
           holdings: [],

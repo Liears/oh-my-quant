@@ -832,15 +832,47 @@ description: Use for crypto market analysis.
       updated: "2026-06-01",
       funds: [{ code: "510300", name: "沪深300ETF" }],
     }, null, 2));
+    const instrumentsSeen: Array<string | undefined> = [];
     const h = harness(
       async () => [],
-      async (entries) => entries.map((entry) => ({ code: entry.code, name: entry.name, price: 1, pct: 0 })),
+      async (entries) => {
+        instrumentsSeen.push(...entries.map((entry) => entry.instrument));
+        return entries.map((entry) => ({ code: entry.code, name: entry.name, price: 1, pct: 0 }));
+      },
     );
     await h.runtime.submit("/portfolio use Alpha组合");
     expect(h.localStates.at(-1)?.activePortfolio).toBe("Alpha组合");
     expect(loadPanelPortfolio().symbols.map((item) => item.code)).toEqual(["510300"]);
+    expect(loadPanelPortfolio().symbols[0]?.instrument).toBe("fund");
+    expect(instrumentsSeen).toContain("fund");
     const latestPanel = h.panels.at(-1)?.panel ?? [];
     expect(latestPanel.some((section) => section.title === "Alpha组合")).toBe(true);
+  });
+
+  it("restores fund identity for an existing bare-code active portfolio", async () => {
+    mkdirSync(join(OHQ, "portfolio"), { recursive: true });
+    await Bun.write(join(OHQ, "portfolio", "holdings_semicon.json"), JSON.stringify({
+      name: "聚焦半导体",
+      funds: [{ code: "022364", name: "永赢科技智选发起A" }],
+    }));
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      preferences: { ...DEFAULT_SETTINGS.preferences, currentPortfolioFile: "holdings_semicon.json", source: "akshare" },
+    });
+    savePanelPortfolio({
+      updated: "2026-07-15",
+      symbols: [{ code: "022364", name: "永赢科技智选发起A", added: "2026-07-15" }],
+      groups: [{ id: "default", name: "聚焦半导体", symbolCodes: ["022364"] }],
+    });
+    const instrumentsSeen: Array<string | undefined> = [];
+    const h = harness(async () => [], async (entries) => {
+      instrumentsSeen.push(...entries.map((entry) => entry.instrument));
+      return [];
+    });
+
+    await h.runtime.refreshOverviewPanel();
+
+    expect(instrumentsSeen).toEqual(["fund"]);
   });
 
   it("refreshes overview panel after /clear", async () => {

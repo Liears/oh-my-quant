@@ -5,7 +5,8 @@ import { dispatchUserMessage, isAgentTurnActive } from "./agent/src/dispatch.ts"
 import { isQuantAnalysisRequest } from "./agent/src/context.ts";
 import { createAgent, updateSessionCtx, type QuantAgentSession } from "./agent/src/session.ts";
 import { skillPaths } from "./skill/index.ts";
-import { ensureDirs, loadSettings, loadPanelPortfolio } from "./storage/index.ts";
+import { baseCode } from "./market/symbols.ts";
+import { ensureDirs, findLocalPortfolio, loadSettings, loadPanelPortfolio } from "./storage/index.ts";
 import type { AppState, PanelSection, UIMessage } from "./tui/src/types.ts";
 import type { CurrentSessionMeta } from "./tui/src/panel.ts";
 import {
@@ -545,7 +546,7 @@ export class AppRuntime {
   private async pullMarketPanel(generation: number): Promise<void> {
     const refreshedAt = new Date();
     const pullMeta: OverviewPullMeta = { sources: [], asOfDates: [] };
-    const panelPortfolio = loadPanelPortfolio();
+    const panelPortfolio = this.loadOverviewPortfolio();
     const portfolioSymbols = collectOverviewSymbols(panelPortfolio);
     const [marketQuotes, portfolioRows] = await Promise.all([
       this.quoteFetcher(MARKET_INDICES, pullMeta),
@@ -569,6 +570,19 @@ export class AppRuntime {
     this.overviewReady = true;
     this.marketSections = marketUnavailablePanel();
     this.syncOverviewPanel();
+  }
+
+  private loadOverviewPortfolio(): ReturnType<typeof loadPanelPortfolio> {
+    const portfolio = loadPanelPortfolio();
+    const selected = findLocalPortfolio(loadSettings().preferences.currentPortfolioFile);
+    if (!selected) return portfolio;
+    const selectedCodes = new Set(selected.holdings.map((holding) => baseCode(holding.code)));
+    return {
+      ...portfolio,
+      symbols: portfolio.symbols.map((entry) => selectedCodes.has(baseCode(entry.code))
+        ? { ...entry, instrument: entry.instrument ?? selected.instrument }
+        : entry),
+    };
   }
 
   private commandResultContext(): CommandResultRuntimeContext {
