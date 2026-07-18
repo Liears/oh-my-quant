@@ -1,13 +1,8 @@
 import { Type } from "typebox";
 import type { Static } from "typebox";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
-import {
-  fetchFinancialDatasetsSnapshot,
-  fetchTushareSnapshot,
-  searchSymbols,
-  type DataSource,
-} from "../source/index.ts";
-import { fetchBars } from "../runtime/source-runtime.ts";
+import type { DataSource } from "../source/index.ts";
+import { fetchBars, searchSymbols } from "../runtime/source-runtime.ts";
 import type { Market } from "../types/data.ts";
 import { inferMarket } from "../market/symbols.ts";
 import { ok } from "./shared/results.ts";
@@ -28,7 +23,7 @@ const FetchBars = Type.Object({
   market: Type.Optional(Type.String({ description: "Market code: A, US, HK" })),
   start: Type.Optional(Type.String({ description: "Start date YYYY-MM-DD" })),
   end: Type.Optional(Type.String({ description: "End date YYYY-MM-DD" })),
-  source: Type.Optional(Type.String({ description: "Preferred data source: akshare (default) or tushare" })),
+  source: Type.Optional(Type.String({ description: "Optional override: akshare, tushare, llmquant-data, or financial-datasets. Defaults to /config." })),
 });
 
 const SearchSymbols = Type.Object({
@@ -55,7 +50,7 @@ function unsupported(symbol: string, market: string): AgentToolResult<unknown> {
 
 export const fetchBarsTool: AgentTool<typeof FetchBars> = {
   name: "fetch_bars",
-  description: "Fetch and cache local bars through AKShare. Best for A-share, index, and fund symbols.",
+  description: "Fetch and cache daily bars through the data source selected in /config. An explicit source overrides it for this call.",
   label: "Fetch Bars",
   parameters: FetchBars,
   executionMode: "sequential",
@@ -65,14 +60,14 @@ export const fetchBarsTool: AgentTool<typeof FetchBars> = {
       return unsupported(args.symbol, market);
     }
 
-    const source: DataSource = args.source === "tushare" ? "tushare" : "akshare";
+    const source: DataSource | undefined = isDataSource(args.source) ? args.source : undefined;
     const result = await fetchBars(args.symbol, market, args.start, args.end, source);
     if (result.bars.length === 0) {
       return ok(
         [
           `No daily bars were returned for ${args.symbol}.`,
           `Market     ${market}`,
-          "Source     akshare",
+          `Source     ${source || "configured source"}`,
           "Next       Check the symbol/date range, or run /config to verify the data source.",
         ].join("\n"),
         { symbol: args.symbol, market, source: "akshare", barCount: 0 },
@@ -122,18 +117,20 @@ export const searchSymbolsTool: AgentTool<typeof SearchSymbols> = {
 
 export const fetchSnapshotTool: AgentTool<typeof FetchSnapshot> = {
   name: "fetch_snapshot",
-  description: "Fetch a compact company or trading snapshot through direct data adapters.",
+  description: "Fetch a compact latest-price snapshot through the data source selected in /config.",
   label: "Snapshot",
   parameters: FetchSnapshot,
   executionMode: "sequential",
   async execute(_id: string, args: Static<typeof FetchSnapshot>): Promise<AgentToolResult<unknown>> {
     const market = (args.market || inferMarket(args.symbol)) as Market;
     let snapshot: Record<string, unknown>;
-    if (market === "A") {
-      snapshot = await fetchTushareSnapshot(args.symbol);
-    } else {
-      snapshot = await fetchFinancialDatasetsSnapshot(args.symbol);
-    }
+    // Tushare daily_basic requires a higher permission tier. Daily OHLCV is
+    // enough for a trading snapshot and uses the configured source/token.
+    const result = await fetchBars(args.symbol, market);
+    const latest = result.bars.at(-1);
+    snapshot = latest
+      ? { date: latest.date, open: latest.open, high: latest.high, low: latest.low, close: latest.close, volume: latest.volume, amount: latest.amount, source: result.source }
+      : {};
     const rows = Object.entries(snapshot)
       .filter(([, value]) => value != null && value !== "")
       .slice(0, 8)
@@ -159,3 +156,7 @@ export const DATA_TOOLS: AgentTool[] = [
   ...AKSHARE_INDEX_TOOLS,
   ...AKSHARE_FUND_TOOLS,
 ];
+
+function isDataSource(value: unknown): value is Exclude<DataSource, "auto"> {
+  return value === "akshare" || value === "tushare" || value === "llmquant-data" || value === "financial-datasets";
+}

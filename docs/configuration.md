@@ -12,8 +12,8 @@ WhyJ Quant 的配置单一真源是 `.ohquant/settings.json`。交互模式使�
 | Agent Runtime | `Thinking` | `thinkingLevel` | `high` | 推理深度：`off`、`minimal`、`low`、`medium`、`high`、`xhigh`。深度越高，通常延迟和 token 使用越高。 |
 | Agent Runtime | `Provider Key` | `env.WHYJ_QUANT_API_KEY` | 未配置 | 模型 provider 凭证。本地保存，界面只显示脱敏值。`WHYJ_QUANT_AUTH_TOKEN` 仅作为旧配置 fallback。 |
 | Agent Runtime | `Provider URL` | `env.WHYJ_QUANT_BASE_URL` | provider 默认值 | 模型端点。运行时根据 `/anthropic` 或 `/v1` 等端点形态选择 Anthropic Messages 或 OpenAI-compatible 协议。 |
-| Research Data | `Market Data` | `preferences.source` | `llmquant-data` | 首选行情 provider。Provider 失败时仍使用文档定义的市场与 source fallback 链。 |
-| Research Data | `Data Token` | 对应 `env.WHYJ_QUANT_*` key | 未配置 | 当前 Market Data provider 的凭证；AKShare 不需要 token。 |
+| Research Data | `Market Data` | `preferences.source` | `llmquant-data` | 首选行情 provider。保存后，Overview 面板、底部状态栏与 Agent 数据工具在下一次刷新或调用时共用同一份运行时 source 配置；Provider 失败时仍使用文档定义的 fallback 链。 |
+| Research Data | `Data Token` | 对应 `env.WHYJ_QUANT_*` key | 未配置 | 当前 Market Data provider 的凭证；AKShare 不需要 token。保存的 token 会注入 provider adapter，不会显示在面板、日志或工具结果中。 |
 | Research Data | `Active Portfolio` | `preferences.currentPortfolioFile` | `holdings.json` | Overview dock 使用的 symbol group。行情报价实时获取，不把个人持仓或仓位快照写入缓存。 |
 | Workspace Experience | `External Skills` | `skillIntegrations.external` | `false` | 开启后额外加载用户级 Codex、Claude、Agents 和 pi skills；项目量化 skills 始终加载。 |
 | Workspace Experience | `Overview Dock` | `showPortfolioPanel` | `true` | 显示右侧 Overview dock；关闭后 Analyzing 面板使用完整终端宽度。 |
@@ -29,6 +29,8 @@ WhyJ Quant 的配置单一真源是 `.ohquant/settings.json`。交互模式使�
 | `tushare` | A 股、基金 | `WHYJ_QUANT_TUSHARE_TOKEN` |
 | `llmquant-data` | 美股、港股 | `WHYJ_QUANT_LLMQUANT_API_KEY` |
 | `financial-datasets` | 美股价格与快照 | `WHYJ_QUANT_FINANCIAL_DATASETS_KEY` |
+
+Tushare 配置示例：将 `Market Data` 设为 `tushare`，并保存 `WHYJ_QUANT_TUSHARE_TOKEN`。日线和 symbol 搜索均会使用该 token；紧凑快照不会调用需要额外积分权限的 `daily_basic`，避免把权限错误误报为配置未生效。
 
 ## 规范化配置示例
 

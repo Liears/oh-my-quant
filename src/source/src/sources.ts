@@ -3,12 +3,12 @@
  */
 
 import { SOURCE_LABELS } from "./source-contracts.ts";
-import { fallbackSourceForMarket, pullBarsFromProviders } from "./source-providers.ts";
+import { fallbackSourceForMarket, normalizeBarSeries, pullBarsFromProviders } from "./source-providers.ts";
 import type { Bar, Market } from "../../types/data.ts";
 import type { DataSource, LiveFetchResult, PullSource, SourceFetchOptions, SourceRuntimeDeps } from "./source-contracts.ts";
 
 export { SOURCE_LABELS } from "./source-contracts.ts";
-export { pullBarsFromProviders, searchSymbols } from "./source-providers.ts";
+export { normalizeBarSeries, pullBarsFromProviders, searchSymbols } from "./source-providers.ts";
 export type {
   BarProviderAdapter,
   DataSource,
@@ -52,7 +52,7 @@ export async function fetchBars(
     const fresh = await deps.isCacheFresh(symbol, selected);
     if (fresh) {
       const cached = await deps.loadBars(symbol, selected);
-      const filtered = filterBarsByDate(cached, start, end);
+      const filtered = normalizeBarSeries(cached, start, end);
       if (filtered.length > 0) return { bars: filtered, source: selected };
     }
   }
@@ -60,12 +60,12 @@ export async function fetchBars(
   const pulled = await pullBarsFromProviders(symbol, market, start, end, selected, options.providers);
   if (pulled.bars.length > 0) {
     await deps.saveBars(symbol, pulled.source, pulled.bars);
-    return { bars: filterBarsByDate(pulled.bars, start, end), source: pulled.source };
+    return { bars: pulled.bars, source: pulled.source };
   }
 
   // Last resort: load any cached data
   for (const src of ["akshare", "tushare", "llmquant-data", "financial-datasets"]) {
-    const cached = filterBarsByDate(await deps.loadBars(symbol, src), start, end);
+    const cached = normalizeBarSeries(await deps.loadBars(symbol, src), start, end);
     if (cached.length > 0) return { bars: cached, source: src };
   }
 
@@ -114,9 +114,5 @@ function defaultSourceRuntimeDeps(): SourceRuntimeDeps {
 // --- Helpers ---
 
 export function filterBarsByDate(bars: Bar[], start?: string, end?: string): Bar[] {
-  return bars.filter((b) => {
-    if (start && b.date < start) return false;
-    if (end && b.date > end) return false;
-    return true;
-  });
+  return normalizeBarSeries(bars, start, end);
 }

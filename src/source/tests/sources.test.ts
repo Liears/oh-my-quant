@@ -79,6 +79,34 @@ describe("pullBarsFromProviders", () => {
     expect(result.bars[0]?.close).toBe(20);
   });
 
+  it("normalizes provider bars into a sorted, deduplicated daily series", async () => {
+    const result = await pullBarsFromProviders(
+      "000300.SH", "A", undefined, undefined, "akshare",
+      aShareProviders(async () => [
+        { ...SAMPLE_BARS[2]!, date: "20260608", close: 11 },
+        { ...SAMPLE_BARS[0]!, date: "2026-06-06T15:00:00+08:00", close: 10 },
+        { ...SAMPLE_BARS[2]!, date: "2026-06-08", close: 11.2 },
+      ], async () => []),
+    );
+    expect(result.bars.map((bar) => [bar.date, bar.close])).toEqual([
+      ["2026-06-06", 10],
+      ["2026-06-08", 11.2],
+    ]);
+  });
+
+  it("falls back when a provider ignores the requested date window", async () => {
+    const result = await pullBarsFromProviders(
+      "000300.SH", "A", "2026-06-07", "2026-06-08", "akshare",
+      aShareProviders(
+        async () => [{ ...SAMPLE_BARS[0]!, date: "2020-01-01" }],
+        async () => SAMPLE_BARS,
+      ),
+    );
+    expect(result.source).toBe("tushare");
+    expect(result.bars.map((bar) => bar.date)).toEqual(["2026-06-07", "2026-06-08"]);
+    expect(result.attempts.map((attempt) => attempt.status)).toEqual(["empty", "success"]);
+  });
+
   it("falls back after provider errors and empty results", async () => {
     const afterError = await pullBarsFromProviders(
       "000300.SH", "A", undefined, undefined, "tushare",

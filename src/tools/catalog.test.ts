@@ -11,13 +11,13 @@ import {
 
 describe("tool display catalog", () => {
   it("maps local data tools to provider-specific labels", () => {
-    expect(toolDisplayLabel("fetch_bars")).toBe("AKShare · Daily Bars");
+    expect(toolDisplayLabel("fetch_bars")).toBe("Market Data · Daily Bars");
     expect(toolDisplayLabel("search_symbols")).toBe("Tushare · Search");
     expect(toolDisplayLabel("unknown_tool")).toBe("unknown tool");
   });
 
   it("formats tool line with args", () => {
-    expect(formatToolLine("fetch_bars", "000300.SH")).toBe("AKShare · Daily Bars · 000300.SH");
+    expect(formatToolLine("fetch_bars", "000300.SH")).toBe("Market Data · Daily Bars · 000300.SH");
   });
 
   it("lists distinct data source prompts for config panel", () => {

@@ -36,10 +36,11 @@ export async function pullBarsFromProviders(
 export async function searchSymbols(
   keyword: string,
   market?: Market,
+  providerOptions: SourceProviderOptions = {},
 ): Promise<SymbolInfo[]> {
   if (market && market !== "A") return [];
   try {
-    return await searchTushareSymbols(keyword);
+    return await searchTushareSymbols(keyword, providerOptions.tushare);
   } catch {
     return [];
   }
@@ -55,7 +56,7 @@ async function tryProvider(
   request: Parameters<BarProviderAdapter["fetchBars"]>[0],
 ): Promise<{ bars: Bar[]; attempt: ProviderAttempt }> {
   try {
-    const bars = await provider.fetchBars(request);
+    const bars = normalizeBarSeries(await provider.fetchBars(request), request.start, request.end);
     return { bars, attempt: { source: id, status: bars.length > 0 ? "success" : "empty" } };
   } catch (error) {
     return { bars: [], attempt: { source: id, status: "error", error: providerErrorMessage(error) } };
@@ -88,7 +89,11 @@ function providerOrderFor(
   if (configured?.length) return orderedWithSelectedFirst(selected, configured);
 
   if (market === "A") {
-    return selected === "tushare" ? ["tushare", "akshare"] : ["akshare", "tushare"];
+    if (selected === "tushare") return ["tushare", "akshare"];
+    if (selected === "akshare" || selected === "auto") return ["akshare", "tushare"];
+    // Keep a deliberately selected cross-market provider first, then use the
+    // two A-share-native adapters as reliable fallbacks.
+    return orderedWithSelectedFirst(selected, ["akshare", "tushare"]);
   }
 
   const order: ProviderSource[] = [];
@@ -98,7 +103,43 @@ function providerOrderFor(
 
   if (selected === "llmquant-data" || market === "US" || market === "HK") add("llmquant-data");
   if (selected === "financial-datasets" || market === "US") add("financial-datasets");
+  // Financial Datasets can be explicitly selected for HK too; retain the
+  // generally available LLMQuant fallback when it has no coverage.
+  if (selected === "financial-datasets") add("llmquant-data");
   return order;
+}
+
+/** Convert provider output to one deterministic, ascending daily-bar series. */
+export function normalizeBarSeries(bars: readonly Bar[], start?: string, end?: string): Bar[] {
+  const byDate = new Map<string, Bar>();
+  for (const bar of bars) {
+    const date = normalizeDate(bar.date);
+    const normalized: Bar = {
+      ...bar,
+      date,
+      open: Number(bar.open),
+      high: Number(bar.high),
+      low: Number(bar.low),
+      close: Number(bar.close),
+      volume: Number(bar.volume),
+      amount: Number(bar.amount),
+    };
+    if (!date || !isValidBar(normalized)) continue;
+    if (start && date < start) continue;
+    if (end && date > end) continue;
+    byDate.set(date, normalized);
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function normalizeDate(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  if (/^\d{8}$/.test(raw)) return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+  return /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(0, 10) : "";
+}
+
+function isValidBar(bar: Bar): boolean {
+  return [bar.open, bar.high, bar.low, bar.close, bar.volume, bar.amount].every(Number.isFinite);
 }
 
 function orderedWithSelectedFirst(selected: DataSource, fallback: readonly ProviderSource[]): ProviderSource[] {

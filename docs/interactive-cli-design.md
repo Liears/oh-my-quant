@@ -42,7 +42,7 @@
 | 数据 | 本地 data adapter + `.ohquant/` 本地 JSON |
 | Schema | TypeBox（agent tool 参数） |
 | 构建 | `bun build src/index.ts --outdir dist --target bun` |
-| 测试 | `bun test src/` |
+| 测试 | `bun run test` |
 
 ---
 
@@ -346,7 +346,8 @@ pi-ai 边界（CLI 不应触碰）：
 ## 13. 测试与相关文档
 
 ```bash
-bun test src/     # session, context, cli, tui, storage, agent
+bun run test      # 仅发现 src 下的确定性项目测试
+bun run test:manual-artifacts  # 手动运行会写入 .ohquant 的 artifact 演示生成器
 ```
 
 | 文档 | 范围 |

@@ -38,7 +38,9 @@
     "check:architecture": "bun run scripts/check-architecture.ts",
     "typecheck": "bun run tsc --noEmit",
     "gen:insights": "bun run scripts/generate-insights.ts",
-    "test": "bun test src/",
+    "test": "bun run test:fence && bun test",
+    "test:fence": "bun run scripts/check-test-fence.ts",
+    "test:manual-artifacts": "bun test --path-ignore-patterns 'reference/**' src/artifact/test/gen-kline.test.ts src/artifact/test/gen-kc50.test.ts src/artifact/test/gen-fund.test.ts src/artifact/test/gen-fund-006265.test.ts src/artifact/test/gen-sst-all.test.ts src/artifact/test/gen-stock-300308.test.ts",
     "test:providers": "bun run scripts/provider-smoke.ts",
     "test:watch": "bun test --watch",
     "prepublishOnly": "bun run gen:insights && bun run build && bun run typecheck"

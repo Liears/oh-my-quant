@@ -15,7 +15,7 @@ export interface ToolDisplay {
 }
 
 const TOOL_DISPLAYS: Record<string, ToolDisplay> = {
-  fetch_bars: { label: "AKShare · Daily Bars", provider: "akshare" },
+  fetch_bars: { label: "Market Data · Daily Bars" },
   search_symbols: { label: "Tushare · Search", provider: "joinquant" },
   fetch_snapshot: { label: "Direct · Snapshot" },
   fetch_index_spot: { label: "AKShare · Index Spot", provider: "akshare" },

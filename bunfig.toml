@@ -4,3 +4,12 @@ frozen-lockfile = false
 
 [install.cache]
 dir = ".bun-cache"
+
+# `bun test` must only discover this repository's deterministic test suite.
+# Vendored/reference trees can use a different runner, and gen-* artifact files
+# are manual demo generators that write into .ohquant at module load time.
+[test]
+root = "src"
+pathIgnorePatterns = [
+  "**/gen-*.test.ts",
+]

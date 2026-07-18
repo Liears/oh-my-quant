@@ -53,12 +53,11 @@
   - `daily` — 股票日线
   - `fund_daily` — 基金/ETF 日线（`daily` 返回空时自动回退）
   - `stock_basic` — symbol 搜索
-  - `daily_basic` — 快照（PE/PB/市值）
 - 本地角色：
   - 当 `settings.preferences.source` 设为 `tushare` 时的 A 股首选 provider
   - 其他 source 配置下，AKShare 返回空或出错时的 A 股回退
   - `/search` 风格查找的 symbol 搜索
-  - A 股 symbol 的紧凑交易快照
+  - A 股日线与 symbol 搜索；紧凑快照由已成功获取的 bars 派生，不请求 `daily_basic`
 - 本地 wrapper 形态：
   - POST `https://api.tushare.pro`
   - body 包含 `api_name`、`token`、`params`、`fields`
@@ -247,10 +246,9 @@ Overview 在调用前保留 portfolio 的 instrument 语义：标记为 `fund` �
    - `search_symbols`
    - `fetch_snapshot`
 2. 这些工具 handler 调用 source 模块导出：
-   - `fetchBars(...)` — 支持 `source: "akshare" | "tushare"`
+   - `fetchBars(...)` — 使用当前保存的 source；调用参数显式指定 source 时优先
    - `searchSymbols(...)`
-   - `fetchTushareSnapshot(...)`
-   - `fetchFinancialDatasetsSnapshot(...)`
+   - `fetch_snapshot` 工具复用 `fetchBars(...)` 的最新 OHLCV；不把 Tushare `daily_basic` 作为默认路径
 3. source orchestrator 调度到具体的 provider
 
 ### 4.2 Prompt 注入
@@ -278,6 +276,8 @@ Overview 在调用前保留 portfolio 的 instrument 语义：标记为 `fund` �
 7. provider adapter 返回标准化的 `Bar[]`
 8. 工具结果发送回 harness event stream
 9. TUI 渲染工具行、结果文本和 Overview source attribution
+
+`AppRuntime` 在配置保存后重建 source runtime snapshot。Overview、底部状态栏和 Agent tools 都从该 snapshot 读取 source 选择与 provider 凭证，因此不会出现界面显示一个 source、工具仍使用旧 token 的分叉状态。
 
 ### 4.4 Overview 注入
 
@@ -312,6 +312,9 @@ Overview 在调用前保留 portfolio 的 instrument 语义：标记为 `fund` �
 - provider fallback order
 - 实时获取空窗口回退
 - source attribution 格式化
+- 配置保存后 source runtime snapshot 同步到 Agent tools 与 TUI
+- Tushare 日线/搜索使用配置 token，且快照路径不依赖 `daily_basic` 权限
+- HTTP 请求超时会作为可降级 provider error 交回 orchestrator
 
 ## 6. 维护规则
 

@@ -268,6 +268,10 @@ export class PanelController {
     return this.currentPortfolioName();
   }
 
+  activeDataSource(): string {
+    return this.currentSource();
+  }
+
   showPortfolioPanel(): boolean {
     return this.cfg?.showPortfolioPanel !== false;
   }

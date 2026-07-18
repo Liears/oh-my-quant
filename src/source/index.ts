@@ -45,6 +45,7 @@ export {
   filterBarsByDate,
   formatRefreshMinute,
   formatSourceLabels,
+  normalizeBarSeries,
   pullBarsFromProviders,
   searchSymbols,
 } from "./src/sources.ts";

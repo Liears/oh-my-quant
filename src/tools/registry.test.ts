@@ -29,7 +29,7 @@ describe("built-in tool registry", () => {
   it("finds tools and display metadata from the same registration", () => {
     expect(findBuiltinTool("check_risk")?.label).toBe("Risk");
     expect(builtinToolDisplay("check_risk")?.label).toBe("Quant.Risk");
-    expect(builtinToolDisplay("fetch_bars")?.provider).toBe("akshare");
+    expect(builtinToolDisplay("fetch_bars")?.provider).toBeUndefined();
     expect(builtinToolDisplay("fetch_index_spot")?.label).toBe("AKShare · Index Spot");
     expect(builtinToolDisplay("fetch_index_info")?.label).toBe("AKShare · Index Info");
     expect(builtinToolDisplay("fetch_index_constituents")?.label).toBe("AKShare · Index Constituents");

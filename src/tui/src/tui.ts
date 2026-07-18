@@ -359,6 +359,7 @@ export class QuantTui {
       if (result?.command) this.submitHandler?.(result.command);
       if (result?.restoreArtifact) this.artifactRestoreHandler?.(result.restoreArtifact);
       if (result?.refreshPanel) this.panelRefreshHandler?.();
+      this.state.source = this.panel.activeDataSource();
       if (result?.close) {
         const name = this.panel.activePortfolioName();
         const showPanel = this.panel.showPortfolioPanel();
