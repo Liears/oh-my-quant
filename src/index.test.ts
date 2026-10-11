@@ -16,6 +16,7 @@ function runCli(args: string[], envOverrides: Record<string, string | undefined>
       WHYJ_QUANT_BASE_URL: "https://api.deepseek.com/anthropic",
       WHYJ_QUANT_LLMQUANT_API_KEY: "test-data-key",
       WHYJ_DOCTOR_SKIP_NETWORK: "1",
+      WHYJ_PYTHON: join(ohq, "intentionally-missing-python.exe"),
       ...envOverrides,
     } as Record<string, string | undefined>;
     for (const [key, value] of Object.entries(env)) {
@@ -73,8 +74,11 @@ describe("CLI doctor command", () => {
         ready: true,
         auth: expect.any(Object),
         config: expect.any(Object),
-        hints: [],
+        hints: expect.arrayContaining([expect.stringMatching(/Python/)]),
       }),
+    }));
+    expect(body.data.phases).toContainEqual(expect.objectContaining({
+      phase: "tools", status: "fail", dependency: expect.objectContaining({ status: "missing-python" }),
     }));
     expect(body.data.auth.WHYJ_QUANT_API_KEY).toEqual(expect.objectContaining({
       available: true,

@@ -39,7 +39,10 @@ export async function installSkillRepository(root: string, repo: string, git: Sk
     if (updating) {
       if (lstatSync(target).isSymbolicLink() || !lstatSync(target).isDirectory()) throw new Error("Install location must be a repository directory, not a link or file.");
       const top = await command(["-C", target, "rev-parse", "--show-toplevel"], 10_000);
-      if (realpathSync(top) !== realpathSync(target)) throw new Error("Install location is not its own Git repository.");
+      // Windows may report the same directory using an 8.3 alias or different casing.
+      const topIdentity = statSync(top, { bigint: true });
+      const targetIdentity = statSync(target, { bigint: true });
+      if (topIdentity.dev !== targetIdentity.dev || topIdentity.ino !== targetIdentity.ino) throw new Error("Install location is not its own Git repository.");
       const origin = await command(["-C", target, "remote", "get-url", "origin"], 10_000);
       if (origin.replace(/\.git$/, "").toLowerCase() !== source.replace(/\.git$/, "").toLowerCase()) {
         throw new Error("Existing origin differs from the requested repository; the installation was preserved.");
