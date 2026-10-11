@@ -20,6 +20,7 @@ for (const name of ["index.html", "style.css"]) copyFileSync(resolve(desktop, "s
 copyFileSync(resolve(desktop, "node_modules/@xterm/xterm/css/xterm.css"), resolve(desktop, "dist/xterm.css"));
 copyFileSync(resolve(desktop, "assets/icon.ico"), resolve(desktop, "dist/icon.ico"));
 const child = Bun.spawn([process.execPath, "build", resolve(root, "src/index.ts"), "--compile", "--target=bun-windows-x64-baseline",
+  "--compile-executable-path", resolve(desktop, ".downloads/bun/bun-windows-x64-baseline/bun.exe"),
   "--outfile", resolve(desktop, "runtime/whyj.exe")], { cwd: root, stdout: "inherit", stderr: "inherit" });
 if (await child.exited !== 0) throw new Error("Standalone CLI build failed");
 mkdirSync(resolve(desktop, "runtime/notes/quant"), { recursive: true });
