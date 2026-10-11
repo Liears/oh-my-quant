@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const ROOT = process.env.WHYJ_RESOURCE_ROOT || resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 export interface InsightEntry {
   quote: string;

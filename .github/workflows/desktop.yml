@@ -1,0 +1,78 @@
+name: Windows desktop
+on:
+  push:
+    branches: [app]
+    paths-ignore: ['docs/**', 'README.md', 'CHANGELOG.md']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Set-Location desktop
+          bun install --frozen-lockfile
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node node_modules/electron/install.js
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Check CLI and desktop
+        run: |
+          bun run typecheck
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          bun run check:architecture
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          bun run test
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          bun run build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          bun run --cwd desktop typecheck
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Bundle runtimes and installer
+        run: |
+          ./desktop/scripts/prepare-runtime.ps1
+          bun run desktop:build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          bun run --cwd desktop dist:win
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Install and exercise the shipped application
+        run: |
+          $version = (Get-Content desktop/package.json | ConvertFrom-Json).version
+          $installer = (Resolve-Path "release/WhyJ-Quant-Setup-$version-win-x64.exe").Path
+          $installDir = Join-Path $env:RUNNER_TEMP 'WhyJ Quant installed'
+          $process = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDir") -PassThru -Wait -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          $env:WHYJ_SMOKE_EXE = Join-Path $installDir 'WhyJ Quant.exe'
+          if (-not (Test-Path $env:WHYJ_SMOKE_EXE)) { throw 'Installed executable missing' }
+          bun run --cwd desktop test:smoke
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Get-ChildItem release/*.exe | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content release/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-evidence
+          path: output/playwright/desktop
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            release/*.exe
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          compression-level: 0

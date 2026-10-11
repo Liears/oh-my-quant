@@ -26,3 +26,9 @@ skills/portfolio/data/sst_*.json
 
 # reference
 reference/
+# Desktop build products and local acceptance evidence
+desktop/runtime/
+desktop/.downloads/
+release/
+output/
+.playwright-cli/

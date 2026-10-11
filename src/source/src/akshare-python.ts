@@ -92,6 +92,8 @@ export function runPython(
 }
 
 function getPythonCandidates(): PythonCandidate[] {
+  // A desktop build pins its private interpreter; never silently use a host Python.
+  if (process.env.WHYJ_PYTHON) return [{ command: process.env.WHYJ_PYTHON, args: [] }];
   const root = packageRoot();
   const venvCandidates = process.platform === "win32"
     ? [

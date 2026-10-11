@@ -356,6 +356,19 @@ export class QuantTui {
         continue;
       }
       if (action.type === "discard") continue;
+      if (action.type === "paste") {
+        if (this.panel.isOpen()) {
+          for (const char of action.text.replace(/[\n\t]/g, " ")) {
+            this.handleKeyAction({ type: "key", name: "", char, ctrl: false, shift: false, meta: false });
+          }
+        } else {
+          this.inputBuf += action.text;
+          this.scrollRegion = "composer";
+          this.suggestionIdx = 0;
+        }
+        this.paint();
+        continue;
+      }
       this.handleKeyAction(action);
       this.paint();
     }

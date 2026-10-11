@@ -1,0 +1,47 @@
+{
+  "name": "whyj-quant-desktop",
+  "version": "1.3.0",
+  "private": true,
+  "description": "WhyJ Quant desktop research terminal",
+  "author": "yangjing",
+  "license": "MIT",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "bun run scripts/build.ts",
+    "typecheck": "tsc --noEmit",
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis --x64 --publish never",
+    "test:smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": { "node-pty": "1.1.0" },
+  "devDependencies": {
+    "@types/bun": "1.3.14",
+    "@xterm/xterm": "6.0.0",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-web-links": "0.12.0",
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3",
+    "playwright": "1.64.0",
+    "typescript": "5.9.3"
+  },
+  "trustedDependencies": ["electron"],
+  "build": {
+    "appId": "io.github.yangjingo.whyj-quant",
+    "productName": "WhyJ Quant",
+    "directories": { "output": "../release", "buildResources": "assets" },
+    "files": ["dist/**/*", "package.json", "node_modules/node-pty/**/*", "!node_modules/node-pty/prebuilds/linux-*", "!node_modules/node-pty/prebuilds/darwin-*", "!node_modules/node-pty/prebuilds/win32-arm64"],
+    "extraResources": [{ "from": "runtime", "to": "runtime", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] }],
+    "asarUnpack": ["node_modules/node-pty/**/*"],
+    "npmRebuild": false,
+    "win": { "target": "nsis", "icon": "assets/icon.ico", "artifactName": "WhyJ-Quant-Setup-${version}-win-${arch}.${ext}" },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

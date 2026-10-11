@@ -1,10 +1,9 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import manifest from "../package.json";
 import { AppRuntime, createInitialAppState } from "./app-runtime.ts";
 import { QuantTui } from "./tui/src/tui.ts";
 
 export async function startApp(): Promise<void> {
-  const initial = createInitialAppState(getPkgVersion());
+  const initial = createInitialAppState(manifest.version);
   let tui: QuantTui | null = null;
 
   const runtime = new AppRuntime({
@@ -81,13 +80,3 @@ export async function startApp(): Promise<void> {
     tui?.stop();
   });
 }
-
-function getPkgVersion(): string {
-  try {
-    const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8"));
-    return pkg.version || "1.2.0";
-  } catch {
-    return "1.2.0";
-  }
-}
-

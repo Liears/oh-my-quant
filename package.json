@@ -1,6 +1,6 @@
 {
   "name": "whyj-quant",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "type": "module",
   "description": "WhyJ Quant — Interactive AI-powered quantitative analysis terminal",
   "keywords": [
@@ -45,16 +45,20 @@
     "bench:model": "bun run scripts/measure-model.ts",
     "eval:research": "bun run scripts/evaluate-research.ts",
     "test:watch": "bun test --watch",
-    "prepublishOnly": "bun run gen:insights && bun run build && bun run typecheck"
+    "prepublishOnly": "bun run gen:insights && bun run build && bun run typecheck",
+    "desktop:build": "bun run --cwd desktop build",
+    "desktop:dist": "bun run desktop:build && bun run --cwd desktop dist:win"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "1.1.0",
     "@earendil-works/pi-ai": "1.1.0",
     "@mozilla/readability": "0.6.0",
+    "ignore": "7.0.12",
     "linkedom": "0.18.13",
     "proper-lockfile": "4.1.2",
     "strip-json-comments": "5.0.3",
-    "typebox": "1.3.7"
+    "typebox": "1.3.7",
+    "yaml": "2.9.1"
   },
   "devDependencies": {
     "@types/bun": "^1.2.0",
