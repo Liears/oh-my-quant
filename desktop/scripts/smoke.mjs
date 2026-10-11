@@ -95,6 +95,7 @@ try {
   page = await application.firstWindow();
   await waitFor(page, "WhyJ Quant v1.3.0");
   assert.equal(await page.locator("#font-reset").textContent(), "15px");
+  assert.equal(JSON.parse(readFileSync(settingsPath, "utf8")).preferences.marketColorScheme, "green-up");
   record("desktop preferences survive restart");
   // A window-close follows the same runtime shutdown as the user's title-bar X.
   await Promise.all([application.waitForEvent("close", { timeout: 15000 }),

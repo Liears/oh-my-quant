@@ -4,6 +4,11 @@ on:
     branches: [app]
     paths-ignore: ['docs/**', 'README.md', 'CHANGELOG.md']
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Publish the verified installer as a versioned GitHub Release
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -76,3 +81,23 @@ jobs:
             release/SHA256SUMS.txt
           if-no-files-found: error
           compression-level: 0
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_release
+    needs: windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: release
+      - name: Publish the tested installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./desktop/package.json').version")
+          cp desktop/RELEASE-NOTES.md release/notes.md
+          printf '\n验证记录：[Windows 构建与安装验收](%s/%s/actions/runs/%s)。\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >> release/notes.md
+          gh release create "v$version" release/*.exe release/SHA256SUMS.txt --target "$GITHUB_SHA" --title "WhyJ Quant Desktop $version" --notes-file release/notes.md --latest
