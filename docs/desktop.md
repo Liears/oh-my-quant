@@ -23,6 +23,8 @@
 
 ## 构建
 
+桌面首次创建配置时选择免 Token 的 AKShare；已经保存的数据源设置不会被覆盖。模型连接仍需配置用户自己的凭证。
+
 构建机器需要 Windows x64、Bun 1.3.14、Node、PowerShell 7、uv。最终用户不需要这些工具。
 
 ```powershell

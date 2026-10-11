@@ -5,7 +5,8 @@
  *   bun run src/index.ts                Interactive REPL
  *   bun run src/index.ts -- -c "/help"   One-shot command
  */
-import { migrateOldConfig, loadSettings } from "./storage/index.ts";
+import { migrateOldConfig, loadSettings, saveSettings, resolveSettingsPath } from "./storage/index.ts";
+import { existsSync } from "node:fs";
 import { parseCommand, executeCommand } from "./cli/registry.ts";
 import { COMMAND_CATALOG } from "./cli/catalog.ts";
 import { commandPreflight } from "./runtime/command-preflight.ts";
@@ -160,7 +161,12 @@ if (positional[0] === "doctor") {
 let settings: ReturnType<typeof loadSettings>;
 try {
   migrateOldConfig();
+  const initializeDesktop = process.env.WHYJ_DESKTOP === "1" && !existsSync(resolveSettingsPath());
   settings = loadSettings();
+  if (initializeDesktop) {
+    settings.preferences.source = "akshare";
+    saveSettings(settings);
+  }
 } catch (error) {
   const code = (error as NodeJS.ErrnoException).code;
   const message = code === "ESTORAGEFORMAT" || code === "ELOCKED"

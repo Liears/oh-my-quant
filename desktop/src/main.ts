@@ -56,6 +56,7 @@ function startTerminal(size: TerminalSize): void {
     PATH: [python, git, process.env.PATH || process.env.Path || ""].join(";"),
     TERM: "xterm-256color", COLORTERM: "truecolor", FORCE_COLOR: "3",
     OHQUANT_DIR: join(workspace, ".ohquant"), WHYJ_PYTHON: join(python, "python.exe"),
+    WHYJ_DESKTOP: "1",
     WHYJ_RESOURCE_ROOT: runtime, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8",
   });
   pendingBytes = 0;

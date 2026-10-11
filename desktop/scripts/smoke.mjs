@@ -52,8 +52,21 @@ try {
   await page.keyboard.press("Control+p");
   await waitFor(page, "Settings");
   await page.screenshot({ path: join(evidence, "settings.png") });
+  const settingsPath = join(home, "workspace/.ohquant/settings.json");
+  assert.equal(JSON.parse(readFileSync(settingsPath, "utf8")).preferences.source, "akshare");
+  for (let i = 0; i < 7; i++) await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await waitFor(page, "Green ↑ Red ↓");
+  assert.equal(JSON.parse(readFileSync(settingsPath, "utf8")).preferences.marketColorScheme, "green-up");
   await page.keyboard.press("Escape");
-  record("original help and settings keyboard navigation");
+  record("original help/settings, public AKShare first-run default and settings persistence");
+  for (const [command, title] of [["/portfolio", "Portfolios"], ["/resume", "Resume a previous session"], ["/artifact", "Artifacts"]]) {
+    await page.keyboard.type(command);
+    await page.keyboard.press("Enter");
+    await waitFor(page, title);
+    await page.keyboard.press("Escape");
+  }
+  record("portfolio, saved-session and research-report panels");
   await application.evaluate(async ({ clipboard }) => { await clipboard.writeText("中文桌面输入验证\n/exit"); });
   await page.keyboard.press("Control+v");
   await waitFor(page, "中文桌面输入验证");
@@ -91,6 +104,11 @@ try {
   const bounds = JSON.parse(readFileSync(join(home, "window.json"), "utf8"));
   assert.equal(bounds.width, 820);
   record("native window close and persisted window bounds");
+  const remaining = execFileSync(join(process.env.SystemRoot, "System32/WindowsPowerShell/v1.0/powershell.exe"),
+    ["-NoProfile", "-Command", "Get-CimInstance Win32_Process -Filter \"Name='whyj.exe'\" | Select-Object -ExpandProperty ProcessId"],
+    { windowsHide: true, encoding: "utf8", timeout: 20000 }).trim();
+  assert.equal(remaining, "", "The isolated test runner must have no orphaned WhyJ CLI processes");
+  record("no CLI process survives desktop shutdown");
   assert.deepEqual(errors, []);
   writeFileSync(join(evidence, "result.json"), JSON.stringify({ version: "1.3.0", executable: executable || "development", home, checks, at: new Date().toISOString() }, null, 2));
   console.log(`Evidence: ${evidence}`);
