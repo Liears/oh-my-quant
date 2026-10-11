@@ -25,11 +25,15 @@ export async function runFirstSource<T>(
   symbol: string,
   sourcePriority: string | undefined,
   candidates: SourceCandidate<T>[],
+  signal?: AbortSignal,
 ): Promise<SourceResult<T>> {
+  signal?.throwIfAborted();
   const attempts: SourceAttempt[] = [];
   for (const candidate of orderCandidates(candidates, sourcePriority)) {
+    signal?.throwIfAborted();
     try {
       const value = await candidate.fetch(symbol);
+      signal?.throwIfAborted();
       const hit = candidate.isHit(value);
       attempts.push({
         id: candidate.id,
@@ -40,6 +44,7 @@ export async function runFirstSource<T>(
       });
       if (hit) return { candidate, value, attempts };
     } catch (error) {
+      signal?.throwIfAborted();
       attempts.push({
         id: candidate.id,
         provider: candidate.provider,
@@ -56,12 +61,16 @@ export async function runAllSources<T>(
   symbol: string,
   sourcePriority: string | undefined,
   candidates: SourceCandidate<T>[],
+  signal?: AbortSignal,
 ): Promise<{ values: Array<{ candidate: SourceCandidate<T>; value: T }>; attempts: SourceAttempt[] }> {
+  signal?.throwIfAborted();
   const values: Array<{ candidate: SourceCandidate<T>; value: T }> = [];
   const attempts: SourceAttempt[] = [];
   for (const candidate of orderCandidates(candidates, sourcePriority)) {
+    signal?.throwIfAborted();
     try {
       const value = await candidate.fetch(symbol);
+      signal?.throwIfAborted();
       const hit = candidate.isHit(value);
       attempts.push({
         id: candidate.id,
@@ -72,6 +81,7 @@ export async function runAllSources<T>(
       });
       if (hit) values.push({ candidate, value });
     } catch (error) {
+      signal?.throwIfAborted();
       attempts.push({
         id: candidate.id,
         provider: candidate.provider,

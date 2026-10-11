@@ -5,9 +5,10 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { estimateTokens, estimateContextTokens, createAgent, resolveModelId, updateSessionCtx } from "../src/session.ts";
-import { JsonlSessionRepo } from "../src/pi/index.ts";
-import { NodeExecutionEnv } from "../src/pi/node.ts";
+import { estimateTokens, estimateContextTokens, createAgent, resolveModelId } from "../src/session.ts";
+import { JsonlSessionRepo } from "../src/session-runtime/index.ts";
+import { NodeExecutionEnv } from "../src/session-runtime/node.ts";
+import { reduceAgentState } from "../src/session-state.ts";
 
 let TEST_DIR = "";
 let TEST_SESSIONS_DIR = "";
@@ -622,18 +623,18 @@ describe("createAgent", () => {
 
     const harness = agent.harness as any;
     const model = agent.state.model;
-    await harness.emitOwn({
+    await harness.emitAny({
       type: "before_provider_request",
       model,
       sessionId: "s-1",
       streamOptions: {},
     });
-    await harness.emitOwn({
+    await harness.emitAny({
       type: "before_provider_payload",
       model,
       payload: { messages: [{ role: "user" }], tools: [{ name: "bash" }], max_tokens: 2048 },
     });
-    await harness.emitOwn({
+    await harness.emitAny({
       type: "after_provider_response",
       status: 200,
       headers: { "x-request-id": "req_1" },
@@ -774,6 +775,8 @@ describe("createAgent", () => {
 
     const captured: Record<string, string> = {};
     agent.harness = {
+      getModel: () => agent.state.model,
+      getThinkingLevel: () => agent.state.thinkingLevel,
       prompt: async (text: string) => { captured.prompt = text; },
       followUp: async (text: string) => { captured.followUp = text; },
       skill: async (name: string, text?: string, options?: { displayText?: string }) => {
@@ -785,7 +788,7 @@ describe("createAgent", () => {
     agent.ready = Promise.resolve();
 
     await agent.prompt("compare top 5 holdings and show a table");
-    updateSessionCtx({
+    agent.updateContext({
       recentToolState: {
         toolName: "check_risk",
         resultShape: "risk_metrics",
@@ -824,7 +827,7 @@ describe("createAgent", () => {
     }) as any;
     await agent.waitForIdle();
 
-    agent.reduceState({
+    reduceAgentState(agent.state, agent.sessionCtx, agent.state.tools, {
       type: "tool_execution_end",
       toolCallId: "dash-1",
       toolName: "show_dashboard",

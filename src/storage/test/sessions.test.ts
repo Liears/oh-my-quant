@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { listStoredSessions } from "../src/sessions.ts";
 
@@ -21,6 +21,38 @@ function encodeCwd(cwd: string): string {
 }
 
 describe("session storage summaries", () => {
+  it("excludes truncated transcripts without rewriting their recoverable bytes", () => {
+    const cwd = process.cwd();
+    const dir = join(OHQ, "sessions", encodeCwd(cwd));
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, "damaged.jsonl");
+    const text = JSON.stringify({ type: "session", version: 3, id: "damaged", timestamp: "2026-09-14T00:00:00Z", cwd }) + '\n{"type":"message","id":';
+    writeFileSync(path, text);
+    expect(listStoredSessions({ cwd })).toEqual([]);
+    expect(readFileSync(path, "utf8")).toBe(text);
+  });
+
+  it("excludes cycles, duplicate ids and missing parent or leaf references from the resume listing", () => {
+    const cwd = process.cwd();
+    const dir = join(OHQ, "sessions", encodeCwd(cwd));
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, "damaged.jsonl");
+    const header = { type: "session", version: 3, id: "damaged", timestamp: "2026-09-14T00:00:00Z", cwd };
+    const first = { type: "message", id: "first", parentId: null, timestamp: header.timestamp, message: { role: "user", content: "Original" } };
+    for (const last of [
+      { ...first, parentId: "first" },
+      { ...first, id: "second", parentId: "second" },
+      { ...first, id: "second", parentId: "missing" },
+      { ...first, id: "second", parentId: undefined },
+      { type: "leaf", id: "second", parentId: "first", targetId: "missing", timestamp: header.timestamp },
+    ]) {
+      const text = [header, first, last].map(value => JSON.stringify(value)).join("\n");
+      writeFileSync(path, text);
+      expect(listStoredSessions({ cwd })).toEqual([]);
+      expect(readFileSync(path, "utf8")).toBe(text);
+    }
+  });
+
   it("lists JSONL and legacy Markdown sessions with recent message previews", () => {
     const cwd = process.cwd();
     const jsonlDir = join(OHQ, "sessions", encodeCwd(cwd));

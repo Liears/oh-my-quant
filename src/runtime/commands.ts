@@ -33,7 +33,7 @@ export interface CommandResultRuntimeContext {
 }
 
 export function getRuntimeCommandInvocation(parsed: ParsedCommand): RuntimeCommandInvocation {
-  const isSkillInvoke = parsed.command === "skill" && Boolean(parsed.positional[0]) && !["list", "info"].includes(parsed.positional[0]!);
+  const isSkillInvoke = parsed.command === "skill" && Boolean(parsed.positional[0]) && !["list", "info", "install"].includes(parsed.positional[0]!);
   return {
     isSkillInvoke,
     isCompactCommand: parsed.command === "compact",
@@ -111,6 +111,7 @@ function applyCommandEffect(effect: CommandEffect, ctx: CommandResultRuntimeCont
 }
 
 function isPureLocalCommand(parsed: ParsedCommand): boolean {
+  if (parsed.command === "config" && parsed.flags.extensions !== undefined && parsed.flags.extensions !== true && parsed.flags.extensions !== "list") return false;
   if (parsed.command === "skill" && parsed.positional[0] && !["list", "info"].includes(parsed.positional[0])) return false;
   return isLocalSlashCommand(parsed.command);
 }

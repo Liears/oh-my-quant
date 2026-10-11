@@ -23,28 +23,88 @@ const BASELINE_PATH = join(ROOT, "scripts", "architecture-boundary-baseline.json
 
 const RULES: BoundaryRule[] = [
   {
+    id: "account-performance-is-private-and-transient",
+    from: ["account-performance"],
+    blockedTo: ["agent", "app", "artifact", "cli", "execution", "extensions", "runtime", "skill", "source", "storage", "tools", "tui", "research"],
+    reason: "Account performance uses an explicit read-only history adapter and pure calculations, never credential discovery, persistence or Agent/public report output.",
+  },
+  {
+    id: "private-account-data-stays-out-of-research",
+    from: ["agent", "artifact", "market", "quant", "research", "skill", "source", "storage", "tools", "tui", "types", "execution"],
+    blockedTo: ["account-performance"],
+    reason: "Private account performance may only be assembled by an explicit application host; research results and public market data cannot consume it.",
+  },
+  {
+    id: "alpha-consumes-explicit-inputs",
+    from: ["alpha"],
+    blockedTo: ["agent", "app", "artifact", "cli", "execution", "extensions", "runtime", "skill", "source", "storage", "tools", "tui", "research"],
+    reason: "Alpha engines receive fixed data and options; fetching, persistence, UI and live execution belong to other adapters.",
+  },
+  {
+    id: "lower-layers-do-not-run-alpha",
+    from: ["types", "quant", "market", "source", "storage", "tui", "execution"],
+    blockedTo: ["alpha"],
+    reason: "External alpha engines are orchestrated above shared contracts, pure calculations, persistence and rendering.",
+  },
+  {
+    id: "execution-is-an-explicit-port",
+    from: ["execution"],
+    blockedTo: ["agent", "app", "artifact", "cli", "extensions", "market", "quant", "runtime", "skill", "source", "storage", "tools", "tui", "research"],
+    reason: "Execution contracts use injected adapters and must not discover credentials, persist private state or call research/UI modules.",
+  },
+  {
+    id: "execution-stays-out-of-research-and-public-data",
+    from: ["agent", "artifact", "market", "quant", "research", "skill", "source", "storage", "tui", "types"],
+    blockedTo: ["execution"],
+    reason: "Private execution belongs to explicit application adapters, not research prompts, reports, public data or storage.",
+  },
+  {
+    id: "extension-host-is-independent",
+    from: ["extensions"],
+    blockedTo: ["app", "cli", "quant", "runtime", "skill", "source", "storage", "tools", "tui", "research"],
+    reason: "The extension host owns lifecycle and public contracts; application bindings stay in runtime.",
+  },
+  {
+    id: "research-is-independent-evidence",
+    from: ["research"],
+    blockedTo: ["agent", "app", "artifact", "cli", "runtime", "skill", "source", "tools", "tui"],
+    reason: "Research consumes journal snapshots and archived observations, not UI, live providers or the Agent loop.",
+  },
+  {
+    id: "lower-layers-do-not-own-research",
+    from: ["types", "storage", "quant", "source", "market", "tui"],
+    blockedTo: ["research"],
+    reason: "Research orchestration stays above shared types, persistence and pure calculations; UI consumes runtime projections.",
+  },
+  {
     id: "types-are-shared-contracts",
     from: ["types"],
-    blockedTo: ["agent", "app", "artifact", "cli", "quant", "skill", "source", "storage", "tools", "tui"],
+    blockedTo: ["agent", "app", "artifact", "cli", "quant", "runtime", "skill", "source", "storage", "tools", "tui"],
     reason: "src/types must stay provider/UI/runtime independent.",
   },
   {
     id: "storage-owns-persistence-only",
     from: ["storage"],
-    blockedTo: ["agent", "app", "artifact", "cli", "quant", "skill", "source", "tools", "tui"],
+    blockedTo: ["agent", "app", "artifact", "cli", "quant", "runtime", "skill", "source", "tools", "tui"],
     reason: "storage should expose persistence APIs without depending on higher-level modules.",
   },
   {
     id: "quant-core-is-pure",
     from: ["quant"],
-    blockedTo: ["agent", "app", "artifact", "cli", "skill", "source", "storage", "tools", "tui"],
+    blockedTo: ["agent", "app", "artifact", "cli", "runtime", "skill", "source", "storage", "tools", "tui"],
     reason: "quant core should stay pure and receive data/persistence through adapters.",
   },
   {
     id: "source-provider-boundary",
     from: ["source"],
-    blockedTo: ["agent", "app", "artifact", "cli", "quant", "skill", "storage", "tools", "tui"],
+    blockedTo: ["agent", "app", "artifact", "cli", "quant", "runtime", "skill", "storage", "tools", "tui"],
     reason: "source providers should not depend on UI, tools, agent, storage, or quant workflows.",
+  },
+  {
+    id: "market-normalization-is-pure",
+    from: ["market"],
+    blockedTo: ["agent", "app", "artifact", "cli", "quant", "runtime", "skill", "source", "storage", "tools", "tui"],
+    reason: "Market symbols, dates and bars should not depend on IO or orchestration.",
   },
   {
     id: "tui-is-render-adapter",
@@ -75,6 +135,7 @@ const RULES: BoundaryRule[] = [
 const WRITE_BASELINE = process.argv.includes("--write-baseline");
 
 function main(): void {
+  assertKernelDependencies();
   const violations = findViolations();
   const baseline = loadBaseline();
   if (WRITE_BASELINE) {
@@ -104,6 +165,20 @@ function main(): void {
   process.exitCode = 1;
 }
 
+function assertKernelDependencies(): void {
+  const manifest = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  const core = manifest.dependencies?.["@earendil-works/pi-agent-core"];
+  const ai = manifest.dependencies?.["@earendil-works/pi-ai"];
+  if (typeof core !== "string" || !/^\d+\.\d+\.\d+$/.test(core) || core !== ai) {
+    throw new Error("pi-agent-core and pi-ai must pin the same exact release.");
+  }
+  const config = JSON.parse(readFileSync(join(ROOT, "tsconfig.json"), "utf8"));
+  const paths = Object.keys(config.compilerOptions?.paths ?? {});
+  if (paths.some((path) => path.startsWith("@earendil-works/pi-"))) {
+    throw new Error("Do not shadow the installed pi kernel with a local TypeScript path alias.");
+  }
+}
+
 function findViolations(): Violation[] {
   const files = listTsFiles(SRC_ROOT);
   const violations: Violation[] = [];
@@ -111,12 +186,31 @@ function findViolations(): Violation[] {
     const source = readFileSync(file, "utf8");
     const fromModule = moduleOf(file);
     if (!fromModule) continue;
+    const implementationSpecifiers = new Set(importSpecifiers(source.replace(/\b(?:import|export)\s+type\b[^;]+;/gms, "")));
     violations.push(...findOhquantPathViolations(file, source, fromModule));
     for (const specifier of importSpecifiers(source)) {
+      const isCore = specifier === "@earendil-works/pi-agent-core" && implementationSpecifiers.has(specifier);
+      const isProvider = /^@earendil-works\/pi-ai\/(api|providers)\//.test(specifier);
+      const expected = isCore ? "src/agent/src/kernel/loop.ts" : "src/agent/src/kernel/llm.ts";
+      if ((isCore || isProvider) && toProjectPath(file) !== expected) {
+        const rule = "agent-kernel-owns-upstream-runtime";
+        violations.push({
+          rule, from: toProjectPath(file), to: expected, specifier,
+          reason: "Route upstream loop/provider implementations through the agent kernel boundary.",
+          key: [rule, toProjectPath(file), expected, specifier].join("|"),
+        });
+      }
       const target = resolveLocalImport(file, specifier);
       if (!target) continue;
       const toModule = moduleOf(target);
       if (!toModule || toModule === fromModule) continue;
+      if (toProjectPath(file) === "src/agent/src/session.ts" && ["storage", "tools", "source", "tui"].includes(toModule)) {
+        const rule = "session-consumes-injected-ports";
+        violations.push({ rule, from: toProjectPath(file), to: toProjectPath(target), specifier,
+          reason: "Bind concrete IO and builtin tools in session-dependencies, not the session facade.",
+          key: [rule, toProjectPath(file), toProjectPath(target), specifier].join("|"),
+        });
+      }
       for (const rule of RULES) {
         if (!rule.from.includes(fromModule) || !rule.blockedTo.includes(toModule)) continue;
         const violation = {
@@ -183,10 +277,11 @@ function importSpecifiers(source: string): string[] {
   const dynamicImportRe = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/gms;
   for (const match of source.matchAll(staticImportRe)) specifiers.add(match[1]!);
   for (const match of source.matchAll(dynamicImportRe)) specifiers.add(match[1]!);
-  return [...specifiers].filter((specifier) => specifier.startsWith("."));
+  return [...specifiers];
 }
 
 function resolveLocalImport(fromFile: string, rawSpecifier: string): string | null {
+  if (!rawSpecifier.startsWith(".")) return null;
   const specifier = rawSpecifier.split("?")[0]!;
   const base = resolve(dirname(fromFile), specifier);
   const candidates = [

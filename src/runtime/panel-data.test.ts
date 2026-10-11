@@ -32,7 +32,7 @@ describe("runtime panel data service", () => {
     expect(service.stripTerminalControlCodes(reloaded.env.WHYJ_QUANT_BASE_URL!)).toBe("https://api.example.com");
   });
 
-  it("removes orphaned reports before showing the Artifact panel", () => {
+  it("hides unavailable reports while retaining their snapshots for recovery", () => {
     const sessionId = "kept-session";
     const sessionDir = join(OHQ, "sessions", "--test--");
     mkdirSync(sessionDir, { recursive: true });
@@ -49,6 +49,6 @@ describe("runtime panel data service", () => {
     const reports = createStoragePanelDataService().listArtifacts();
 
     expect(reports.map((report) => report.sessionId)).toEqual(["kept-report"]);
-    expect(loadArtifact("orphan-report")).toBeNull();
+    expect(loadArtifact("orphan-report")).toBe("<html>orphan</html>");
   });
 });

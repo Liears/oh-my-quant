@@ -11,6 +11,8 @@ describe("built-in tool registry", () => {
   it("keeps a unique ordered list of enabled built-in tools", () => {
     const names = BUILTIN_TOOLS.map((tool) => tool.name);
     expect(names.slice(0, 3)).toEqual(["fetch_bars", "search_symbols", "fetch_snapshot"]);
+    expect(names).toContain("fetch_bars_archive");
+    expect(names).toContain("analyze_archived_bars");
     expect(names).toContain("fetch_index_spot");
     expect(names).toContain("fetch_index_info");
     expect(names).toContain("fetch_index_constituents");
@@ -29,6 +31,7 @@ describe("built-in tool registry", () => {
   it("finds tools and display metadata from the same registration", () => {
     expect(findBuiltinTool("check_risk")?.label).toBe("Risk");
     expect(builtinToolDisplay("check_risk")?.label).toBe("Quant.Risk");
+    expect(builtinToolDisplay("analyze_archived_bars")?.label).toBe("Quant.ArchiveAnalysis");
     expect(builtinToolDisplay("fetch_bars")?.provider).toBeUndefined();
     expect(builtinToolDisplay("fetch_index_spot")?.label).toBe("AKShare · Index Spot");
     expect(builtinToolDisplay("fetch_index_info")?.label).toBe("AKShare · Index Info");
@@ -44,6 +47,7 @@ describe("built-in tool registry", () => {
   it("groups registrations by domain", () => {
     const dataTools = listBuiltinToolRegistrations("data").map((entry) => entry.tool.name);
     expect(dataTools.slice(0, 3)).toEqual(["fetch_bars", "search_symbols", "fetch_snapshot"]);
+    expect(dataTools).toContain("fetch_bars_archive");
     expect(dataTools).toContain("fetch_index_spot");
     expect(dataTools).toContain("fetch_index_info");
     expect(dataTools).toContain("fetch_index_constituents");
@@ -51,6 +55,7 @@ describe("built-in tool registry", () => {
     expect(dataTools).toContain("akshare_fund_fund_overview_em");
     expect(dataTools).toContain("akshare_fund_fund_portfolio_hold_em");
     expect(listBuiltinToolRegistrations("quant").map((entry) => entry.tool.name)).toContain("fund_dca_backtest");
+    expect(listBuiltinToolRegistrations("quant").map((entry) => entry.tool.name)).toContain("analyze_archived_bars");
     expect(listBuiltinToolRegistrations("system").map((entry) => entry.tool.name)).toEqual(["bash"]);
   });
 });

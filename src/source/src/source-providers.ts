@@ -1,8 +1,16 @@
-import { fetchFromAKShare } from "./akshare.ts";
+import { normalizeBarSeries, validateDateRange } from "../../market/bars.ts";
+import { normalizeSymbol } from "../../market/symbols.ts";
+import { isSafeProviderEndpoint } from "../../market/provider-endpoint.ts";
+import { isPriceAdjustment } from "../../market/price-adjustment.ts";
+import { ProviderBudget } from "./provider-budget.ts";
+export { normalizeBarSeries } from "../../market/bars.ts";
+
+import { fetchFromAKShareDetailed } from "./akshare.ts";
+import { fetchFromAKShareGlobalDetailed } from "./akshare-global-bars.ts";
 import { fetchFromFinancialDatasets } from "./financial-datasets.ts";
 import { fetchFromLlmQuant } from "./llmquant.ts";
-import { fetchFromTushare, searchTushareSymbols } from "./tushare.ts";
-import type { Bar, Market, SymbolInfo } from "../../types/data.ts";
+import { fetchFromTushareDetailed, searchTushareSymbols } from "./tushare.ts";
+import type { Bar, Market, PriceAdjustment, SymbolInfo } from "../../types/data.ts";
 import type {
   BarProviderAdapter,
   DataSource,
@@ -20,16 +28,30 @@ export async function pullBarsFromProviders(
   end?: string,
   selected: DataSource = fallbackSourceForMarket(market),
   providerOptions: SourceProviderOptions = {},
+  sharedBudget?: ProviderBudget,
 ): Promise<PullBarsResult> {
+  validateDateRange(start, end);
   const normalized = normalizeSymbol(symbol, market);
-  const adapters = createProviderAdapters(providerOptions);
   const attempts: ProviderAttempt[] = [];
-  for (const id of providerOrderFor(market, selected, providerOptions.fallbackOrder)) {
-    const result = await tryProvider(id, adapters[id], { symbol: normalized, market, start, end });
-    attempts.push(result.attempt);
-    if (result.bars.length > 0) return { bars: result.bars, source: id, attempts };
+  const budget = sharedBudget ?? new ProviderBudget(providerOptions.signal, providerOptions.budgetMs);
+  const adapters = createProviderAdapters(providerOptions, budget);
+  try {
+    for (const id of providerOrderFor(market, selected, providerOptions.fallbackOrder)) {
+      if (budget.exhausted) break;
+      const result = await tryProvider(id, adapters[id], { symbol: normalized, market, start, end, signal: budget.signal }, budget);
+      if (budget.exhausted) {
+        attempts.push({ source: id, status: "error", error: "Provider request timed out" });
+        break;
+      }
+      attempts.push(result.attempt);
+      if (result.bars.length > 0) return { bars: result.bars, source: id, attempts,
+        ...(result.adjustment ? { adjustment: result.adjustment } : {}),
+        ...(result.providerEndpoint ? { providerEndpoint: result.providerEndpoint } : {}) };
+    }
+    return { bars: [], source: "unavailable", attempts, ...(budget.exhausted ? { budgetExhausted: true } : {}) };
+  } finally {
+    if (!sharedBudget) budget.close();
   }
-  return { bars: [], source: "unavailable", attempts };
 }
 
 /** Search symbols */
@@ -38,12 +60,21 @@ export async function searchSymbols(
   market?: Market,
   providerOptions: SourceProviderOptions = {},
 ): Promise<SymbolInfo[]> {
+  providerOptions.signal?.throwIfAborted();
   if (market && market !== "A") return [];
+  const budget = new ProviderBudget(providerOptions.signal, providerOptions.budgetMs);
   try {
-    return await searchTushareSymbols(keyword, providerOptions.tushare);
-  } catch {
-    return [];
-  }
+    const rows = await budget.run(async () => {
+      const credentials = await providerOptions.loadCredentials?.(budget.signal);
+      if (budget.exhausted) throw budget.signal?.reason;
+      return searchTushareSymbols(keyword, { ...credentials?.tushare, ...providerOptions.tushare, signal: budget.signal });
+    });
+    if (budget.exhausted) throw new Error("Provider request timed out");
+    return rows;
+  } catch (error) {
+    providerOptions.signal?.throwIfAborted();
+    throw new Error(providerErrorMessage(error));
+  } finally { budget.close(); }
 }
 
 export function fallbackSourceForMarket(market: Market): DataSource {
@@ -54,92 +85,63 @@ async function tryProvider(
   id: ProviderSource,
   provider: BarProviderAdapter,
   request: Parameters<BarProviderAdapter["fetchBars"]>[0],
-): Promise<{ bars: Bar[]; attempt: ProviderAttempt }> {
+  budget: ProviderBudget,
+): Promise<{ bars: Bar[]; attempt: ProviderAttempt; providerEndpoint?: string; adjustment?: PriceAdjustment }> {
   try {
-    const bars = normalizeBarSeries(await provider.fetchBars(request), request.start, request.end);
-    return { bars, attempt: { source: id, status: bars.length > 0 ? "success" : "empty" } };
+    const response = await budget.run(() => provider.fetchBars(request));
+    const adjustment = Array.isArray(response) ? undefined : response.adjustment;
+    if (adjustment !== undefined && !isPriceAdjustment(adjustment)) throw new Error("Provider response invalid: price adjustment");
+    const bars = normalizeBarSeries(Array.isArray(response) ? response : response.bars, request.start, request.end);
+    const endpoint = Array.isArray(response) ? null : response.endpoint;
+    const providerEndpoint = bars.length > 0 && isSafeProviderEndpoint(endpoint) ? endpoint : undefined;
+    return { bars, attempt: { source: id, status: bars.length > 0 ? "success" : "empty",
+      ...(providerEndpoint ? { providerEndpoint } : {}) }, ...(providerEndpoint ? { providerEndpoint } : {}),
+      ...(bars.length && adjustment ? { adjustment } : {}) };
   } catch (error) {
     return { bars: [], attempt: { source: id, status: "error", error: providerErrorMessage(error) } };
   }
 }
 
-function createProviderAdapters(options: SourceProviderOptions): Record<ProviderSource, BarProviderAdapter> {
+function createProviderAdapters(options: SourceProviderOptions, budget: ProviderBudget): Record<ProviderSource, BarProviderAdapter> {
+  type Credentials = Awaited<ReturnType<NonNullable<SourceProviderOptions["loadCredentials"]>>>;
+  let loaded: Promise<Credentials> | undefined;
+  const credentials = async (): Promise<Credentials> => {
+    loaded ??= Promise.resolve(options.loadCredentials?.(budget.signal) ?? {});
+    const snapshot = await loaded;
+    if (budget.exhausted) throw budget.signal?.reason;
+    return snapshot;
+  };
   return {
     akshare: options.adapters?.akshare ?? {
-      fetchBars: ({ symbol, start, end }) => fetchFromAKShare(symbol, start, end, options.akshare),
+      fetchBars: ({ symbol, market, start, end, signal }) => market === "A"
+        ? fetchFromAKShareDetailed(symbol, start, end, { ...options.akshare, signal })
+        : fetchFromAKShareGlobalDetailed(symbol, market, start, end, signal),
     },
     tushare: options.adapters?.tushare ?? {
-      fetchBars: ({ symbol, start, end }) => fetchFromTushare(symbol, start, end, options.tushare),
+      fetchBars: async ({ symbol, start, end, signal }) => fetchFromTushareDetailed(symbol, start, end,
+        { ...(await credentials()).tushare, ...options.tushare, signal }),
     },
     "llmquant-data": options.adapters?.["llmquant-data"] ?? {
-      fetchBars: ({ symbol, start, end }) => fetchFromLlmQuant(symbol, start, end, options.llmquant),
+      fetchBars: async ({ symbol, start, end, signal }) => fetchFromLlmQuant(symbol, start, end,
+        { ...(await credentials()).llmquant, ...options.llmquant, signal }),
     },
     "financial-datasets": options.adapters?.["financial-datasets"] ?? {
-      fetchBars: ({ symbol, start, end }) => fetchFromFinancialDatasets(symbol, start, end, options.financialDatasets),
+      fetchBars: async ({ symbol, start, end, signal }) => fetchFromFinancialDatasets(symbol, start, end,
+        { ...(await credentials()).financialDatasets, ...options.financialDatasets, signal }),
     },
   };
 }
 
-function providerOrderFor(
+export function providerOrderFor(
   market: Market,
   selected: DataSource,
-  overrides: SourceProviderOptions["fallbackOrder"],
+  overrides?: SourceProviderOptions["fallbackOrder"],
 ): ProviderSource[] {
-  const configured = overrides?.[market];
-  if (configured?.length) return orderedWithSelectedFirst(selected, configured);
-
-  if (market === "A") {
-    if (selected === "tushare") return ["tushare", "akshare"];
-    if (selected === "akshare" || selected === "auto") return ["akshare", "tushare"];
-    // Keep a deliberately selected cross-market provider first, then use the
-    // two A-share-native adapters as reliable fallbacks.
-    return orderedWithSelectedFirst(selected, ["akshare", "tushare"]);
-  }
-
-  const order: ProviderSource[] = [];
-  const add = (id: ProviderSource) => {
-    if (!order.includes(id)) order.push(id);
-  };
-
-  if (selected === "llmquant-data" || market === "US" || market === "HK") add("llmquant-data");
-  if (selected === "financial-datasets" || market === "US") add("financial-datasets");
-  // Financial Datasets can be explicitly selected for HK too; retain the
-  // generally available LLMQuant fallback when it has no coverage.
-  if (selected === "financial-datasets") add("llmquant-data");
-  return order;
-}
-
-/** Convert provider output to one deterministic, ascending daily-bar series. */
-export function normalizeBarSeries(bars: readonly Bar[], start?: string, end?: string): Bar[] {
-  const byDate = new Map<string, Bar>();
-  for (const bar of bars) {
-    const date = normalizeDate(bar.date);
-    const normalized: Bar = {
-      ...bar,
-      date,
-      open: Number(bar.open),
-      high: Number(bar.high),
-      low: Number(bar.low),
-      close: Number(bar.close),
-      volume: Number(bar.volume),
-      amount: Number(bar.amount),
-    };
-    if (!date || !isValidBar(normalized)) continue;
-    if (start && date < start) continue;
-    if (end && date > end) continue;
-    byDate.set(date, normalized);
-  }
-  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
-}
-
-function normalizeDate(value: unknown): string {
-  const raw = String(value ?? "").trim();
-  if (/^\d{8}$/.test(raw)) return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
-  return /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(0, 10) : "";
-}
-
-function isValidBar(bar: Bar): boolean {
-  return [bar.open, bar.high, bar.low, bar.close, bar.volume, bar.amount].every(Number.isFinite);
+  const supported: ProviderSource[] = market === "A" ? ["akshare", "tushare"]
+    : market === "US" ? ["llmquant-data", "financial-datasets", "akshare"] : ["llmquant-data", "akshare"];
+  const configured = overrides?.[market]?.filter(id => supported.includes(id));
+  const fallback = configured?.length ? configured : supported;
+  return orderedWithSelectedFirst(supported.includes(selected as ProviderSource) ? selected : "auto", fallback);
 }
 
 function orderedWithSelectedFirst(selected: DataSource, fallback: readonly ProviderSource[]): ProviderSource[] {
@@ -152,29 +154,22 @@ function orderedWithSelectedFirst(selected: DataSource, fallback: readonly Provi
 }
 
 function providerErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message
-    .replace(/(bearer\s+)[^\s]+/giu, "$1[redacted]")
-    .replace(/([?&](?:api[_-]?key|token|key)=)[^&\s]+/giu, "$1[redacted]")
-    .replace(/((?:api[_-]?key|token)\s*[:=]\s*)[^\s]+/giu, "$1[redacted]")
-    .replace(/[\r\n]+/g, " ")
-    .slice(0, 240);
-}
-
-/** Normalize bare 6-digit Chinese codes to exchange-suffixed format. */
-function normalizeSymbol(symbol: string, market: Market): string {
-  if (market !== "A") return symbol;
-  // Already suffixed
-  if (/\.(SH|SZ|BJ|OF)$/i.test(symbol)) return symbol;
-  // 6-digit bare code
-  if (/^\d{6}$/.test(symbol)) {
-    const prefix = symbol.charAt(0);
-    // Shanghai: 5xxxxx (funds), 6xxxxx (stocks), 68xxxx (STAR)
-    if (prefix === "5" || prefix === "6") return `${symbol}.SH`;
-    // Beijing: 8xxxxx, 4xxxxx
-    if (prefix === "8" || prefix === "4") return `${symbol}.BJ`;
-    // Shenzhen: 0xxxxx (funds), 1xxxxx (funds), 2xxxxx (stocks), 3xxxxx (ChiNext)
-    return `${symbol}.SZ`;
-  }
-  return symbol;
+  // Provider exceptions can contain arbitrary URLs, headers or response bodies.
+  // Only bounded categories may enter research errors and Agent/tool text.
+  let message: string;
+  try { message = error instanceof Error ? error.message : String(error); }
+  catch { return "Provider request failed"; }
+  const httpStatus = /\bHTTP\s+([1-5]\d{2})\b/i.exec(message)?.[1];
+  if (httpStatus) return `HTTP ${httpStatus}`;
+  if (/identity mismatch/i.test(message)) return "Provider identity mismatch";
+  if (/response truncated/i.test(message)) return "Provider response truncated";
+  if (/pagination invalid/i.test(message)) return "Provider pagination invalid";
+  if (/response invalid/i.test(message)) return "Provider response invalid";
+  if (/invalid.*token|token.*(?:invalid|无效)|认证失败/i.test(message)) return "Provider authentication failed";
+  if (/permission|权限|积分不足/i.test(message)) return "Provider permission denied";
+  if (/timed?\s*out|timeout/i.test(message)) return "Provider request timed out";
+  if (/not configured|missing.*credential/i.test(message)) return "Provider credential not configured";
+  if (/No module named|not installed|ENOENT/i.test(message)) return "Provider dependency unavailable";
+  if (/ECONNREFUSED|ECONNRESET|ENOTFOUND|network|offline/i.test(message)) return "Provider connection failed";
+  return "Provider request failed";
 }

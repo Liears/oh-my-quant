@@ -124,7 +124,7 @@ describe("artifact storage CRUD", () => {
     expect(listArtifacts()).toEqual([]);
   });
 
-  it("prunes reports with missing HTML, metadata, or source sessions", () => {
+  it("filters missing sources without destroying snapshots and keeps repairable HTML views", () => {
     saveArtifact("valid-report", "<html>valid</html>", { sourceSessionId: "valid-session" });
     saveArtifact("orphan-report", "<html>orphan</html>", { sourceSessionId: "missing-session" });
     saveArtifact("missing-html", "<html>gone</html>", { sourceSessionId: "valid-session" });
@@ -133,10 +133,10 @@ describe("artifact storage CRUD", () => {
 
     const result = pruneUnrestorableArtifacts(new Set(["valid-session"]));
 
-    expect(result.artifacts.map((artifact) => artifact.sessionId)).toEqual(["valid-report"]);
-    expect(result.removedIds.sort()).toEqual(["missing-html", "missing-meta", "orphan-report"]);
-    expect(loadArtifact("orphan-report")).toBeNull();
-    expect(loadArtifactMeta("missing-html")).toBeNull();
+    expect(result.artifacts.map((artifact) => artifact.sessionId).sort()).toEqual(["missing-html", "valid-report"]);
+    expect(result.removedIds).toEqual([]);
+    expect(loadArtifact("orphan-report")).toContain("orphan");
+    expect(loadArtifactMeta("missing-html")).not.toBeNull();
     expect(loadArtifact("missing-meta")).toBeNull();
   });
 });

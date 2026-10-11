@@ -1,0 +1,226 @@
+import { loadPanelPortfolio } from "../storage/index.ts";
+import { buildOverviewPanelSections, collectOverviewSymbols, MARKET_INDICES } from "./overview.ts";
+import type { OverviewPortfolio } from "./overview.ts";
+import { fetchOverviewQuotes, fetchOverviewHoldings, OverviewRequestPool } from "./overview-data.ts";
+import type { OverviewQuoteFetcher, OverviewHoldingFetcher, OverviewRequestTiming } from "./overview-data.ts";
+import type { OverviewQuote } from "./overview-data.ts";
+import type { PanelSection } from "../tui/src/types.ts";
+import { marketRefreshLoadingPanel, marketUnavailablePanel } from "./panel-service.ts";
+import { perfLog } from "../perf.ts";
+import { OverviewBudget } from "./overview-budget.ts";
+
+type Outcome = "success" | "partial" | "unavailable" | "timeout" | "error" | "superseded" | "disposed";
+export interface OverviewRefreshMeasurement {
+  generation: number;
+  outcome: Outcome;
+  queuedMs: number;
+  pullMs: number;
+  buildMs: number | null;
+  publishMs: number | null;
+  totalMs: number;
+  /** First current-generation panel containing a usable quote; not terminal flush latency. */
+  firstResultMs: number | null;
+  rows: number;
+  availableRows: number;
+  requests: OverviewRequestTiming[];
+}
+export interface OverviewRefreshOptions {
+  onPanel?: (sections: PanelSection[], loading: boolean) => void;
+  onMeasurement?: (measurement: OverviewRefreshMeasurement) => void | Promise<void>;
+  loadPortfolio?: () => OverviewPortfolio;
+  quoteFetcher?: OverviewQuoteFetcher;
+  holdingFetcher?: OverviewHoldingFetcher;
+  /** Injected pools must forward both signal and budget to preserve the production deadline. */
+  poolFactory?: (signal: AbortSignal, budget: OverviewBudget) => OverviewRequestPool;
+  timeoutMs?: number;
+  intervalMs?: number;
+}
+interface RefreshRun {
+  generation: number;
+  controller: AbortController;
+  promise: Promise<void>;
+  startedAt: number;
+  requestedAt: number;
+  superseded: boolean;
+}
+
+/** Owns refresh lifecycle independently of model/session operations and terminal rendering. */
+export class OverviewRefresh {
+  private readonly options: OverviewRefreshOptions;
+  private active: RefreshRun | null = null;
+  private queued: Promise<void> | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private generation = 0;
+  private disposed = false;
+  private sections: PanelSection[] = [];
+  private status: Outcome | "idle" | "fetching" = "idle";
+  private progress: { settled: number; total: number } | null = null;
+
+  constructor(options: OverviewRefreshOptions = {}) {
+    const timeout = options.timeoutMs ?? 120_000;
+    if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 2147483647) throw new Error("Overview timeout must be a positive timer-safe integer");
+    this.options = options;
+  }
+
+  /** Background triggers share an active refresh without asking for another one. */
+  start(): Promise<void> { return this.active?.promise ?? this.launch(performance.now()); }
+
+  /** Explicit refresh supersedes old inputs; concurrent requests share one follow-up. */
+  refresh(): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    if (this.queued) return this.queued;
+    if (!this.active) return this.launch(performance.now());
+    const requestedAt = performance.now(), run = this.active;
+    run.superseded = true;
+    this.queued = run.promise.then(() => {
+      this.queued = null;
+      return this.launch(requestedAt);
+    });
+    run.controller.abort(new Error("Overview inputs superseded"));
+    return this.queued;
+  }
+
+  render(): void {
+    if (this.disposed) return;
+    if (this.status === "idle") { this.options.onPanel?.(marketRefreshLoadingPanel(), true); return; }
+    const text = this.status === "fetching" ? (this.progress ? `fetching · ${this.progress.settled}/${this.progress.total} 已返回` : this.sections.length ? "fetching · 上次结果" : "fetching")
+      : this.status === "timeout" ? "timeout · 刷新超时"
+        : this.status === "error" ? "error · 刷新失败"
+          : this.status === "partial" ? "partial · 部分可用" : this.status === "unavailable" ? "unavailable · 无数据" : "";
+    const retained = (this.status === "error" || this.status === "timeout") && this.sections.length > 0 && !this.progress;
+    const panel: PanelSection[] = text ? [{ kind: "keyvalue", title: "Market Refresh", rows: [
+      { label: "status", value: text }, ...(retained ? [{ label: "数值", value: "stale · 保留上次结果" }] : []),
+      ...((this.status === "error" || this.status === "timeout") && this.progress
+        ? [{ label: "本轮", value: `${this.progress.settled}/${this.progress.total} 已返回 · 未返回项 --` }] : []),
+    ] }] : [];
+    panel.push(...structuredClone(this.sections.length ? this.sections : this.status === "fetching" ? [] : marketUnavailablePanel()));
+    this.options.onPanel?.(panel, this.status === "fetching");
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.active?.controller.abort(new Error("Overview disposed"));
+  }
+
+  private launch(requestedAt: number): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    if (this.active) return this.active.promise;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    let finish!: () => void;
+    const promise = new Promise<void>(resolve => { finish = resolve; });
+    const run: RefreshRun = { generation: ++this.generation, controller: new AbortController(), promise,
+      startedAt: performance.now(), requestedAt, superseded: false };
+    this.active = run;
+    void this.perform(run).catch(() => {}).finally(() => {
+      if (this.active === run) this.active = null;
+      const interval = this.options.intervalMs ?? 60_000;
+      if (!this.disposed && !this.queued && interval > 0) {
+        this.timer = setTimeout(() => { void this.start(); }, interval);
+        this.timer.unref();
+      }
+      finish();
+    });
+    return promise;
+  }
+
+  private async perform(run: RefreshRun): Promise<void> {
+    const { signal } = run.controller;
+    let pool: OverviewRequestPool | undefined, onAbort: (() => void) | undefined;
+    let outcome: Outcome = "error", rows = 0, availableRows = 0;
+    let pullMs = 0, buildMs: number | null = null, publishMs: number | null = null;
+    let firstResultMs: number | null = null;
+    let progressTimer: ReturnType<typeof setTimeout> | undefined;
+    let publishPartial: (() => boolean) | undefined;
+    const budget = new OverviewBudget(run.controller, run.startedAt, this.options.timeoutMs ?? 120_000);
+    try {
+      this.progress = null; this.status = "fetching"; this.render();
+      signal.throwIfAborted();
+      const portfolio = (this.options.loadPortfolio ?? loadPanelPortfolio)();
+      const portfolioSymbols = collectOverviewSymbols(portfolio);
+      budget.check();
+      pool = this.options.poolFactory?.(signal, budget) ?? new OverviewRequestPool({ signal, budget });
+      const meta = { sources: [], asOfDates: [], signal, pool };
+      let marketQuotes: OverviewQuote[] = MARKET_INDICES.map(entry => ({ ...entry, price: Number.NaN, pct: Number.NaN }));
+      let portfolioRows: OverviewQuote[] = portfolioSymbols.map(entry => ({ ...entry, price: Number.NaN, pct: Number.NaN }));
+      const settled = new Set<string>();
+      let publishQueued = false, publishedProgress = false;
+      const publish = () => {
+        if (this.disposed || this.active !== run || run.superseded || (signal.aborted && this.status === "fetching")) return;
+        if (this.status === "fetching") budget.check();
+        const all = [...marketQuotes, ...portfolioRows];
+        rows = all.length;
+        availableRows = all.filter(row => Number.isFinite(row.price) && Number.isFinite(row.pct)).length;
+        const began = performance.now();
+        this.sections = buildOverviewPanelSections({ portfolio, portfolioSymbols, marketQuotes, portfolioRows, pullMeta: meta, refreshedAt: new Date() });
+        buildMs = (buildMs ?? 0) + performance.now() - began;
+        this.progress = { settled: settled.size, total: rows };
+        const publishStarted = performance.now();
+        this.render(); publishMs = (publishMs ?? 0) + performance.now() - publishStarted;
+        if (availableRows && firstResultMs === null) firstResultMs = performance.now() - run.startedAt;
+      };
+      publishPartial = () => { if (!settled.size) return false; publish(); return true; };
+      const flushProgress = () => {
+        publishQueued = false; publishedProgress = true; progressTimer = undefined;
+        try { if (this.status === "fetching") publish(); }
+        catch { run.controller.abort(new Error("Overview progress publication failed")); }
+      };
+      const acceptRow = (target: OverviewQuote[], group: string, row: OverviewQuote, index: number) => {
+        if (this.disposed || this.active !== run || run.superseded || signal.aborted || this.status !== "fetching") return;
+        budget.check();
+        if (!Number.isInteger(index) || index < 0 || index >= target.length || row.code !== target[index]!.code) return;
+        target[index] = structuredClone(row); settled.add(`${group}/${index}`);
+        // Show the first result promptly, then coalesce bursts to at most one update per 16 ms.
+        if (!publishQueued) {
+          publishQueued = true;
+          if (publishedProgress) progressTimer = setTimeout(flushProgress, 16);
+          else queueMicrotask(flushProgress);
+        }
+      };
+      const data = Promise.all([
+        (this.options.quoteFetcher ?? fetchOverviewQuotes)(MARKET_INDICES, { ...meta, onRow: (row, index) => acceptRow(marketQuotes, "market", row, index) }),
+        (this.options.holdingFetcher ?? fetchOverviewHoldings)(portfolioSymbols, { ...meta, onRow: (row, index) => acceptRow(portfolioRows, "portfolio", row, index) }),
+      ]);
+      const completed = await Promise.race([data, new Promise<never>((_, reject) => {
+        onAbort = () => reject(signal.reason);
+        if (signal.aborted) onAbort(); else signal.addEventListener("abort", onAbort, { once: true });
+      })]);
+      pullMs = performance.now() - run.startedAt;
+      budget.check();
+      [marketQuotes, portfolioRows] = completed;
+      const all = [...marketQuotes, ...portfolioRows];
+      rows = all.length;
+      availableRows = all.filter(row => Number.isFinite(row.price) && Number.isFinite(row.pct)).length;
+      outcome = !availableRows ? "unavailable" : availableRows < rows || all.some(row => row.observation?.state === "outside-window") ? "partial" : "success";
+      if (!this.disposed && this.active === run && !run.superseded) {
+        this.status = outcome; publish();
+      }
+    } catch {
+      pullMs = performance.now() - run.startedAt;
+      outcome = this.disposed ? "disposed" : run.superseded ? "superseded" : budget.timedOut ? "timeout" : "error";
+      run.controller.abort(new Error("Overview refresh ended"));
+      if (!this.disposed && this.active === run && !run.superseded) {
+        this.status = outcome;
+        if (!publishPartial?.()) {
+          const publishStarted = performance.now();
+          this.render(); publishMs = (publishMs ?? 0) + performance.now() - publishStarted;
+        }
+      }
+    } finally {
+      budget.close();
+      if (progressTimer) clearTimeout(progressTimer);
+      if (onAbort) signal.removeEventListener("abort", onAbort);
+      pool?.close();
+      const measurement: OverviewRefreshMeasurement = { generation: run.generation, outcome,
+        queuedMs: run.startedAt - run.requestedAt, pullMs, buildMs, publishMs,
+        totalMs: performance.now() - run.startedAt, firstResultMs, rows, availableRows, requests: pool?.timings() ?? [] };
+      perfLog("runtime.market.refresh", run.startedAt, { generation: run.generation, outcome, rows, availableRows,
+        uniqueRequests: measurement.requests.length, pullMs, buildMs, publishMs });
+      if (!this.disposed) {
+        try { Promise.resolve(this.options.onMeasurement?.(structuredClone(measurement))).catch(() => {}); } catch { /* Diagnostics do not own refresh success. */ }
+      }
+    }
+  }
+}

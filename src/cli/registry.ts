@@ -3,6 +3,10 @@
  * / prefix → direct execution.  No prefix → AI Agent.
  */
 import { SLASH_COMMANDS } from "./catalog.ts";
+import { commandPreflight } from "../runtime/command-preflight.ts";
+import { isInstalledToolProbeSchemaQuery } from "../runtime/tool-probe-schema.ts";
+import { installedAkshareIndexSchemaResult } from "../runtime/installed-akshare-index-schema.ts";
+import { tokenizeSlashArguments } from "./arguments.ts";
 import {
   clearHandler,
   compactHandler,
@@ -29,9 +33,9 @@ export function isLocalSlashCommand(command: string): boolean {
 export function parseCommand(input: string): ParsedCommand | null {
   const trimmed = input.trim();
   if (!trimmed.startsWith("/")) return null;
-  const parts = trimmed.slice(1).split(/\s+/);
-  if (parts.length === 0 || !parts[0]) return null;
-  let command = parts[0];
+  const { tokens: parts, error } = tokenizeSlashArguments(trimmed.slice(1));
+  if (parts.length === 0) return null;
+  let command = parts[0]!.value;
   let colonArg = "";
   const colonIdx = command.indexOf(":");
   if (colonIdx > 0) {
@@ -39,27 +43,26 @@ export function parseCommand(input: string): ParsedCommand | null {
     command = command.slice(0, colonIdx);
   }
   if (command === "session") command = "resume";
-  const flags: Record<string, string | number | boolean> = {};
+  const flags: Record<string, string | number | boolean> = Object.create(null);
+  let argumentError = error ?? (!command ? "Missing command name." : undefined);
   const positional: string[] = colonArg ? [colonArg] : [];
   let i = 1;
   while (i < parts.length) {
-    const part = parts[i];
-    if (part.startsWith("--")) {
-      const key = part.slice(2);
-      if (i + 1 < parts.length && !parts[i + 1].startsWith("--")) {
-        i++; flags[key] = parts[i];
-      } else flags[key] = true;
-    } else if (/^-[A-Za-z]$/.test(part)) {
-      const key = part.slice(1);
-      if (i + 1 < parts.length && !parts[i + 1].startsWith("-")) {
-        i++; flags[key] = parts[i];
+    const { value: part, quoted } = parts[i]!;
+    const next = parts[i + 1];
+    const hasValue = next && (next.quoted || !next.value.startsWith("--") && !/^-[A-Za-z]$/.test(next.value));
+    if (!quoted && (part.startsWith("--") || /^-[A-Za-z]$/.test(part))) {
+      const key = part.slice(part.startsWith("--") ? 2 : 1);
+      if (Object.hasOwn(flags, key)) argumentError = `Duplicate option ${part}.`;
+      if (hasValue) {
+        i++; flags[key] = parts[i]!.value;
       } else flags[key] = true;
     } else {
       positional.push(part);
     }
     i++;
   }
-  return { command, raw: trimmed, flags, positional };
+  return { command, raw: trimmed, flags, positional, ...(argumentError ? { argumentError } : {}) };
 }
 
 const HANDLERS: Record<string, CommandHandler> = {
@@ -75,6 +78,9 @@ const HANDLERS: Record<string, CommandHandler> = {
 };
 
 export async function executeCommand(cmd: ParsedCommand, ctx: CommandContext = {}): Promise<CommandResult> {
+  const early = commandPreflight(cmd);
+  if (early) return early;
+  if (isInstalledToolProbeSchemaQuery(cmd)) return installedAkshareIndexSchemaResult(cmd.flags, cmd.positional, { signal: ctx.commandSignal });
   const { command, flags, positional } = cmd;
   if (command === "exit") return exitHandler();
   const handler = HANDLERS[command];

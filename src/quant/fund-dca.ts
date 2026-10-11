@@ -1,4 +1,5 @@
 import type { FundNavDaily } from "../types/data.ts";
+import { isDailyDate, validateDateRange } from "../market/bars.ts";
 
 export type DcaFrequency = "weekly" | "biweekly" | "monthly" | "quarterly";
 
@@ -9,6 +10,7 @@ export interface DcaBacktestOptions {
   investAmount?: number;
   investDay?: number;
   purchaseFeeRate?: number;
+  purchaseFeeUnit?: "decimal" | "percent" | "auto";
 }
 
 export interface DcaTradeRecord {
@@ -31,11 +33,14 @@ export interface DcaAccountPoint {
   marketValue: number;
   floatingProfit: number;
   returnRate: number;
+  /** Cash-flow-adjusted wealth index, starting at 1 before the first purchase fee. */
+  performanceIndex: number;
   drawdown: number;
   maxDrawdownToDate: number;
 }
 
 export interface DcaBacktestResult {
+  methodVersion: 2;
   plan: {
     startDate: string;
     endDate: string;
@@ -53,6 +58,7 @@ export interface DcaBacktestResult {
     finalMarketValue: number;
     profit: number;
     returnRate: number;
+    timeWeightedReturn: number;
     xirr: number | null;
     averageCost: number;
     breakevenNav: number;
@@ -65,19 +71,23 @@ export interface DcaBacktestResult {
 const DAY_MS = 86_400_000;
 
 export function runDcaBacktest(navRows: FundNavDaily[], options: DcaBacktestOptions = {}): DcaBacktestResult {
+  validateDcaOptions(options);
+  if (navRows.some(row => !isDailyDate(row.navDate) || !Number.isFinite(row.unitNav) || row.unitNav <= 0)
+    || new Set(navRows.map(row => row.navDate)).size !== navRows.length || new Set(navRows.map(row => row.fundCode)).size > 1) throw new Error("DCA requires valid, unique observations for one fund.");
   const rows = navRows
     .filter((row) => row.navDate && Number.isFinite(row.unitNav) && row.unitNav > 0)
     .sort((a, b) => a.navDate.localeCompare(b.navDate));
   if (rows.length === 0) throw new Error("No NAV rows available for DCA backtest.");
 
   const latest = rows[rows.length - 1]!;
-  const rawStartDate = options.startDate || shiftYears(latest.navDate, -5);
+  if ((options.startDate && options.startDate > latest.navDate) || (options.endDate && options.endDate < rows[0]!.navDate)) throw new Error("No NAV observations within requested dates.");
+  const endDate = options.endDate && options.endDate < latest.navDate ? options.endDate : latest.navDate;
+  const rawStartDate = options.startDate || shiftYears(endDate, -5);
   const startDate = normalizeStartDate(rawStartDate, rows[0]!.navDate, latest.navDate);
-  const endDate = clampDate(options.endDate || latest.navDate, startDate, latest.navDate);
   const frequency = options.frequency || "monthly";
   const investAmount = positive(options.investAmount, 1000);
   const investDay = Math.max(1, Math.floor(options.investDay || defaultInvestDay(frequency)));
-  const purchaseFeeRate = normalizeRate(options.purchaseFeeRate ?? 0);
+  const purchaseFeeRate = normalizeRate(options.purchaseFeeRate ?? 0, options.purchaseFeeUnit);
 
   const schedules = buildDcaSchedule(startDate, endDate, frequency, investDay);
   const navByDate = new Map(rows.map((row) => [row.navDate, row]));
@@ -112,6 +122,7 @@ export function runDcaBacktest(navRows: FundNavDaily[], options: DcaBacktestOpti
   }
 
   const accountCurve = buildAccountCurve(rows, trades, startDate, endDate);
+  if (!trades.length) throw new Error("No scheduled purchases within available NAV dates.");
   const finalPoint = accountCurve[accountCurve.length - 1];
   const finalMarketValue = finalPoint?.marketValue ?? 0;
   const profit = finalMarketValue - cumulativePrincipal;
@@ -119,6 +130,7 @@ export function runDcaBacktest(navRows: FundNavDaily[], options: DcaBacktestOpti
   if (finalPoint) cashflows.push({ date: finalPoint.date, amount: finalMarketValue });
 
   return {
+    methodVersion: 2,
     plan: { startDate, endDate, frequency, investAmount, investDay, purchaseFeeRate },
     summary: {
       tradeCount: trades.length,
@@ -129,6 +141,7 @@ export function runDcaBacktest(navRows: FundNavDaily[], options: DcaBacktestOpti
       finalMarketValue,
       profit,
       returnRate: cumulativePrincipal > 0 ? profit / cumulativePrincipal : 0,
+      timeWeightedReturn: finalPoint!.performanceIndex - 1,
       xirr: calculateXirr(cashflows),
       averageCost: cumulativeShares > 0 ? totalNetAmount / cumulativeShares : 0,
       breakevenNav: cumulativeShares > 0 ? cumulativePrincipal / cumulativeShares : 0,
@@ -140,6 +153,7 @@ export function runDcaBacktest(navRows: FundNavDaily[], options: DcaBacktestOpti
 }
 
 export function buildDcaSchedule(startDate: string, endDate: string, frequency: DcaFrequency, investDay: number): string[] {
+  validateDcaOptions({ startDate, endDate, frequency, investDay });
   const start = parseYmd(startDate);
   const end = parseYmd(endDate);
   let cursor = initialScheduleDate(start, frequency, investDay);
@@ -152,52 +166,70 @@ export function buildDcaSchedule(startDate: string, endDate: string, frequency: 
 }
 
 export function calculateXirr(cashflows: Array<{ date: string; amount: number }>): number | null {
-  if (cashflows.length < 2 || !cashflows.some((c) => c.amount < 0) || !cashflows.some((c) => c.amount > 0)) return null;
-  const start = parseYmd(cashflows[0]!.date).getTime();
-  const npv = (rate: number) => cashflows.reduce((sum, flow) => {
-    const years = (parseYmd(flow.date).getTime() - start) / DAY_MS / 365;
-    return sum + flow.amount / Math.pow(1 + rate, years);
-  }, 0);
-
-  let lo = -0.9999;
-  let hi = 10;
+  if (cashflows.length < 2 || cashflows.some(flow => !isDailyDate(flow.date) || !Number.isFinite(flow.amount))) return null;
+  const scale = cashflows.reduce((max, flow) => Math.max(max, Math.abs(flow.amount)), 0);
+  if (scale === 0) return null;
+  const byDate = new Map<string, number>();
+  for (const flow of cashflows) byDate.set(flow.date, (byDate.get(flow.date) ?? 0) + flow.amount / scale);
+  const flows = [...byDate].filter(([, amount]) => amount !== 0).sort(([a], [b]) => a.localeCompare(b));
+  if (flows.length < 2 || !flows.some(([, amount]) => amount < 0) || !flows.some(([, amount]) => amount > 0)) return null;
+  const start = parseYmd(flows[0]![0]).getTime();
+  const terms = flows.map(([date, amount]) => ({ sign: Math.sign(amount), logAmount: Math.log(Math.abs(amount)), years: (parseYmd(date).getTime() - start) / DAY_MS / 365 }));
+  // Solve in log(1 + rate), scaling every NPV evaluation to avoid overflow and amount-dependent tolerances.
+  const npv = (logRate: number) => {
+    const logs = terms.map(term => term.logAmount - logRate * term.years);
+    const max = logs.reduce((a, b) => Math.max(a, b), -Infinity);
+    return terms.reduce((sum, term, i) => sum + term.sign * Math.exp(logs[i]! - max), 0);
+  };
+  let lo = Math.log(Number.EPSILON / 2);
+  let hi = Math.log(Number.MAX_VALUE);
   let loVal = npv(lo);
-  let hiVal = npv(hi);
-  if (Math.sign(loVal) === Math.sign(hiVal)) return null;
-  for (let i = 0; i < 100; i++) {
+  if (Math.sign(loVal) === Math.sign(npv(hi))) return null;
+  for (let i = 0; i < 200; i++) {
     const mid = (lo + hi) / 2;
     const midVal = npv(mid);
-    if (Math.abs(midVal) < 1e-7) return mid;
+    if (midVal === 0 || hi - lo < 1e-13) {
+      const rate = Math.expm1(mid);
+      return Number.isFinite(rate) && rate > -1 ? rate : null;
+    }
     if (Math.sign(midVal) === Math.sign(loVal)) {
       lo = mid;
       loVal = midVal;
     } else {
       hi = mid;
-      hiVal = midVal;
     }
   }
-  return (lo + hi) / 2;
+  return null;
 }
 
 function buildAccountCurve(rows: FundNavDaily[], trades: DcaTradeRecord[], startDate: string, endDate: string): DcaAccountPoint[] {
   let tradeIndex = 0;
   let cumulativePrincipal = 0;
   let cumulativeShares = 0;
-  let peakValue = 0;
+  let previousNav: number | undefined;
+  let performanceIndex = 1;
+  let peakValue = 1;
   let maxDrawdownToDate = 0;
   const curve: DcaAccountPoint[] = [];
 
   for (const row of rows) {
     if (row.navDate < startDate || row.navDate > endDate) continue;
+    const valueBeforeFlow = cumulativeShares * row.unitNav;
+    let contribution = 0;
     while (tradeIndex < trades.length && trades[tradeIndex]!.tradeDate <= row.navDate) {
       const trade = trades[tradeIndex++]!;
+      contribution += trade.grossAmount;
       cumulativePrincipal = trade.cumulativePrincipal;
       cumulativeShares = trade.cumulativeShares;
     }
     if (cumulativePrincipal <= 0) continue;
     const marketValue = cumulativeShares * row.unitNav;
-    peakValue = Math.max(peakValue, marketValue);
-    const drawdown = peakValue > 0 ? marketValue / peakValue - 1 : 0;
+    // Value old shares before the flow, then isolate the purchase fee after the flow.
+    if (previousNav !== undefined) performanceIndex *= row.unitNav / previousNav;
+    if (contribution > 0) performanceIndex *= marketValue / (valueBeforeFlow + contribution);
+    previousNav = row.unitNav;
+    peakValue = Math.max(peakValue, performanceIndex);
+    const drawdown = performanceIndex / peakValue - 1;
     maxDrawdownToDate = Math.min(maxDrawdownToDate, drawdown);
     curve.push({
       date: row.navDate,
@@ -207,6 +239,7 @@ function buildAccountCurve(rows: FundNavDaily[], trades: DcaTradeRecord[], start
       marketValue,
       floatingProfit: marketValue - cumulativePrincipal,
       returnRate: marketValue / cumulativePrincipal - 1,
+      performanceIndex,
       drawdown,
       maxDrawdownToDate,
     });
@@ -259,19 +292,23 @@ function defaultInvestDay(frequency: DcaFrequency): number {
   return frequency === "weekly" || frequency === "biweekly" ? 1 : 1;
 }
 
-function normalizeRate(rate: number): number {
+function normalizeRate(rate: number, unit: DcaBacktestOptions["purchaseFeeUnit"] = "auto"): number {
   if (!Number.isFinite(rate) || rate <= 0) return 0;
-  return rate > 0.05 ? rate / 100 : rate;
+  return unit === "percent" || (unit === "auto" && rate > 0.05) ? rate / 100 : rate;
+}
+
+export function validateDcaOptions(options: DcaBacktestOptions): void {
+  validateDateRange(options.startDate, options.endDate);
+  const frequency = options.frequency ?? "monthly", day = options.investDay ?? 1;
+  if (!["weekly", "biweekly", "monthly", "quarterly"].includes(frequency)) throw new Error("Invalid DCA frequency.");
+  if (!Number.isInteger(day) || day < 1 || day > (["weekly", "biweekly"].includes(frequency) ? 7 : 31)) throw new Error("Invalid DCA investment day.");
+  if (options.investAmount !== undefined && (!Number.isFinite(options.investAmount) || options.investAmount <= 0)) throw new Error("DCA investment amount must be positive.");
+  if (options.purchaseFeeUnit !== undefined && !["decimal", "percent", "auto"].includes(options.purchaseFeeUnit)) throw new Error("Invalid DCA fee unit.");
+  if (options.purchaseFeeRate !== undefined && (!Number.isFinite(options.purchaseFeeRate) || options.purchaseFeeRate < 0 || normalizeRate(options.purchaseFeeRate, options.purchaseFeeUnit) >= 1)) throw new Error("Invalid DCA purchase fee.");
 }
 
 function positive(value: number | undefined, fallback: number): number {
   return value && Number.isFinite(value) && value > 0 ? value : fallback;
-}
-
-function clampDate(date: string, min: string, max: string): string {
-  if (date < min) return min;
-  if (date > max) return max;
-  return date;
 }
 
 function normalizeStartDate(date: string, firstNavDate: string, latestNavDate: string): string {
@@ -286,8 +323,8 @@ function daysBetween(a: string, b: string): number {
 
 function shiftYears(date: string, years: number): string {
   const d = parseYmd(date);
-  d.setUTCFullYear(d.getUTCFullYear() + years);
-  return formatYmd(d);
+  const year = d.getUTCFullYear() + years, month = d.getUTCMonth();
+  return formatYmd(new Date(Date.UTC(year, month, Math.min(d.getUTCDate(), lastDayOfMonth(year, month)))));
 }
 
 function parseYmd(value: string): Date {

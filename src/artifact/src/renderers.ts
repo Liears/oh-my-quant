@@ -6,6 +6,8 @@ import { esc } from "./template.ts";
 import type { KlineData, FactorBar, FactorSeries, Card, ScoreTable } from "./types.ts";
 import type { NavLineData } from "./detectors.ts";
 import { WHYJ_THEME } from "../../types/theme-colors.ts";
+import { displayedMovement, displayedNumber, movementTone } from "../../types/metric-semantics.ts";
+import { metricValueClass, tableValueClass } from "./semantic-colors.ts";
 
 // ── ECharts K-line render (multi-timeframe with tabs) ──
 
@@ -87,27 +89,27 @@ export function renderEchartsKline(kls: KlineData[]): string {
       <span class="tgl"><button class="tgl-btn on" onclick="toggleView(this,'chart')">Chart</button><button class="tgl-btn" onclick="toggleView(this,'raw')">Raw</button></span>
     </div>
     ${kpisHtml}
-    <div class="ec-body"><div id="${id}" class="kline-stage">${fallbackSvg}</div></div>
+    <div class="ec-body"><div id="${id}" class="kline-stage" role="region" aria-label="${esc(firstKl.timeframe || "日K")} K线图" tabindex="0">${fallbackSvg}</div></div>
     <div class="ec-raw"><pre>${rawText}</pre></div>
-    <details class="ind-glossary"><summary>指标说明</summary><div class="ig-body"><div class="ig-item"><span class="ig-name">K线</span><span class="ig-desc">蜡烛图, 显示开/收/高/低价, 阳线红涨阴线绿跌</span></div><div class="ig-item"><span class="ig-name">MA5(5日均)</span><span class="ig-desc">5日移动平均线, 反映超短期价格趋势</span></div><div class="ig-item"><span class="ig-name">MA10(10日均)</span><span class="ig-desc">10日移动平均线, 短期趋势参考</span></div><div class="ig-item"><span class="ig-name">MA20(20日均)</span><span class="ig-desc">20日移动平均线, 中期趋势生命线</span></div><div class="ig-item"><span class="ig-name">MA60(60日均)</span><span class="ig-desc">60日移动平均线, 长期趋势, 牛熊分界线</span></div><div class="ig-item"><span class="ig-name">DIF(快线)</span><span class="ig-desc">差离值 = EMA12 - EMA26, 反映短期动量</span></div><div class="ig-item"><span class="ig-name">DEA(慢线)</span><span class="ig-desc">信号线 = DIF的9日EMA, DIF上穿DEA为金叉看涨</span></div><div class="ig-item"><span class="ig-name">MACD(柱线)</span><span class="ig-desc">(DIF-DEA)*2, 红柱多头绿柱空头, 长短反映动能强弱</span></div><div class="ig-item"><span class="ig-name">Vol</span><span class="ig-desc">成交量, 放量上涨确认趋势, 缩量上涨警惕背离</span></div></div></details>
+    <details class="ind-glossary"><summary>指标说明</summary><div class="ig-body"><div class="ig-item"><span class="ig-name">K线</span><span class="ig-desc">蜡烛图, 显示开/收/高/低价, 收盘高于开盘为涨、低于为跌、相等为平；颜色约定见报告顶部</span></div><div class="ig-item"><span class="ig-name">MA5(5日均)</span><span class="ig-desc">5日移动平均线, 反映超短期价格趋势</span></div><div class="ig-item"><span class="ig-name">MA10(10日均)</span><span class="ig-desc">10日移动平均线, 短期趋势参考</span></div><div class="ig-item"><span class="ig-name">MA20(20日均)</span><span class="ig-desc">20日移动平均线, 中期趋势生命线</span></div><div class="ig-item"><span class="ig-name">MA60(60日均)</span><span class="ig-desc">60日移动平均线, 长期趋势, 牛熊分界线</span></div><div class="ig-item"><span class="ig-name">DIF(快线)</span><span class="ig-desc">差离值 = EMA12 - EMA26, 反映短期动量</span></div><div class="ig-item"><span class="ig-name">DEA(慢线)</span><span class="ig-desc">信号线 = DIF的9日EMA, DIF上穿DEA为金叉看涨</span></div><div class="ig-item"><span class="ig-name">MACD(柱线)</span><span class="ig-desc">(DIF-DEA)*2, 正柱与负柱表示动量方向，零值为中性, 长短反映动能强弱</span></div><div class="ig-item"><span class="ig-name">Vol</span><span class="ig-desc">成交量, 放量上涨确认趋势, 缩量上涨警惕背离</span></div></div></details>
   </div>
-  <script>(function(){var d=document.getElementById('${id}');if(!d||typeof echarts==='undefined')return;d.innerHTML='';var tfData=${json};var bm=${bmJson};var bm2=${bm2Json};var curTf='${esc(defaultTf)}';var ch=echarts.init(d,'dark');var up='${WHYJ_THEME.marketUp}',dn='${WHYJ_THEME.marketDown}',gold='${WHYJ_THEME.gold}',cream='${WHYJ_THEME.cream}',muted='${WHYJ_THEME.muted}',hairline='${WHYJ_THEME.hairline}',canvas='${WHYJ_THEME.canvas}';
+  <script>(function(){var d=document.getElementById('${id}');if(!d||typeof echarts==='undefined')return;d.innerHTML='';var tfData=${json};var bm=${bmJson};var bm2=${bm2Json};var curTf='${esc(defaultTf)}';var ch=echarts.init(d,'dark');var css=getComputedStyle(d);var up=css.getPropertyValue('--up').trim()||'${WHYJ_THEME.marketUp}',dn=css.getPropertyValue('--down').trim()||'${WHYJ_THEME.marketDown}',gold='${WHYJ_THEME.gold}',cream='${WHYJ_THEME.cream}',muted='${WHYJ_THEME.muted}',hairline='${WHYJ_THEME.hairline}',canvas='${WHYJ_THEME.canvas}';
 	function buildOption(c){
-	  var ohlcData=c.ohlc.map(function(d){return d});
+	  var ohlcData=c.ohlc.map(function(d){return d[0]===d[1]?{value:d,itemStyle:{color:muted,color0:muted,borderColor:muted,borderColor0:muted}}:d});
 	  var legendData=['K线','MA5(5日均)','MA10(10日均)','MA20(20日均)','MA60(60日均)','DIF(快线)','DEA(慢线)','MACD(柱线)'];
 	  var series=[
 	    {name:'K线',type:'candlestick',xAxisIndex:0,yAxisIndex:0,data:ohlcData,itemStyle:{color:up,color0:dn,borderColor:up,borderColor0:dn}},
 	    {name:'MA5(5日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma5,smooth:true,lineStyle:{color:cream,width:1},symbol:'none',connectNulls:false},
 	    {name:'MA10(10日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma10,smooth:true,lineStyle:{color:gold,width:1},symbol:'none',connectNulls:false},
-	    {name:'MA20(20日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma20,smooth:true,lineStyle:{color:up,width:1.2},symbol:'none',connectNulls:false},
-	    {name:'MA60(60日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma60,smooth:true,lineStyle:{color:dn,width:1},symbol:'none',connectNulls:false},
+	    {name:'MA20(20日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma20,smooth:true,lineStyle:{color:muted,width:1.2,type:'dashed'},symbol:'none',connectNulls:false},
+	    {name:'MA60(60日均)',type:'line',xAxisIndex:0,yAxisIndex:0,data:c.ma60,smooth:true,lineStyle:{color:gold,width:1,type:'dotted'},symbol:'none',connectNulls:false},
 	    {name:'DIF(快线)',type:'line',xAxisIndex:1,yAxisIndex:1,data:c.dif,smooth:true,lineStyle:{color:cream,width:1},symbol:'none',connectNulls:false},
 	    {name:'DEA(慢线)',type:'line',xAxisIndex:1,yAxisIndex:1,data:c.dea,smooth:true,lineStyle:{color:gold,width:1},symbol:'none',connectNulls:false},
-	    {name:'MACD(柱线)',type:'bar',xAxisIndex:1,yAxisIndex:1,data:c.macd.map(function(v,i){if(v===null)return'-';return{value:v,itemStyle:{color:v>=0?up:dn}}})}
+	    {name:'MACD(柱线)',type:'bar',xAxisIndex:1,yAxisIndex:1,data:c.macd.map(function(v,i){if(v===null)return'-';return{value:v,itemStyle:{color:v===0?muted:v>0?up:dn}}})}
 	  ];
 	  if(bm){legendData.push(bm.label);series.push({name:bm.label,type:'line',xAxisIndex:0,yAxisIndex:0,data:bm.closes,smooth:true,lineStyle:{color:'#F0D77A',width:2},symbol:'none',emphasis:{focus:'series',lineStyle:{width:3}},z:2,label:{show:true,position:'right',fontSize:8,color:'#F0D77A',formatter:function(p){return p.dataIndex===p.data.length-1?bm.label:''}}});} if(bm2){legendData.push(bm2.label);series.push({name:bm2.label,type:'line',xAxisIndex:0,yAxisIndex:0,data:bm2.closes,smooth:true,lineStyle:{color:'#5B9BD5',width:2},symbol:'none',emphasis:{focus:'series',lineStyle:{width:3}},z:2,label:{show:true,position:'right',fontSize:8,color:'#5B9BD5',formatter:function(p){return p.dataIndex===p.data.length-1?bm2.label:''}}});}
-	  if(c.hasVol){series.push({name:'Vol',type:'bar',xAxisIndex:2,yAxisIndex:2,data:c.vols.map(function(v,i){return{value:v,itemStyle:{color:ohlcData[i]&&ohlcData[i][1]>=ohlcData[i][0]?up:dn}}}),barWidth:'60%'});}
-	  return {animation:true,backgroundColor:'transparent',textStyle:{color:cream,fontFamily:'Cascadia Code,monospace'},tooltip:{trigger:'axis',backgroundColor:canvas,borderColor:hairline,textStyle:{color:cream},axisPointer:{type:'cross',lineStyle:{color:gold},crossStyle:{color:gold}}},legend:{data:legendData,bottom:0,textStyle:{fontSize:9,color:muted}},grid:[{left:'8%',right:'2%',top:'3%',height:'38%'},{left:'8%',right:'2%',top:'46%',height:'20%'},{left:'8%',right:'2%',top:'70%',height:'12%'}],xAxis:[{data:c.dates,gridIndex:0,axisLabel:{fontSize:9,color:muted},axisLine:{lineStyle:{color:hairline}}},{data:c.dates,gridIndex:1,axisLabel:{show:false},axisLine:{lineStyle:{color:hairline}},axisTick:{show:false}},{data:c.dates,gridIndex:2,axisLabel:{show:false},axisLine:{lineStyle:{color:hairline}},axisTick:{show:false}}],yAxis:[{gridIndex:0,scale:true,axisLabel:{fontSize:9,color:muted},splitLine:{lineStyle:{color:hairline,type:'dashed'}}},{gridIndex:1,axisLabel:{fontSize:8,color:muted},splitLine:{lineStyle:{color:hairline,type:'dashed'}}},{gridIndex:2,axisLabel:{fontSize:8,color:muted},splitLine:{show:false}}],dataZoom:[{type:'slider',xAxisIndex:[0,1,2],start:0,end:100,height:14,bottom:2,borderColor:hairline,backgroundColor:canvas,fillerColor:'rgba(232,179,57,0.12)',handleStyle:{color:gold},textStyle:{fontSize:8,color:muted}},{type:'inside',xAxisIndex:[0,1,2]}],series:series};
+	  if(c.hasVol){series.push({name:'Vol',type:'bar',xAxisIndex:2,yAxisIndex:2,data:c.vols.map(function(v,i){return{value:v,itemStyle:{color:!c.ohlc[i]||c.ohlc[i][1]===c.ohlc[i][0]?muted:c.ohlc[i][1]>c.ohlc[i][0]?up:dn}}}),barWidth:'60%'});}
+	  return {animation:true,backgroundColor:'transparent',textStyle:{color:cream,fontFamily:'Cascadia Code,monospace'},tooltip:{trigger:'axis',backgroundColor:canvas,borderColor:hairline,textStyle:{color:cream},axisPointer:{type:'cross',lineStyle:{color:gold},crossStyle:{color:gold}}},legend:{data:legendData,bottom:0,textStyle:{fontSize:9,color:muted}},grid:[{left:'8%',right:'2%',top:'3%',height:'38%'},{left:'8%',right:'2%',top:'46%',height:'20%'},{left:'8%',right:'2%',top:'70%',height:'12%'}],xAxis:[{data:c.dates,gridIndex:0,axisLabel:{fontSize:9,color:muted},axisLine:{lineStyle:{color:hairline}}},{data:c.dates,gridIndex:1,axisLabel:{show:false},axisLine:{lineStyle:{color:hairline}},axisTick:{show:false}},{data:c.dates,gridIndex:2,axisLabel:{show:false},axisLine:{lineStyle:{color:hairline}},axisTick:{show:false}}],yAxis:[{gridIndex:0,scale:true,axisLabel:{fontSize:9,color:muted},splitLine:{lineStyle:{color:hairline,type:'dashed'}}},{gridIndex:1,axisLabel:{fontSize:8,color:muted},splitLine:{lineStyle:{color:hairline,type:'dashed'}}},{gridIndex:2,axisLabel:{fontSize:8,color:muted},splitLine:{show:false}}],dataZoom:[{type:'slider',xAxisIndex:[0,1,2],start:0,end:100,height:14,bottom:2,borderColor:hairline,backgroundColor:canvas,fillerColor:'rgba(212,175,55,0.12)',handleStyle:{color:gold},textStyle:{fontSize:8,color:muted}},{type:'inside',xAxisIndex:[0,1,2]}],series:series};
 	}
 	ch.setOption(buildOption(tfData[curTf]||tfData['日K']));
 	// Timeframe tab switching
@@ -119,20 +121,20 @@ export function renderEchartsKline(kls: KlineData[]): string {
 function renderKlineKpis(kl: KlineData, series: ReturnType<typeof computeKlineSeries>): string {
   const last = kl.rows.at(-1)!;
   const previous = kl.rows.at(-2);
-  const change = previous && previous.close !== 0 ? (last.close - previous.close) / previous.close * 100 : 0;
+  const change = displayedMovement(previous && previous.close !== 0 ? (last.close - previous.close) / previous.close * 100 : null);
   const rangeHigh = Math.max(...kl.rows.map((row) => row.high));
   const rangeLow = Math.min(...kl.rows.map((row) => row.low));
   const ma5 = lastNumber(series.ma5);
   const ma20 = lastNumber(series.ma20);
   const macd = lastNumber(series.macd);
   const cards = [
-    ["最新价", formatPrice(last.close), change >= 0 ? "up" : "down"],
-    ["涨跌幅", `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`, change >= 0 ? "up" : "down"],
+    ["最新价", formatPrice(last.close), change.tone],
+    ["涨跌幅", change.text, change.tone],
     ["区间高点", formatPrice(rangeHigh), "neutral"],
     ["区间低点", formatPrice(rangeLow), "neutral"],
-    ["MA5", ma5 === null ? "—" : formatPrice(ma5), "gold"],
-    ["MA20", ma20 === null ? "—" : formatPrice(ma20), "up"],
-    ["MACD", macd === null ? "—" : macd.toFixed(2), macd !== null && macd >= 0 ? "up" : "down"],
+    ["MA5", ma5 === null ? "—" : formatPrice(ma5), ma5 === null ? "neutral" : "gold"],
+    ["MA20", ma20 === null ? "—" : formatPrice(ma20), "neutral"],
+    ["MACD", macd === null ? "—" : macd.toFixed(2), movementTone(macd === null ? null : Number(macd.toFixed(2)))],
   ];
   return `<div class="kline-kpis">${cards.map(([label, value, tone]) =>
     `<div class="kline-kpi"><span>${label}</span><b class="${tone}">${value}</b></div>`
@@ -173,8 +175,7 @@ function renderStaticKlineSvg(kl: KlineData, series: ReturnType<typeof computeKl
     const closeY = priceY(row.close);
     const highY = priceY(row.high);
     const lowY = priceY(row.low);
-    const rising = row.close >= row.open;
-    const cls = rising ? "k-up" : "k-down";
+    const cls = `k-${movementTone(row.close - row.open)}`;
     const bodyY = Math.min(openY, closeY);
     const bodyHeight = Math.max(1.5, Math.abs(openY - closeY));
     const volume = row.vol ?? 0;
@@ -236,9 +237,9 @@ export function renderEchartsBars(bars: FactorBar[]): string {
     </div>
     <div class="ec-body"><div id="${id}" style="width:100%;height:${Math.max(100, bars.length * 36)}px"></div></div>
     <div class="ec-raw"><pre>${rawText}</pre></div>
-    <details class="ind-glossary"><summary>指标说明</summary><div class="ig-body"><div class="ig-item"><span class="ig-name">K线</span><span class="ig-desc">蜡烛图, 显示开/收/高/低价, 阳线红涨阴线绿跌</span></div><div class="ig-item"><span class="ig-name">MA5(5日均)</span><span class="ig-desc">5日移动平均线, 反映超短期价格趋势</span></div><div class="ig-item"><span class="ig-name">MA10(10日均)</span><span class="ig-desc">10日移动平均线, 短期趋势参考</span></div><div class="ig-item"><span class="ig-name">MA20(20日均)</span><span class="ig-desc">20日移动平均线, 中期趋势生命线</span></div><div class="ig-item"><span class="ig-name">MA60(60日均)</span><span class="ig-desc">60日移动平均线, 长期趋势, 牛熊分界线</span></div><div class="ig-item"><span class="ig-name">DIF(快线)</span><span class="ig-desc">差离值 = EMA12 - EMA26, 反映短期动量</span></div><div class="ig-item"><span class="ig-name">DEA(慢线)</span><span class="ig-desc">信号线 = DIF的9日EMA, DIF上穿DEA为金叉看涨</span></div><div class="ig-item"><span class="ig-name">MACD(柱线)</span><span class="ig-desc">(DIF-DEA)*2, 红柱多头绿柱空头, 长短反映动能强弱</span></div><div class="ig-item"><span class="ig-name">Vol</span><span class="ig-desc">成交量, 放量上涨确认趋势, 缩量上涨警惕背离</span></div></div></details>
+    <details class="ind-glossary"><summary>指标说明</summary><div class="ig-body"><div class="ig-item"><span class="ig-name">K线</span><span class="ig-desc">蜡烛图, 显示开/收/高/低价, 收盘高于开盘为涨、低于为跌、相等为平；颜色约定见报告顶部</span></div><div class="ig-item"><span class="ig-name">MA5(5日均)</span><span class="ig-desc">5日移动平均线, 反映超短期价格趋势</span></div><div class="ig-item"><span class="ig-name">MA10(10日均)</span><span class="ig-desc">10日移动平均线, 短期趋势参考</span></div><div class="ig-item"><span class="ig-name">MA20(20日均)</span><span class="ig-desc">20日移动平均线, 中期趋势生命线</span></div><div class="ig-item"><span class="ig-name">MA60(60日均)</span><span class="ig-desc">60日移动平均线, 长期趋势, 牛熊分界线</span></div><div class="ig-item"><span class="ig-name">DIF(快线)</span><span class="ig-desc">差离值 = EMA12 - EMA26, 反映短期动量</span></div><div class="ig-item"><span class="ig-name">DEA(慢线)</span><span class="ig-desc">信号线 = DIF的9日EMA, DIF上穿DEA为金叉看涨</span></div><div class="ig-item"><span class="ig-name">MACD(柱线)</span><span class="ig-desc">(DIF-DEA)*2, 正柱与负柱表示动量方向，零值为中性, 长短反映动能强弱</span></div><div class="ig-item"><span class="ig-name">Vol</span><span class="ig-desc">成交量, 放量上涨确认趋势, 缩量上涨警惕背离</span></div></div></details>
   </div>
-  <script>(function(){var d=document.getElementById('${id}');if(!d||typeof echarts==='undefined')return;var c=${json};var ch=echarts.init(d,'dark');ch.setOption({animation:true,tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},grid:{left:'30%',right:'8%',top:'5%',bottom:'5%'},xAxis:{type:'value',axisLabel:{fontSize:10,color:'#A6A6A6'},splitLine:{lineStyle:{color:'#242424',type:'dashed'}}},yAxis:{type:'category',data:c.map(function(b){return b.label;}).reverse(),axisLabel:{fontSize:10,color:'#A6A6A6',fontFamily:'monospace'},axisLine:{lineStyle:{color:'#242424'}}},series:[{type:'bar',data:c.map(function(b){return{value:b.value,itemStyle:{color:b.value>=50?'#D4AF37':b.value>=30?'#E8B339':'#9B968C',borderRadius:[0,3,3,0]}}}),barMaxWidth:18,label:{show:true,position:'right',fontSize:10,color:'#A6A6A6',formatter:function(p){return p.value.toFixed(1)+'%';}}}]});window.addEventListener('resize',function(){ch.resize();});})();</script>`;
+  <script>(function(){var d=document.getElementById('${id}');if(!d||typeof echarts==='undefined')return;var c=${json};var ch=echarts.init(d,'dark');ch.setOption({animation:true,tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},grid:{left:'30%',right:'8%',top:'5%',bottom:'5%'},xAxis:{type:'value',axisLabel:{fontSize:10,color:'#A6A6A6'},splitLine:{lineStyle:{color:'#242424',type:'dashed'}}},yAxis:{type:'category',data:c.map(function(b){return b.label;}).reverse(),axisLabel:{fontSize:10,color:'#A6A6A6',fontFamily:'monospace'},axisLine:{lineStyle:{color:'#242424'}}},series:[{type:'bar',data:c.map(function(b){return{value:b.value,itemStyle:{color:b.value>=50?'#D4AF37':b.value>=30?'${WHYJ_THEME.goldHighlight}':'${WHYJ_THEME.muted}',borderRadius:[0,3,3,0]}}}),barMaxWidth:18,label:{show:true,position:'right',fontSize:10,color:'#A6A6A6',formatter:function(p){return p.value.toFixed(1)+'%';}}}]});window.addEventListener('resize',function(){ch.resize();});})();</script>`;
 }
 
 // ── Factor matrix render (compact table for 9+ factors) ──
@@ -277,14 +278,14 @@ export function renderFactorRadar(bars: FactorBar[]): string {
     </div>
     <div class="ec-body"><div id="${id}" style="width:100%;height:380px"></div></div>
     <div class="ec-raw"><pre>${rawText}</pre></div>
-    <details class="ind-glossary"><summary>指标说明</summary><div class="ig-body"><div class="ig-item"><span class="ig-name">K线</span><span class="ig-desc">蜡烛图, 显示开/收/高/低价, 阳线红涨阴线绿跌</span></div><div class="ig-item"><span class="ig-name">MA5(5日均)</span><span class="ig-desc">5日移动平均线, 反映超短期价格趋势</span></div><div class="ig-item"><span class="ig-name">MA10(10日均)</span><span class="ig-desc">10日移动平均线, 短期趋势参考</span></div><div class="ig-item"><span class="ig-name">MA20(20日均)</span><span class="ig-desc">20日移动平均线, 中期趋势生命线</span></div><div class="ig-item"><span class="ig-name">MA60(60日均)</span><span class="ig-desc">60日移动平均线, 长期趋势, 牛熊分界线</span></div><div class="ig-item"><span class="ig-name">DIF(快线)</span><span class="ig-desc">差离值 = EMA12 - EMA26, 反映短期动量</span></div><div class="ig-item"><span class="ig-name">DEA(慢线)</span><span class="ig-desc">信号线 = DIF的9日EMA, DIF上穿DEA为金叉看涨</span></div><div class="ig-item"><span class="ig-name">MACD(柱线)</span><span class="ig-desc">(DIF-DEA)*2, 红柱多头绿柱空头, 长短反映动能强弱</span></div><div class="ig-item"><span class="ig-name">Vol</span><span class="ig-desc">成交量, 放量上涨确认趋势, 缩量上涨警惕背离</span></div></div></details>
+    <details class="ind-glossary"><summary>指标说明</summary><div class="ig-body"><div class="ig-item"><span class="ig-name">K线</span><span class="ig-desc">蜡烛图, 显示开/收/高/低价, 收盘高于开盘为涨、低于为跌、相等为平；颜色约定见报告顶部</span></div><div class="ig-item"><span class="ig-name">MA5(5日均)</span><span class="ig-desc">5日移动平均线, 反映超短期价格趋势</span></div><div class="ig-item"><span class="ig-name">MA10(10日均)</span><span class="ig-desc">10日移动平均线, 短期趋势参考</span></div><div class="ig-item"><span class="ig-name">MA20(20日均)</span><span class="ig-desc">20日移动平均线, 中期趋势生命线</span></div><div class="ig-item"><span class="ig-name">MA60(60日均)</span><span class="ig-desc">60日移动平均线, 长期趋势, 牛熊分界线</span></div><div class="ig-item"><span class="ig-name">DIF(快线)</span><span class="ig-desc">差离值 = EMA12 - EMA26, 反映短期动量</span></div><div class="ig-item"><span class="ig-name">DEA(慢线)</span><span class="ig-desc">信号线 = DIF的9日EMA, DIF上穿DEA为金叉看涨</span></div><div class="ig-item"><span class="ig-name">MACD(柱线)</span><span class="ig-desc">(DIF-DEA)*2, 正柱与负柱表示动量方向，零值为中性, 长短反映动能强弱</span></div><div class="ig-item"><span class="ig-name">Vol</span><span class="ig-desc">成交量, 放量上涨确认趋势, 缩量上涨警惕背离</span></div></div></details>
   </div>
   <script>(function(){var d=document.getElementById('${id}');if(!d||typeof echarts==='undefined')return;var c=${json};var ch=echarts.init(d,'dark');ch.setOption({tooltip:{trigger:'item'},radar:{indicator:c.indicators,center:['50%','55%'],radius:'65%',axisName:{fontSize:9,color:'#A6A6A6'},splitArea:{areaStyle:{color:['rgba(255,255,255,0.02)','rgba(255,255,255,0.04)']}},splitLine:{lineStyle:{color:'#242424'}},axisLine:{lineStyle:{color:'#242424'}}},series:[{type:'radar',data:[{value:c.values,name:'Score',areaStyle:{color:'rgba(212,175,55,0.15)'},lineStyle:{color:'#D4AF37',width:1.5},itemStyle:{color:'#D4AF37'}}],symbol:'circle',symbolSize:4,emphasis:{lineStyle:{width:2.5},areaStyle:{color:'rgba(212,175,55,0.25)'}}}]});window.addEventListener('resize',function(){ch.resize();});})();</script>`;
 }
 
 // ── Multi-series comparison radar ──
 
-export const COMPARE_COLORS = ["#D4AF37", "#E8B339", "#E5494D", "#1E9F4D", "#5DB8A6", "#CC785C", "#9B968C", "#F5F5F5"];
+export const COMPARE_COLORS = [WHYJ_THEME.gold, WHYJ_THEME.goldHighlight, "#E5494D", "#1E9F4D", "#5DB8A6", "#CC785C", "#9B968C", "#F5F5F5"];
 
 export function renderComparisonRadar(series: FactorSeries[]): string {
   // Use common factors across all series
@@ -314,7 +315,7 @@ export function renderComparisonRadar(series: FactorSeries[]): string {
     </div>
     <div class="ec-body"><div id="${id}" style="width:100%;height:400px"></div></div>
     <div class="ec-raw"><pre>${rawText}</pre></div>
-    <details class="ind-glossary"><summary>指标说明</summary><div class="ig-body"><div class="ig-item"><span class="ig-name">K线</span><span class="ig-desc">蜡烛图, 显示开/收/高/低价, 阳线红涨阴线绿跌</span></div><div class="ig-item"><span class="ig-name">MA5(5日均)</span><span class="ig-desc">5日移动平均线, 反映超短期价格趋势</span></div><div class="ig-item"><span class="ig-name">MA10(10日均)</span><span class="ig-desc">10日移动平均线, 短期趋势参考</span></div><div class="ig-item"><span class="ig-name">MA20(20日均)</span><span class="ig-desc">20日移动平均线, 中期趋势生命线</span></div><div class="ig-item"><span class="ig-name">MA60(60日均)</span><span class="ig-desc">60日移动平均线, 长期趋势, 牛熊分界线</span></div><div class="ig-item"><span class="ig-name">DIF(快线)</span><span class="ig-desc">差离值 = EMA12 - EMA26, 反映短期动量</span></div><div class="ig-item"><span class="ig-name">DEA(慢线)</span><span class="ig-desc">信号线 = DIF的9日EMA, DIF上穿DEA为金叉看涨</span></div><div class="ig-item"><span class="ig-name">MACD(柱线)</span><span class="ig-desc">(DIF-DEA)*2, 红柱多头绿柱空头, 长短反映动能强弱</span></div><div class="ig-item"><span class="ig-name">Vol</span><span class="ig-desc">成交量, 放量上涨确认趋势, 缩量上涨警惕背离</span></div></div></details>
+    <details class="ind-glossary"><summary>指标说明</summary><div class="ig-body"><div class="ig-item"><span class="ig-name">K线</span><span class="ig-desc">蜡烛图, 显示开/收/高/低价, 收盘高于开盘为涨、低于为跌、相等为平；颜色约定见报告顶部</span></div><div class="ig-item"><span class="ig-name">MA5(5日均)</span><span class="ig-desc">5日移动平均线, 反映超短期价格趋势</span></div><div class="ig-item"><span class="ig-name">MA10(10日均)</span><span class="ig-desc">10日移动平均线, 短期趋势参考</span></div><div class="ig-item"><span class="ig-name">MA20(20日均)</span><span class="ig-desc">20日移动平均线, 中期趋势生命线</span></div><div class="ig-item"><span class="ig-name">MA60(60日均)</span><span class="ig-desc">60日移动平均线, 长期趋势, 牛熊分界线</span></div><div class="ig-item"><span class="ig-name">DIF(快线)</span><span class="ig-desc">差离值 = EMA12 - EMA26, 反映短期动量</span></div><div class="ig-item"><span class="ig-name">DEA(慢线)</span><span class="ig-desc">信号线 = DIF的9日EMA, DIF上穿DEA为金叉看涨</span></div><div class="ig-item"><span class="ig-name">MACD(柱线)</span><span class="ig-desc">(DIF-DEA)*2, 正柱与负柱表示动量方向，零值为中性, 长短反映动能强弱</span></div><div class="ig-item"><span class="ig-name">Vol</span><span class="ig-desc">成交量, 放量上涨确认趋势, 缩量上涨警惕背离</span></div></div></details>
   </div>
   <script>(function(){var d=document.getElementById('${id}');if(!d||typeof echarts==='undefined')return;var ch=echarts.init(d,'dark');ch.setOption({tooltip:{trigger:'item'},legend:{data:${JSON.stringify(series.map(s=>s.name))},bottom:0,textStyle:{fontSize:9,color:'#A6A6A6'}},radar:{indicator:${JSON.stringify(indicators)},center:['50%','48%'],radius:'58%',axisName:{fontSize:9,color:'#A6A6A6'},splitArea:{areaStyle:{color:['rgba(255,255,255,0.02)','rgba(255,255,255,0.04)']}},splitLine:{lineStyle:{color:'#242424'}},axisLine:{lineStyle:{color:'#242424'}}},series:[{type:'radar',data:[${radarData.map((d,i)=>{const c=COMPARE_COLORS[i%COMPARE_COLORS.length]!;const r=parseInt(c.slice(1,3),16);const g=parseInt(c.slice(3,5),16);const b=parseInt(c.slice(5,7),16);return`{value:${JSON.stringify(d.value)},name:${JSON.stringify(d.name)},lineStyle:{color:'${c}',width:1.5},itemStyle:{color:'${c}'},areaStyle:{color:'rgba(${r},${g},${b},0.08)'}}`;}).join(",")}],symbol:'circle',symbolSize:4,emphasis:{lineStyle:{width:2.5}}}]});window.addEventListener('resize',function(){ch.resize();});})();</script>`;
 }
@@ -322,15 +323,16 @@ export function renderComparisonRadar(series: FactorSeries[]): string {
 // ── Metric cards render ──
 
 export function highlight(text: string): string {
-  return text.replace(/([+-]\d+(?:\.\d+)?%)/g, (m) => {
-    const v = parseFloat(m);
-    return isNaN(v) ? m : `<span class="whyj-${v > 0 ? "up" : "dn"}">${m}</span>`;
+  return text.replace(/([+-]\d+(?:\.\d+)?%)/g, (m, _match: string, offset: number) => {
+    const label = text.slice(0, offset).split(/[，,。；;\n]/).at(-1) ?? "";
+    const cls = metricValueClass(m, label);
+    return `<span class="whyj-${cls}">${m}</span>`;
   });
 }
 
 export function renderMetricCards(cards: Card[]): string {
   return `<div class="mgrid">${cards.map((c) => {
-    const cls = c.num > 0.001 ? "pos" : c.num < -0.001 ? "neg" : "nt";
+    const cls = metricValueClass(c.value, c.label);
     return `<div class="mcard"><div class="ml">${esc(c.label)}</div><div class="mv ${cls}">${esc(c.value)}</div></div>`;
   }).join("")}</div>`;
 }
@@ -344,11 +346,13 @@ export function renderScoreTable(st: ScoreTable): string {
 
   const numCols = new Set<number>();
   const scoreCols = new Set<number>();
+  const hasScoreContext = header.some(label => /得分|score|rating|总分|综合|稳健/i.test(label));
   for (let i = 0; i < nCols; i++) {
     const vals = data.map((r) => r[i] ?? "").filter((v) => v !== "" && v !== "-").map((v) => parseFloat(v.replace(/[%,+¥$]/g, "")));
     if (vals.length > 0 && vals.every((v) => !isNaN(v))) {
       numCols.add(i);
-      if (/收益|风险|稳健|得分|score|rating|总分|综合/i.test(header[i] ?? "") && vals.every((v) => v >= 0 && v <= 100)) scoreCols.add(i);
+      if (hasScoreContext && /^(收益|风险|稳健性?|得分|score|rating|总分|综合)(评分|得分|score)?$/i.test(header[i] ?? "")
+        && data.every(row => !/[%％]/.test(row[i] ?? "")) && vals.every((v) => v >= 0 && v <= 100)) scoreCols.add(i);
     }
   }
 
@@ -358,7 +362,8 @@ export function renderScoreTable(st: ScoreTable): string {
 
   const tb = data.map((row) =>
     `<tr>${row.map((c, i) => {
-      if (!numCols.has(i)) return `<td>${esc(c)}</td>`;
+      const label = i === 1 && /^(value|值|数值)?$/i.test(header[i] ?? "") ? row[0] ?? "" : header[i] ?? "";
+      if (!numCols.has(i)) return `<td class="${displayedNumber(c) !== null ? "n " : ""}${tableValueClass(c, label)}">${esc(c)}</td>`;
       const v = parseFloat(c.replace(/[%,+¥$]/g, ""));
       if (isNaN(v)) return `<td class="n">${esc(c)}</td>`;
       if (scoreCols.has(i)) {
@@ -366,8 +371,8 @@ export function renderScoreTable(st: ScoreTable): string {
         const tier = pct >= 80 ? "hi" : pct >= 50 ? "md" : "lo";
         return `<td class="n"><div class="si"><div class="tr"><div class="fl ${tier}" style="width:${pct}%"></div></div><span class="vl">${esc(c)}</span></div></td>`;
       }
-      const cls = v > 0.001 ? " p" : v < -0.001 ? " ng" : " m";
-      return `<td class="n${cls}">${esc(c)}</td>`;
+      const cls = tableValueClass(c, label);
+      return `<td class="n ${cls}">${esc(c)}</td>`;
     }).join("")}</tr>`
   ).join("");
 
@@ -394,7 +399,7 @@ export function renderNavEcharts(nd: NavLineData): string {
     </div>
     <div class="ec-body"><div id="${id}" style="width:100%;height:380px"></div></div>
     <div class="ec-raw"><pre>${rawText}</pre></div>
-    <details class="ind-glossary"><summary>指标说明</summary><div class="ig-body"><div class="ig-item"><span class="ig-name">K线</span><span class="ig-desc">蜡烛图, 显示开/收/高/低价, 阳线红涨阴线绿跌</span></div><div class="ig-item"><span class="ig-name">MA5(5日均)</span><span class="ig-desc">5日移动平均线, 反映超短期价格趋势</span></div><div class="ig-item"><span class="ig-name">MA10(10日均)</span><span class="ig-desc">10日移动平均线, 短期趋势参考</span></div><div class="ig-item"><span class="ig-name">MA20(20日均)</span><span class="ig-desc">20日移动平均线, 中期趋势生命线</span></div><div class="ig-item"><span class="ig-name">MA60(60日均)</span><span class="ig-desc">60日移动平均线, 长期趋势, 牛熊分界线</span></div><div class="ig-item"><span class="ig-name">DIF(快线)</span><span class="ig-desc">差离值 = EMA12 - EMA26, 反映短期动量</span></div><div class="ig-item"><span class="ig-name">DEA(慢线)</span><span class="ig-desc">信号线 = DIF的9日EMA, DIF上穿DEA为金叉看涨</span></div><div class="ig-item"><span class="ig-name">MACD(柱线)</span><span class="ig-desc">(DIF-DEA)*2, 红柱多头绿柱空头, 长短反映动能强弱</span></div><div class="ig-item"><span class="ig-name">Vol</span><span class="ig-desc">成交量, 放量上涨确认趋势, 缩量上涨警惕背离</span></div></div></details>
+    <details class="ind-glossary"><summary>指标说明</summary><div class="ig-body"><div class="ig-item"><span class="ig-name">K线</span><span class="ig-desc">蜡烛图, 显示开/收/高/低价, 收盘高于开盘为涨、低于为跌、相等为平；颜色约定见报告顶部</span></div><div class="ig-item"><span class="ig-name">MA5(5日均)</span><span class="ig-desc">5日移动平均线, 反映超短期价格趋势</span></div><div class="ig-item"><span class="ig-name">MA10(10日均)</span><span class="ig-desc">10日移动平均线, 短期趋势参考</span></div><div class="ig-item"><span class="ig-name">MA20(20日均)</span><span class="ig-desc">20日移动平均线, 中期趋势生命线</span></div><div class="ig-item"><span class="ig-name">MA60(60日均)</span><span class="ig-desc">60日移动平均线, 长期趋势, 牛熊分界线</span></div><div class="ig-item"><span class="ig-name">DIF(快线)</span><span class="ig-desc">差离值 = EMA12 - EMA26, 反映短期动量</span></div><div class="ig-item"><span class="ig-name">DEA(慢线)</span><span class="ig-desc">信号线 = DIF的9日EMA, DIF上穿DEA为金叉看涨</span></div><div class="ig-item"><span class="ig-name">MACD(柱线)</span><span class="ig-desc">(DIF-DEA)*2, 正柱与负柱表示动量方向，零值为中性, 长短反映动能强弱</span></div><div class="ig-item"><span class="ig-name">Vol</span><span class="ig-desc">成交量, 放量上涨确认趋势, 缩量上涨警惕背离</span></div></div></details>
   </div>
   <script>(function(){var d=document.getElementById('${id}');if(!d||typeof echarts==='undefined')return;var c=${json};var ch=echarts.init(d,'dark');
 var legendData=['本产品'];

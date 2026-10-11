@@ -1,25 +1,35 @@
 import { buildCommandHelpText } from "./cli/catalog.ts";
 import { executeCommand, parseCommand } from "./cli/registry.ts";
+import { commandPreflight } from "./runtime/command-preflight.ts";
+import { auditCurrentFundAnswer } from "./runtime/fund-answer-evidence.ts";
+import { auditCurrentFactorAnswer } from "./runtime/factor-answer-evidence.ts";
+import { auditCurrentPortfolioAnswer } from "./runtime/portfolio-answer-evidence.ts";
+import { auditCurrentRiskAnswer } from "./runtime/risk-answer-evidence.ts";
+import { hasRiskMetricLabel, RISK_ANSWER_VIOLATION_LABELS } from "./runtime/risk-answer-claims.ts";
+import { hasExplicitFactorLatestClaim, knownFactorAnswerViolations } from "./runtime/factor-answer-claims.ts";
+import { isInstalledToolProbeSchemaQuery } from "./runtime/tool-probe-schema.ts";
 import { generateCurrentSessionArtifact, restoreArtifactReport } from "./runtime/artifact-reports.ts";
 import { dispatchUserMessage, isAgentTurnActive } from "./agent/src/dispatch.ts";
 import { isQuantAnalysisRequest } from "./agent/src/context.ts";
-import { createAgent, updateSessionCtx, type QuantAgentSession } from "./agent/src/session.ts";
+import type { QuantAgentSession } from "./agent/src/session.ts";
+import { createQuantResearchAgent, QuantResearchHarness } from "./runtime/quant-harness.ts";
+import type { ResearchTaskSnapshot, ResearchTaskSpec } from "./types/research-task.ts";
+import type { QuantAgentEvent, QuantAgentDependencies } from "./agent/src/session-contracts.ts";
+import { createDefaultSessionDependencies } from "./agent/src/session-dependencies.ts";
+import { RuntimeExtensions } from "./runtime/extensions.ts";
+import { extensionSessionDependencies } from "./runtime/extension-session.ts";
+import { loadRuntimeSkillSuggestions, toSkillEntries } from "./runtime/skill-suggestions.ts";
+import { resolveConfiguredModel } from "./agent/src/model-config.ts";
+import type { OhQuantSettings } from "./types/config.ts";
 import { skillPaths } from "./skill/index.ts";
-import { baseCode } from "./market/symbols.ts";
-import { ensureDirs, findLocalPortfolio, loadSettings, loadPanelPortfolio } from "./storage/index.ts";
+import { ensureDefaultSkills } from "./skill/store.ts";
+import { ensureDirs, loadSettings, loadPanelPortfolio } from "./storage/index.ts";
 import type { AppState, PanelSection, UIMessage } from "./tui/src/types.ts";
 import type { CurrentSessionMeta } from "./tui/src/panel.ts";
-import {
-  buildOverviewPanelSections,
-  collectOverviewSymbols,
-  fetchOverviewHoldings,
-  fetchOverviewQuotes,
-  MARKET_INDICES,
-  type OverviewHoldingFetcher,
-  type OverviewPullMeta,
-  type OverviewQuoteFetcher,
-  type OverviewSymbolEntry,
-} from "./runtime/overview.ts";
+import { fetchOverviewHoldings, fetchOverviewQuotes } from "./runtime/overview-data.ts";
+import type { OverviewHoldingFetcher, OverviewQuoteFetcher } from "./runtime/overview-data.ts";
+import { OverviewRefresh } from "./runtime/overview-refresh.ts";
+import type { OverviewRefreshMeasurement, OverviewRefreshOptions } from "./runtime/overview-refresh.ts";
 import { agentStatusText, errorText, formatAgentError, formatSlashRuntimeError } from "./runtime/errors.ts";
 import {
   applyCommandResult as applyRuntimeCommandResult,
@@ -29,8 +39,6 @@ import {
 } from "./runtime/commands.ts";
 import {
   buildLocalStorageState,
-  marketRefreshLoadingPanel,
-  marketUnavailablePanel,
 } from "./runtime/panel-service.ts";
 import {
   addUserMessage as reduceAddUserMessage,
@@ -41,12 +49,14 @@ import {
   syncMessagesFromAgentState as reduceSyncMessagesFromAgentState,
   upsertThinkingMessage as reduceUpsertThinkingMessage,
 } from "./runtime/agent-events.ts";
+import { extractAssistantText } from "./runtime/messages.ts";
 import { perfLog, perfNow } from "./perf.ts";
-import type { DoctorResult } from "./runtime/doctor-contract.ts";
+import type { DoctorResult } from "./types/doctor.ts";
 import type { CommandResult } from "./types/commands.ts";
+import type { PrivateAnnualExportRequest } from "./types/private-annual-export.ts";
+import { runPrivateAnnualFileCommand } from "./cli/private-annual-file.ts";
 import {
   assistantEventHasVisibleOutput,
-  assistantMessageHasVisibleOutput,
   computeTpotMs,
   countConversationTurns,
   createHudMetrics,
@@ -68,12 +78,16 @@ interface AppRuntimeCallbacks {
   onConfigRequest?: () => void;
   onDoctorRequest?: (doctor?: unknown) => void;
   onResumeRequest?: (meta?: CurrentSessionMeta) => void;
+  onResearchRequest?: (snapshot: ResearchTaskSnapshot) => void;
   onPortfolioRequest?: () => void;
   onArtifactRequest?: () => void;
   onHelpRequest?: () => void;
   onSessionRequest?: (meta?: CurrentSessionMeta) => void;
   onPanel?: (panel: PanelSection[], loading?: boolean) => void;
   onHud?: (hud: AppState["hud"]) => void;
+  onMarketRefresh?: (measurement: OverviewRefreshMeasurement) => void | Promise<void>;
+  onModel?: (model: AppRuntimeSnapshot) => void;
+  onSkillsChanged?: () => void;
 }
 
 type QuoteFetcher = OverviewQuoteFetcher;
@@ -82,14 +96,8 @@ type AgentFactory = () => QuantAgentSession;
 type AutoArtifactRunner = (agent: QuantAgentSession) => Promise<{ success: boolean; message: string }>;
 type ArtifactRestoreRunner = (reportId: string, agent: QuantAgentSession) => Promise<CommandResult>;
 
-const SHORT_MODEL: Record<string, string> = {
-  "claude-sonnet-4-6": "sonnet",
-  "claude-opus-4-7": "opus",
-  "claude-haiku-4-5": "haiku",
-  "deepseek-v4-pro": "deepseek",
-};
-export function createRuntimeAgent(): QuantAgentSession {
-  return createAgent({ skillPaths: skillPaths() });
+export function createRuntimeAgent(dependencies?: QuantAgentDependencies): QuantAgentSession {
+  return createQuantResearchAgent({ skillPaths, dependencies });
 }
 
 async function runAutoArtifact(agent: QuantAgentSession): Promise<{ success: boolean; message: string }> {
@@ -102,16 +110,17 @@ async function runArtifactRestore(reportId: string, agent: QuantAgentSession): P
 
 export class AppRuntime {
   private agent: QuantAgentSession | null = null;
+  private unsubscribeAgent: (() => void) | null = null;
   /** Slash command in flight (panel refresh). Agent concurrency uses agent.state.isStreaming. */
   private slashRunning = false;
   private messages: UIMessage[] = [];
-  /** After first successful Overview fetch, later refreshes stay in-place (no spinner wipe). */
-  private overviewReady = false;
-  private marketSections: PanelSection[] = [];
-  private marketRefreshPromise: Promise<void> | null = null;
-  /** Invalidates timed-out or superseded pulls so stale data cannot overwrite a newer panel. */
-  private marketRefreshGeneration = 0;
+  private readonly overview: OverviewRefresh;
+  private disposed = false;
+  private readonly lifetime = new AbortController();
+  private skillInstallation: Promise<void> | undefined;
+  private readonly localOperations = new Set<Promise<void>>();
   private currentDoctor: DoctorResult | null = null;
+  private doctorRun: AbortController | null = null;
   private hud = createHudMetrics();
   private latencyTracker = createLatencyTracker();
   private ttftTotalMs = 0;
@@ -119,39 +128,104 @@ export class AppRuntime {
   private tpotTotalMs = 0;
   private tpotSamples = 0;
   private turnTtftRecorded = false;
+  private latencyScope: string | null = null;
+  private modelConnectionSettings = "";
+  private configuredModel: AppRuntimeSnapshot | null = null;
+  private configuredProvider: string | undefined;
+  private modelConnectionPending = false;
   private pendingAutoArtifactInput: string | null = null;
+  private latestCompletedAssistantText: string | null = null;
   private autoArtifactRunning = false;
+  private activePrompts = 0;
+  private extensions: RuntimeExtensions | undefined;
+  private baseDependencies: QuantAgentDependencies | undefined;
+  private extensionShutdown: Promise<void> | undefined;
+  private bootstrapTask: Promise<AppRuntimeSnapshot> | undefined;
 
   constructor(
     private readonly callbacks: AppRuntimeCallbacks,
-    private readonly quoteFetcher: QuoteFetcher = fetchOverviewQuotes,
-    private readonly holdingFetcher: HoldingFetcher = fetchOverviewHoldings,
-    private readonly agentFactory: AgentFactory = createRuntimeAgent,
+    quoteFetcher: QuoteFetcher = fetchOverviewQuotes,
+    holdingFetcher: HoldingFetcher = fetchOverviewHoldings,
+    private readonly agentFactory?: AgentFactory,
     private readonly autoArtifactRunner: AutoArtifactRunner = runAutoArtifact,
     private readonly artifactRestoreRunner: ArtifactRestoreRunner = runArtifactRestore,
-    private readonly marketRefreshTimeoutMs = AppRuntime.MARKET_REFRESH_TIMEOUT_MS,
-  ) {}
+    marketRefreshTimeoutMs = 120_000,
+    marketRefreshIntervalMs = 60_000,
+    overviewOptions: Pick<OverviewRefreshOptions, "poolFactory"> = {},
+    extensions?: RuntimeExtensions,
+  ) {
+    this.extensions = extensions;
+    this.overview = new OverviewRefresh({ ...overviewOptions, quoteFetcher, holdingFetcher,
+      onPanel: callbacks.onPanel, onMeasurement: callbacks.onMarketRefresh,
+      timeoutMs: marketRefreshTimeoutMs, intervalMs: marketRefreshIntervalMs });
+  }
 
-  async refreshOverviewPanel(): Promise<void> {
-    await this.startMarketRefresh();
+  refreshOverviewPanel(): Promise<void> { return this.overview.refresh(); }
+
+  async getSkillSuggestions() {
+    if (this.disposed) return [];
+    return this.agent ? toSkillEntries(await this.agent.getSkills()) : loadRuntimeSkillSuggestions();
+  }
+
+  /** Start explicitly from the interactive host; headless bootstrap never installs packages. */
+  startSkillInstallation(install: typeof ensureDefaultSkills = ensureDefaultSkills): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    this.skillInstallation ??= install({ signal: this.lifetime.signal, onProgress: progress => {
+      if (this.disposed || progress.status === "present") return;
+      this.pushLocalCommandMessage(progress.message, progress.status === "failed" ? "error" : "assistant");
+      if (progress.status === "installed") this.callbacks.onSkillsChanged?.();
+    } }).catch(error => {
+      if (!this.disposed) this.pushLocalCommandMessage(`Skill installation failed: ${errorText(error)}\nRetry with /skill install <owner/repo>.`, "error");
+    });
+    return this.skillInstallation;
+  }
+
+  /** Structured research entry for hosts; shares the normal UI/event/command runtime. */
+  async submitResearch(task: ResearchTaskSpec, expectedRevision: string | null = null, signal?: AbortSignal): Promise<void> {
+    if (!this.agent || this.slashRunning || isAgentTurnActive(this.agent)) throw new Error("Research requires a ready, idle session.");
+    const snapshot = structuredClone(task);
+    await new QuantResearchHarness(this.agent).update({ version: 1, type: "declare", expectedRevision, task: snapshot }, signal);
+    signal?.throwIfAborted();
+    const abort = () => this.agent?.abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    try { await this.runAgentPrompt(snapshot.request, signal); }
+    finally { signal?.removeEventListener("abort", abort); }
   }
 
   /** Startup agent, then enter ready before blocking on market quotes. */
-  async bootstrap(): Promise<AppRuntimeSnapshot> {
+  bootstrap(): Promise<AppRuntimeSnapshot> {
+    this.bootstrapTask ??= this.startRuntime().catch(error => { this.bootstrapTask = undefined; throw error; });
+    return this.bootstrapTask;
+  }
+
+  private async startRuntime(): Promise<AppRuntimeSnapshot> {
+    this.lifetime.signal.throwIfAborted();
     const startedAt = perfNow();
     ensureDirs();
     const settings = loadSettings();
-
-    for (const [key, value] of Object.entries(settings.env)) {
-      if (value && !process.env[key]) process.env[key] = value;
-    }
+    this.rememberModelConnection(settings);
+    this.configuredModel = { model: readModel(settings), modelLabel: readModelLabel(settings) };
+    this.configuredProvider = settings.provider;
 
     this.setActivity("starting");
 
     const agentStartedAt = perfNow();
-    this.agent = this.agentFactory();
+    if (this.agentFactory) this.agent = this.agentFactory();
+    else {
+      this.extensions ??= new RuntimeExtensions();
+      this.baseDependencies = createDefaultSessionDependencies({ skillPaths });
+      await this.extensions.host.reserve({ skills: (await this.baseDependencies.loadSkills()).map(skill => skill.name),
+        capabilities: Object.keys(this.baseDependencies.readSkillCapabilities?.() ?? {}) });
+      await this.extensions.start();
+      const dependencies = await extensionSessionDependencies(this.baseDependencies, this.extensions.host);
+      this.lifetime.signal.throwIfAborted();
+      this.agent = createRuntimeAgent(dependencies);
+      const failures = this.extensions.startupErrors;
+      if (failures.length) this.pushLocalCommandMessage(`Extensions could not start:\n${failures.join("\n")}\nInspect /config --extensions list.`, "error");
+    }
     perfLog("runtime.agent.create", agentStartedAt);
-    this.agent.subscribe(async (event) => {
+    this.unsubscribeAgent = this.agent.subscribe(async (event) => {
+      if (this.disposed) return;
       this.trackHudFromAgentEvent(event);
       handleAgentEvent(event, {
         messages: this.messages,
@@ -164,7 +238,19 @@ export class AppRuntime {
         scheduleMarketRefresh: () => this.scheduleMarketRefresh(),
       });
       this.refreshHudFromAgentState();
-      if (event.type === "agent_end") await this.maybeAutoGenerateArtifact();
+      if (event.type === "message_start" && ["assistant", "user", "displayUser"].includes(event.message.role))
+        this.latestCompletedAssistantText = null;
+      if (event.type === "message_end" && event.message.role === "assistant")
+        this.latestCompletedAssistantText = event.message.stopReason === "stop"
+          && !event.message.content.some(part => part.type === "toolCall") ? extractAssistantText(event.message) : null;
+      if (event.type === "agent_end") {
+        const answer = this.latestCompletedAssistantText;
+        this.latestCompletedAssistantText = null;
+        if (answer && (await this.flagContradictoryFundAnswer(answer) || await this.flagUnsupportedFactorAnswer(answer)
+          || await this.flagContradictoryRiskAnswer(answer)
+          || await this.flagContradictoryPortfolioAnswer(answer))) return;
+        await this.maybeAutoGenerateArtifact();
+      }
     });
 
     void this.agent.waitForIdle()
@@ -177,8 +263,8 @@ export class AppRuntime {
     perfLog("runtime.bootstrap", startedAt);
 
     return {
-      model: readModel(settings.env),
-      modelLabel: readModelLabel(settings.env),
+      model: readModel(settings),
+      modelLabel: readModelLabel(settings),
     };
   }
 
@@ -189,13 +275,26 @@ export class AppRuntime {
     if (trimmed === "/exit" || trimmed === "/quit") return "exit";
 
     const parsed = parseCommand(trimmed);
+    const early = parsed && commandPreflight(parsed);
+    if (early) {
+      applyRuntimeCommandResult(early, this.commandResultContext());
+      return "continue";
+    }
     const localOnly = parsed ? getRuntimeCommandInvocation(parsed).localOnly : false;
 
     if (parsed) {
-      if (this.slashRunning && !localOnly) return "continue";
-      if (isAgentTurnActive(this.agent) && !localOnly) return "continue";
+      if (!localOnly && parsed.command === "config" && parsed.flags.extensions !== undefined && (this.activePrompts > 0 || this.localOperations.size > 0)) {
+        this.setStatus({ kind: "error", text: "Wait for the current operation to finish before changing extensions." });
+        return "continue";
+      }
+      if (!localOnly && (this.slashRunning || isAgentTurnActive(this.agent))) {
+        if (parsed.command === "config" && parsed.flags.extensions !== undefined) this.setStatus({ kind: "error", text: "Wait for the current operation to finish before changing extensions." });
+        return "continue";
+      }
       if (!localOnly) this.slashRunning = true;
-      await this.runSlashCommand(parsed, localOnly);
+      const operation = this.runSlashCommand(parsed, localOnly);
+      this.localOperations.add(operation);
+      try { await operation; } finally { this.localOperations.delete(operation); }
       return "continue";
     }
 
@@ -205,7 +304,44 @@ export class AppRuntime {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.lifetime.abort();
+    this.cancelDoctor();
+    this.overview.dispose();
+    this.unsubscribeAgent?.();
+    this.unsubscribeAgent = null;
     this.agent?.abort();
+    this.extensionShutdown ??= this.extensions?.dispose();
+  }
+
+  async shutdown(): Promise<void> {
+    this.dispose();
+    await Promise.allSettled([this.skillInstallation, this.bootstrapTask, this.extensionShutdown, ...this.localOperations]);
+    await Promise.allSettled([this.agent?.waitForIdle()]);
+  }
+
+  cancelDoctor(): void {
+    this.doctorRun?.abort();
+    this.doctorRun = null;
+  }
+
+  refreshConfiguration(): void {
+    const settings = loadSettings();
+    this.configuredModel = { model: readModel(settings), modelLabel: readModelLabel(settings) };
+    this.configuredProvider = settings.provider;
+    if (this.rememberModelConnection(settings)) this.modelConnectionPending = true;
+    if (!isAgentTurnActive(this.agent)) {
+      // Saved connections can change credentials/endpoint without changing the model ID.
+      // Do not display previous connection measurements beside the new selection.
+      if (this.modelConnectionPending) {
+        this.hud.contextUsage = null;
+        this.resetHudLatency();
+      }
+      this.callbacks.onModel?.(this.configuredModel);
+    }
+    this.emitLocalStorageState();
+    this.callbacks.onSkillsChanged?.();
+    if (!this.agent) void this.bootstrap().then(snapshot => this.callbacks.onModel?.(snapshot)).catch(error => this.setStatus({ kind: "error", text: errorText(error) }));
   }
 
   /** Handle a report selected in the Artifact panel without routing through slash parsing. */
@@ -215,6 +351,7 @@ export class AppRuntime {
     this.setStatus({ kind: "info", text: "Restoring artifact session..." });
     try {
       const result = await this.artifactRestoreRunner(reportId, this.agent);
+      if (result.success) this.resetHudLatency();
       applyRuntimeCommandResult(result, this.commandResultContext());
       this.refreshHudFromAgentState();
     } catch (error) {
@@ -257,7 +394,15 @@ export class AppRuntime {
     localOnly: boolean,
   ): Promise<void> {
     const invocation = getRuntimeCommandInvocation(parsed);
+    let doctorRun: AbortController | null = null;
+    if (parsed.command === "doctor" && !isInstalledToolProbeSchemaQuery(parsed)) {
+      this.cancelDoctor();
+      doctorRun = new AbortController();
+      this.doctorRun = doctorRun;
+    }
+    const cancelled = () => this.disposed || Boolean(doctorRun && (doctorRun.signal.aborted || this.doctorRun !== doctorRun));
     if (invocation.isSkillInvoke) {
+      this.prepareHudForRequest();
       this.messages.push({
         role: "skill",
         skill: { name: invocation.skillName, label: `SKILL.${invocation.skillName}`, status: "running", startedAt: Date.now() },
@@ -280,14 +425,33 @@ export class AppRuntime {
           : undefined,
         openDoctor: this.callbacks.onDoctorRequest
           ? (doctor) => {
+            if (cancelled()) return;
             this.currentDoctor = isDoctorResult(doctor) ? doctor : null;
             this.callbacks.onDoctorRequest?.(doctor);
           }
           : undefined,
         currentDoctor: this.currentDoctor,
+        doctorSignal: doctorRun?.signal,
+        commandSignal: this.lifetime.signal,
+        manageExtensions: async (action, id, signal) => {
+          if (!this.extensions) return { success: false, message: "Extension management is available after the default runtime has started." };
+          if (action !== "list") await this.agent?.waitForIdle();
+          if ((action === "enable" || action === "reload") && this.baseDependencies) {
+            await this.extensions.host.reserve({ skills: (await this.baseDependencies.loadSkills()).map(skill => skill.name),
+              capabilities: Object.keys(this.baseDependencies.readSkillCapabilities?.() ?? {}) });
+          }
+          const result = await this.extensions.manage(action, id, signal);
+          if (result.success && action !== "list") {
+            try { await this.agent?.getSkills(); }
+            catch (error) { return { success: false, message: `Extension state changed, but session resources could not refresh: ${errorText(error)}. Review /config --extensions list and disable the conflicting extension or correct the skill before retrying.` }; }
+            this.callbacks.onSkillsChanged?.();
+          }
+          return result;
+        },
         openResume: this.callbacks.onResumeRequest
           ? () => { void this.collectCurrentSessionMeta().then(meta => this.callbacks.onResumeRequest?.(meta)); }
           : undefined,
+        openResearch: this.callbacks.onResearchRequest ? snapshot => { if (!cancelled()) this.callbacks.onResearchRequest?.(snapshot); } : undefined,
         openPortfolio: this.callbacks.onPortfolioRequest
           ? () => { this.callbacks.onPortfolioRequest!(); }
           : undefined,
@@ -302,17 +466,21 @@ export class AppRuntime {
           : undefined,
         agentSession: this.agent,
       });
+      if (cancelled()) return;
       applyRuntimeCommandResult(result, this.commandResultContext());
+      if (result.success && parsed.command === "skill" && (parsed.positional[0] === "install" || (parsed.positional[0] === "info" && (parsed.flags.check || parsed.flags["check-network"])))) this.callbacks.onSkillsChanged?.();
       this.refreshHudFromAgentState();
       if (invocation.isSkillInvoke) this.finalizeSkillMessage(!result.success);
-      updateLastSymbol(parsed.flags);
+      if (result.success) updateLastSymbol(this.agent, parsed.flags);
     } catch (err) {
+      if (cancelled()) return;
       if (invocation.isSkillInvoke) this.finalizeSkillMessage(true);
       this.setStatus({ kind: "error", text: formatSlashRuntimeError(parsed.command, err) });
     } finally {
-      this.scheduleMarketRefresh();
+      if (!localOnly && !(parsed.command === "config" && parsed.flags.extensions !== undefined)) this.scheduleMarketRefresh();
       if (!localOnly) this.slashRunning = false;
-      if (!isAgentTurnActive(this.agent)) this.setActivity("ready");
+      if (!isInstalledToolProbeSchemaQuery(parsed) && !cancelled() && !isAgentTurnActive(this.agent)) this.setActivity("ready");
+      if (doctorRun && this.doctorRun === doctorRun) this.doctorRun = null;
     }
   }
 
@@ -320,20 +488,25 @@ export class AppRuntime {
     this.callbacks.onLocalState?.(buildLocalStorageState(loadSettings(), loadPanelPortfolio()));
   }
 
-  private async runAgentPrompt(input: string): Promise<void> {
-    if (!this.agent) {
-      this.emitComposerQueue([input]);
-      this.setActivity("thinking");
-      this.setStatus({ kind: "info", text: "Agent is still starting. Your message is kept in the composer; send it again in a moment." });
-      this.setActivity("ready");
-      return;
-    }
-    this.pendingAutoArtifactInput = input;
+  private async runAgentPrompt(input: string, signal?: AbortSignal): Promise<void> {
+    this.activePrompts++;
     try {
+      if (!this.agent && this.bootstrapTask) await this.bootstrapTask;
+      if (this.disposed) return;
+      if (!this.agent) {
+        this.emitComposerQueue([input]);
+        this.setActivity("thinking");
+        this.setStatus({ kind: "info", text: "Agent is still starting. Your message is kept in the composer; send it again in a moment." });
+        this.setActivity("ready");
+        return;
+      }
+      this.pendingAutoArtifactInput = input;
+      this.prepareHudForRequest();
       const startedAt = perfNow();
-      await dispatchUserMessage(this.agent, input, input);
+      await dispatchUserMessage(this.agent, input, input, signal);
       perfLog("runtime.agent.dispatch", startedAt);
     } catch (err) {
+      if (this.disposed) return;
       this.pendingAutoArtifactInput = null;
       this.emitComposerQueue([]);
       const message = errorText(err);
@@ -341,6 +514,36 @@ export class AppRuntime {
       this.emitMessages();
       this.setStatus({ kind: "error", text: agentStatusText(message) });
       if (!isAgentTurnActive(this.agent)) this.setActivity("ready");
+    } finally {
+      this.activePrompts--;
+    }
+  }
+
+  /** Local private file export; neither the request nor its result enters the Agent session. */
+  async exportPrivateAnnual(request: PrivateAnnualExportRequest): Promise<void> {
+    if (this.disposed) return;
+    if (this.slashRunning || this.activePrompts > 0 || this.autoArtifactRunning || isAgentTurnActive(this.agent)) {
+      this.setStatus({ kind: "error", text: "Wait for the current operation before exporting a private annual report." });
+      return;
+    }
+    this.slashRunning = true;
+    this.setStatus({ kind: "info", text: "Checking public annual evidence and exporting private HTML..." });
+    const selected = structuredClone(request);
+    const operation = this.writePrivateAnnual(selected);
+    this.localOperations.add(operation);
+    try { await operation; }
+    finally { this.localOperations.delete(operation); this.slashRunning = false; }
+  }
+
+  private async writePrivateAnnual(request: PrivateAnnualExportRequest): Promise<void> {
+    try {
+      const args = ["--comparison", request.comparisonId, "--year", String(request.year), "--cutoff", request.valuationCutoff,
+        "--history-file", request.historyFile, "--output", request.output,
+        ...request.decisionIds.flatMap(id => ["--decision", id])];
+      const result = await runPrivateAnnualFileCommand(args, AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(60_000)]));
+      if (!this.disposed) this.setStatus({ kind: "info", text: `Private annual HTML written to ${result.output}` });
+    } catch (error) {
+      if (!this.disposed) this.setStatus({ kind: "error", text: `Private annual export failed · ${errorText(error)}` });
     }
   }
 
@@ -385,6 +588,7 @@ export class AppRuntime {
   }
 
   private syncMessagesFromAgentState(): void {
+    this.resetHudLatency();
     const agentMessages = this.agent?.state.messages ?? [];
     this.messages = reduceSyncMessagesFromAgentState(agentMessages);
     this.emitMessages();
@@ -412,15 +616,30 @@ export class AppRuntime {
       this.emitHud();
       return;
     }
-    this.hud.contextUsage = typeof this.agent.getContextUsage === "function"
+    const active = isAgentTurnActive(this.agent);
+    const agentModel = this.agent.state.model?.id
+      ? { model: this.agent.state.model.id, modelLabel: this.agent.state.model.name || this.agent.state.model.id } : null;
+    const display = active ? agentModel ?? this.configuredModel : this.configuredModel ?? agentModel;
+    if (display) this.callbacks.onModel?.(display);
+    this.hud.contextUsage = this.modelConnectionPending && !active ? null : typeof this.agent.getContextUsage === "function"
       ? this.agent.getContextUsage() ?? null
       : null;
     this.hud.turnCount = countConversationTurns(this.agent.state.messages as Array<{ role?: unknown }>);
     this.emitHud();
   }
 
-  private trackHudFromAgentEvent(event: { type: string; [key: string]: any }): void {
+  private trackHudFromAgentEvent(event: QuantAgentEvent): void {
     const now = Date.now();
+    if (event.type === "before_provider_request") {
+      if (event.model.id === this.configuredModel?.model && event.model.provider === this.configuredProvider)
+        this.modelConnectionPending = false;
+      const scope = JSON.stringify([event.sessionId, event.model.provider, event.model.id, event.model.baseUrl, this.agent?.state.thinkingLevel]);
+      if (this.latencyScope !== scope) this.resetHudLatency();
+      this.latencyScope = scope;
+      this.latencyTracker = { turnStartedAt: now, firstOutputAt: null };
+      this.turnTtftRecorded = false;
+      return;
+    }
     if (event.type === "message_start") {
       const role = event.message?.role;
       if (role === "user" || role === "displayUser") {
@@ -445,18 +664,17 @@ export class AppRuntime {
     }
 
     if (event.type === "message_end" && event.message?.role === "assistant") {
-      if (
-        this.latencyTracker.turnStartedAt !== null
-        && this.latencyTracker.firstOutputAt === null
-        && assistantMessageHasVisibleOutput(event.message)
-      ) {
-        this.recordTurnTtft(now);
-      }
       const outputTokens = extractAssistantOutputTokens(event.message);
       const decodeMs = this.latencyTracker.firstOutputAt === null
         ? null
         : now - this.latencyTracker.firstOutputAt;
-      const turnTpotMs = computeTpotMs(decodeMs, outputTokens);
+      const success = event.message.stopReason !== "error" && event.message.stopReason !== "aborted";
+      if (success && this.latencyTracker.firstOutputAt !== null && this.latencyTracker.turnStartedAt !== null) {
+        this.ttftTotalMs += Math.max(0, this.latencyTracker.firstOutputAt - this.latencyTracker.turnStartedAt);
+        this.ttftSamples += 1;
+        this.hud.ttftMs = this.ttftTotalMs / this.ttftSamples;
+      }
+      const turnTpotMs = success ? computeTpotMs(decodeMs, outputTokens) : null;
       if (turnTpotMs !== null) {
         this.tpotTotalMs += turnTpotMs;
         this.tpotSamples += 1;
@@ -471,11 +689,117 @@ export class AppRuntime {
   private recordTurnTtft(now: number): void {
     if (this.latencyTracker.turnStartedAt === null || this.turnTtftRecorded) return;
     this.latencyTracker.firstOutputAt = now;
-    const turnTtftMs = now - this.latencyTracker.turnStartedAt;
-    this.ttftTotalMs += turnTtftMs;
-    this.ttftSamples += 1;
-    this.hud.ttftMs = this.ttftTotalMs / this.ttftSamples;
     this.turnTtftRecorded = true;
+  }
+
+  /** The final text stays visible; warn on a proven mismatch and avoid archiving it as an automatic report. */
+  private async flagContradictoryFundAnswer(answer: string): Promise<boolean> {
+    if (!this.agent || !/(?:Principal\s+return|本金收益率|Time[- ]weighted\s+return|时间加权收益率|Maximum\s+drawdown|最大回撤|TWR)/iu.test(answer))
+      return false;
+    try {
+      const audit = auditCurrentFundAnswer(await this.agent.getResearchState(), answer);
+      if (audit.status === "not-fund") return false;
+      if (audit.status === "audited" && !audit.violations.length) return false;
+      const labels: Record<string, string> = {
+        "wrong-verified-principal-return": "本金收益率",
+        "wrong-verified-time-weighted-return": "时间加权收益率",
+        "wrong-verified-twr-drawdown": "最大回撤",
+        "wrong-fixed-principal-formula": "本金收益公式",
+      };
+      const detail = audit.status === "unavailable" ? "当前任务缺少可匹配的已核验基金指标"
+        : `${audit.violations.map(code => labels[code] ?? code).join("、")}与已核验工具结果不一致`;
+      this.pushLocalCommandMessage(`基金回答需要复核：${detail}。请检查 fund_dca_backtest 的任务参数与原始指标。`, "error");
+      this.setStatus({ kind: "error", text: `Fund answer needs review · ${detail}` });
+    } catch {
+      this.pushLocalCommandMessage("基金回答需要复核：当前无法读取研究证据。", "error");
+      this.setStatus({ kind: "error", text: "Fund answer needs review · evidence unavailable" });
+    }
+    this.pendingAutoArtifactInput = null;
+    return true;
+  }
+
+  private async flagUnsupportedFactorAnswer(answer: string): Promise<boolean> {
+    if (!this.agent || !knownFactorAnswerViolations(answer).length && !hasExplicitFactorLatestClaim(answer)) return false;
+    try {
+      const audit = auditCurrentFactorAnswer(await this.agent.getResearchState(), answer);
+      if (audit.status === "not-factor" || audit.status === "audited" && !audit.violations.length) return false;
+      const detail = audit.status === "unavailable" ? "当前任务缺少可匹配的已核验因子证据"
+        : audit.violations.map(code => code === "wrong-verified-factor-latest" ? "最新因子值与已核验工具结果不一致"
+          : "历史因子分位未检验后续收益，不能据此断言均值回归").join("；");
+      this.pushLocalCommandMessage(`因子回答需要复核：${detail}。请核对 compute_factor 的任务参数与原始指标。`, "error");
+      this.setStatus({ kind: "error", text: `Factor answer needs review · ${detail}` });
+    } catch {
+      this.pushLocalCommandMessage("因子回答需要复核：当前无法读取研究证据。", "error");
+      this.setStatus({ kind: "error", text: "Factor answer needs review · evidence unavailable" });
+    }
+    this.pendingAutoArtifactInput = null;
+    return true;
+  }
+
+  private async flagContradictoryRiskAnswer(answer: string): Promise<boolean> {
+    if (!this.agent || !hasRiskMetricLabel(answer)) return false;
+    try {
+      const audit = auditCurrentRiskAnswer(await this.agent.getResearchState(), answer);
+      if (audit.status === "not-risk" || audit.status === "audited" && !audit.violations.length) return false;
+      const detail = audit.status === "unavailable" ? "当前任务缺少可匹配的已核验风险指标"
+        : `${audit.violations.map(code => RISK_ANSWER_VIOLATION_LABELS[code] ?? code).join("、")}与已核验工具结果不一致`;
+      this.pushLocalCommandMessage(`风险回答需要复核：${detail}。请检查 check_risk 的任务参数与原始指标。`, "error");
+      this.setStatus({ kind: "error", text: `Risk answer needs review · ${detail}` });
+    } catch {
+      this.pushLocalCommandMessage("风险回答需要复核：当前无法读取研究证据。", "error");
+      this.setStatus({ kind: "error", text: "Risk answer needs review · evidence unavailable" });
+    }
+    this.pendingAutoArtifactInput = null;
+    return true;
+  }
+
+  private async flagContradictoryPortfolioAnswer(answer: string): Promise<boolean> {
+    if (!this.agent || !/(?:累计收益|总收益|总回报|total\s+return|最大回撤|max(?:imum)?\s+drawdown|\bTR\b|\bDD\b)/iu.test(answer)) return false;
+    try {
+      const audit = auditCurrentPortfolioAnswer(await this.agent.getResearchState(), answer);
+      if (audit.status === "not-portfolio" || audit.status === "audited" && !audit.violations.length) return false;
+      const detail = audit.status === "unavailable" ? "当前任务缺少可匹配的已核验组合比较"
+        : `${audit.violations.map(code => {
+          const group = code.includes("-a-") ? "组合 A" : "组合 B";
+          return `${group} ${code.endsWith("-return") ? "累计收益" : "最大回撤"}`;
+        }).join("、")}与已核验工具结果不一致`;
+      this.pushLocalCommandMessage(`组合回答需要复核：${detail}。请检查 compare_portfolios 的任务参数与原始指标。`, "error");
+      this.setStatus({ kind: "error", text: `Portfolio answer needs review · ${detail}` });
+    } catch {
+      this.pushLocalCommandMessage("组合回答需要复核：当前无法读取研究证据。", "error");
+      this.setStatus({ kind: "error", text: "Portfolio answer needs review · evidence unavailable" });
+    }
+    this.pendingAutoArtifactInput = null;
+    return true;
+  }
+
+  private resetHudLatency(): void {
+    this.latencyTracker = createLatencyTracker();
+    this.ttftTotalMs = this.ttftSamples = this.tpotTotalMs = this.tpotSamples = 0;
+    this.turnTtftRecorded = false;
+    this.latencyScope = null;
+    this.hud.ttftMs = this.hud.tpotMs = null;
+    this.emitHud();
+  }
+
+  private rememberModelConnection(settings: OhQuantSettings): boolean {
+    const signature = JSON.stringify([settings.provider, settings.model, settings.providers, settings.thinkingLevel, settings.env]);
+    const changed = signature !== this.modelConnectionSettings;
+    this.modelConnectionSettings = signature;
+    return changed;
+  }
+
+  private prepareHudForRequest(): void {
+    if (isAgentTurnActive(this.agent)) return;
+    const settings = loadSettings();
+    if (this.rememberModelConnection(settings)) {
+      this.configuredModel = { model: readModel(settings), modelLabel: readModelLabel(settings) };
+      this.configuredProvider = settings.provider;
+      this.modelConnectionPending = true;
+    }
+    if (!this.modelConnectionPending) return;
+    this.hud.contextUsage = null;
+    this.resetHudLatency();
   }
 
   private setActivity(activity: AppState["activity"]): void {
@@ -486,104 +810,9 @@ export class AppRuntime {
     this.callbacks.onComposerStatus?.(status);
   }
 
-  private setPanel(panel: PanelSection[], loading = false): void {
-    this.callbacks.onPanel?.(panel, loading);
-  }
+  private syncOverviewPanel(): void { this.overview.render(); }
 
-  private syncOverviewPanel(loading = false): void {
-    const sections = [...this.marketSections];
-    if (!this.overviewReady && sections.length === 0) {
-      this.setPanel(marketRefreshLoadingPanel(), true);
-      return;
-    }
-    this.setPanel(sections, loading);
-  }
-
-  private static readonly MARKET_REFRESH_TIMEOUT_MS = 30_000;
-
-  private scheduleMarketRefresh(): void {
-    if (this.marketRefreshPromise) return;
-    const startedAt = perfNow();
-    void this.startMarketRefresh()
-      .then(() => perfLog("runtime.market.refresh", startedAt, { background: true }));
-  }
-
-  private startMarketRefresh(): Promise<void> {
-    const generation = ++this.marketRefreshGeneration;
-    this.syncOverviewPanel(true);
-
-    const refresh = this.pullMarketPanelWithTimeout(generation)
-      .catch(() => {
-        if (generation !== this.marketRefreshGeneration) return;
-        this.marketRefreshGeneration++;
-        if (this.overviewReady) this.syncOverviewPanel();
-        else this.setMarketUnavailable();
-      })
-      .finally(() => {
-        if (this.marketRefreshPromise === refresh) this.marketRefreshPromise = null;
-      });
-    this.marketRefreshPromise = refresh;
-    return refresh;
-  }
-
-  private async pullMarketPanelWithTimeout(generation: number): Promise<void> {
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    try {
-      await Promise.race([
-        this.pullMarketPanel(generation),
-        new Promise<never>((_, reject) => {
-          timeout = setTimeout(
-            () => reject(new Error("Overview market refresh timed out")),
-            this.marketRefreshTimeoutMs,
-          );
-        }),
-      ]);
-    } finally {
-      if (timeout) clearTimeout(timeout);
-    }
-  }
-
-  private async pullMarketPanel(generation: number): Promise<void> {
-    const refreshedAt = new Date();
-    const pullMeta: OverviewPullMeta = { sources: [], asOfDates: [] };
-    const panelPortfolio = this.loadOverviewPortfolio();
-    const portfolioSymbols = collectOverviewSymbols(panelPortfolio);
-    const [marketQuotes, portfolioRows] = await Promise.all([
-      this.quoteFetcher(MARKET_INDICES, pullMeta),
-      this.holdingFetcher(portfolioSymbols, pullMeta),
-    ]);
-    const sections = buildOverviewPanelSections({
-      portfolio: panelPortfolio,
-      portfolioSymbols,
-      marketQuotes,
-      portfolioRows,
-      pullMeta,
-      refreshedAt,
-    });
-    if (generation !== this.marketRefreshGeneration) return;
-    this.marketSections = sections;
-    this.overviewReady = true;
-    this.syncOverviewPanel();
-  }
-
-  private setMarketUnavailable(): void {
-    this.overviewReady = true;
-    this.marketSections = marketUnavailablePanel();
-    this.syncOverviewPanel();
-  }
-
-  private loadOverviewPortfolio(): ReturnType<typeof loadPanelPortfolio> {
-    const portfolio = loadPanelPortfolio();
-    const selected = findLocalPortfolio(loadSettings().preferences.currentPortfolioFile);
-    if (!selected) return portfolio;
-    const selectedCodes = new Set(selected.holdings.map((holding) => baseCode(holding.code)));
-    return {
-      ...portfolio,
-      symbols: portfolio.symbols.map((entry) => selectedCodes.has(baseCode(entry.code))
-        ? { ...entry, instrument: entry.instrument ?? selected.instrument }
-        : entry),
-    };
-  }
+  private scheduleMarketRefresh(): void { void this.overview.start(); }
 
   private commandResultContext(): CommandResultRuntimeContext {
     return {
@@ -595,6 +824,7 @@ export class AppRuntime {
       pushLocalCommandMessage: (text, role) => this.pushLocalCommandMessage(text, role),
       syncOverviewPanel: () => this.syncOverviewPanel(),
       resetAgent: () => {
+        this.resetHudLatency();
         this.agent?.abort();
         this.agent?.clearAllQueues();
         this.agent?.reset();
@@ -625,7 +855,7 @@ export class AppRuntime {
       },
       emitLocalStorageState: () => this.emitLocalStorageState(),
       refreshMarketPanel: () => {
-        void this.startMarketRefresh();
+        void this.refreshOverviewPanel();
       },
     };
   }
@@ -655,11 +885,11 @@ function isDoctorResult(value: unknown): value is DoctorResult {
 
 export function createInitialAppState(version: string): AppState {
   const settings = loadSettings();
-  const model = readModel(settings.env);
+  const model = readModel(settings);
   const localState = buildLocalStorageState(settings, loadPanelPortfolio());
   return {
     model,
-    modelLabel: readModelLabel(settings.env),
+    modelLabel: readModelLabel(settings),
     version,
     user: process.env.USER || process.env.USERNAME || "trader",
     activity: "starting",
@@ -676,19 +906,18 @@ export function createInitialAppState(version: string): AppState {
   };
 }
 
-function readModel(env: Record<string, string>): string {
-  return env.WHYJ_DEFAULT_SONNET_MODEL || "deepseek-v4-pro";
+function readModel(settings: OhQuantSettings): string {
+  try { return resolveConfiguredModel(settings).id; } catch { return settings.model || "Configure model"; }
 }
 
-function readModelLabel(env: Record<string, string>): string {
-  const model = readModel(env);
-  return SHORT_MODEL[model] || model.split("-").pop() || model;
+function readModelLabel(settings: OhQuantSettings): string {
+  return readModel(settings);
 }
 
-function updateLastSymbol(flags: Record<string, unknown>): void {
+function updateLastSymbol(agent: QuantAgentSession | null, flags: Record<string, unknown>): void {
   const symbol = flags["symbol"] || flags["code"];
   if (!symbol) return;
-  updateSessionCtx({
+  agent?.updateContext({
     lastSymbol: String(symbol),
     lastMarket: String(flags["market"] || flags["m"] || "A"),
   });

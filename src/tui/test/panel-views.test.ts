@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Buffer } from "../src/buffer.ts";
 import { drawPanelFrame } from "../src/panel-chrome.ts";
-import { renderArtifactPanelView, renderHelpPanelView, renderPortfolioPanelView, renderResumePanelView } from "../src/panel-views.ts";
+import { renderArtifactPanelView, renderHelpPanelView, renderResumePanelView } from "../src/panel-views.ts";
 
 describe("panel views", () => {
   it("renders resume metadata and legacy archive markers through the shared resume view", () => {
@@ -52,7 +52,12 @@ describe("panel views", () => {
     expect(plain).toContain("Browse and restore saved sessions");
     expect(plain).toContain("Browse, restore, and open reports");
     expect(plain).toContain("Hotkeys");
-    expect(plain).toContain("Ctrl+P");
+    buf.clear();
+    renderHelpPanelView(buf, drawPanelFrame(buf, "Help", ""), {
+      commands: [], hotkeys: [{ key: "Ctrl+P", desc: "Open settings" }], section: "hotkeys", footer: "Hotkeys apply outside Help.",
+    });
+    expect(buf.toPlain().join("\n")).toContain("Ctrl+P");
+    expect(buf.toPlain().join("\n")).toContain("Open settings");
   });
 
 
@@ -76,18 +81,5 @@ describe("panel views", () => {
     expect(plain).toContain("Selected: Analysis artifact");
     expect(plain).toContain("sess-artifact-1");
     expect(plain).toContain("3 msg");
-  });
-  it("renders actionable portfolio empty state text", () => {
-    const buf = new Buffer(120, 20);
-    const frame = drawPanelFrame(buf, "Portfolio", "Add portfolio JSON files under .ohquant/portfolio/");
-
-    renderPortfolioPanelView(buf, frame, {
-      items: [],
-      footer: "Add portfolio JSON files under .ohquant/portfolio/, then reopen /portfolio.",
-    });
-
-    const plain = buf.toPlain().join("\n");
-    expect(plain).toContain("No local portfolios yet.");
-    expect(plain).toContain(".ohquant/portfolio/");
   });
 });

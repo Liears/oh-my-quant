@@ -15,6 +15,26 @@ export interface StoragePolicyEntry {
 }
 
 export const STORAGE_POLICY: StoragePolicyEntry[] = [
+  { path: ".ohquant/research/decisions/", class: "artifact", cacheable: false,
+    description: "Explicit research choices and rationale bound to comparison archives. Not verified user approval, account activity or public market cache; free text may contain private research notes." },
+  {
+    path: ".ohquant/reports/annual/",
+    class: "artifact",
+    cacheable: false,
+    description: "Immutable local annual observation research and HTML previews bound to archived comparisons; includes group names, no account performance. Not a public share copy.",
+  },
+  {
+    path: ".ohquant/model-auth/{id}.json",
+    class: "durable",
+    cacheable: false,
+    description: "Private OAuth login generations and rotated credentials; settings contain only an opaque reference. Never publish or treat as cache.",
+  },
+  {
+    path: ".ohquant/alpha/runs/",
+    class: "artifact",
+    cacheable: false,
+    description: "Immutable hypothetical alpha research with explicit assumptions and public DatasetRef; not account positions or executions.",
+  },
   {
     path: ".ohquant/settings.json",
     class: "durable",

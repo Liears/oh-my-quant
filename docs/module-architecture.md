@@ -11,9 +11,25 @@
 | `src/app-runtime.ts` | TUI/CLI 到 agent session 和本地面板的桥接 | 编排 UI 状态刷新 |
 | `src/app-watchlist.ts` | watchlist 应用服务 | 让 TUI 不直接访问 storage |
 | `src/insight/` | storage-backed insight/quote 服务 | 从 `quant/insight.ts` 迁出文件持久化 |
-| `src/agent/` | vendored pi harness wrapper、运行时上下文、session facade | 持有 prompt loop、compaction、resume |
+| `src/agent/` | 上游 pi kernel 接入、WhyJ 会话适配、session facade | 持有 prompt loop、compaction、resume |
+| `src/research/` | 分支研究状态与共享证据核验 | 参数/引用/重算独立于 Agent 与报告渲染，不调用实时数据源 |
+| `src/account-performance/` | 私有账户区间业绩的只读历史端口与计算 | 显式适配器、资金流前估值及已扣费用；只在内存处理，未接默认 UI/Agent/年报，见 [账户业绩](./account-performance.md) |
+| `src/execution/` / `src/app/paper-execution/` | 独立订单端口 / 宿主显式选择的本地模拟盘 | 通用端口不持久化或读取凭证；paper 宿主在指定绝对目录保存私有账户/订单，合成成交由宿主注入，不进默认 Agent，见 [执行契约](./execution.md) |
 | `src/tools/` | 内置 agent 工具 | 数据工具、量化工具、shell 工具、注册表 |
 | `src/source/` | 行情数据 provider adapter 和回退编排 | 公共入口点为 `src/source/index.ts` |
+| `src/market/` | 无 IO 的代码、日期和 Bar 规范化 | source/storage 共用，保留交易所与基金后缀身份 |
+| `src/runtime/portfolio.ts` | 自定义组合编辑服务 | TUI 与 CLI 共用校验和增删改逻辑 |
+| `src/runtime/quant-harness.ts` | 结构化研究任务宿主与工具执行守卫 | 组合现有 Session/Pi；任务事件仍存原 session，状态由 research/tasks 投影 |
+| `src/tools/research-task-tool.ts` | 会话绑定的研究控制工具 | registry.bindResearchTools 组装，注入分支读口；成功结果提交事件，不在工具内等待自身 idle |
+| `src/runtime/research-task-view.ts` / `src/tui/src/research-task-panel.ts` | 任务投影文本与只读终端面板 | `/resume --task` 经 AppRuntime 回调传入快照；渲染与按键不执行模型、行情或状态写入 |
+| `src/runtime/analysis-data.ts` | 量化工具数据入口 | 按分析窗口自动取数 |
+| `src/runtime/data-readiness.ts` | 数据连接诊断 | 明确市场/样本/窗口，仅探测所选源，无缓存或隐式保存；CLI/数据配置面板共用 |
+| `src/runtime/data-settings.ts` | 数据配置草稿与验证生命周期 | 编辑使证据失效，取消隔离迟到结果；验证成功才生成可保存草稿，不直接持久化 |
+| `src/runtime/tool-readiness.ts` | 工具能力投影 | 从实际 registry 检查市场、凭证、Python 依赖与日线样本范围，不执行工具 |
+| `src/runtime/tool-probe.ts` / `tool-probe-draft.ts` | 端点响应检查与编辑生命周期 | CLI/TUI 共用；只调用所选 source adapter，复用基金参数 schema；固定配置快照、超时/取消、不持久化 |
+| `src/tui/src/data-settings-panel.ts` | 数据编辑器 | 键盘/焦点/脱敏展示；PanelController 经 PanelDataService 保存，完成事件驱动 TUI 重绘 |
+| `src/runtime/overview-refresh.ts` | Overview 周期/手动刷新生命周期 | 取消、超时、代次、状态和观测；AppRuntime 转发入口 |
+| `src/runtime/overview-data.ts` | 本轮公开报价请求池与来源映射 | 最多 8 个活跃请求，跨指数/组合去重，可注入 source fetcher；无行情缓存 |
 | `src/runtime/source-runtime.ts` | storage-backed source runtime adapter | 将 source 的可注入 cache/settings deps 绑定到 storage |
 | `src/storage/` | `.ohquant` 持久化、缓存、session 摘要、显式 legacy portfolio 迁移 | 本地持久化状态规则的唯一位置；只暴露 resolver/API，不暴露 import-time path constants |
 | `src/types/` | 共享领域契约 | 保持与 provider 无关 |
@@ -28,6 +44,7 @@
 5. `source` 获取并标准化 provider 数据；不决定 portfolio 语义。
 6. `storage` 持有文件系统布局和去重/缓存规则；调用方不应手工拼接 `.ohquant` 路径。
 7. `runtime` 负责把 source 的依赖注入接口绑定到 storage/settings；`source` 本身不导入 storage。
+8. `execution` 只定义私有执行契约和调用边界；显式应用宿主可以持有独立执行服务账本，不能将其并入 `.ohquant` 公开行情/观察组合存储或默认研究上下文。
 
 ## 模块契约
 
@@ -70,8 +87,16 @@
   - system prompt/context 组装
 - 规则：
   - UI 应调用 facade，不直接修改 agent 状态
+  - `kernel/loop.ts` 唯一导入上游执行循环；`kernel/llm.ts` 唯一导入上游协议与模型目录
+  - `model-config.ts` 解析配置；`session-state.ts` 映射事件；每个 Agent 自有 SessionCtx
+  - `session-contracts.ts` 定义完整模型/工具/skills/repo/prompt/证据端口；`session-dependencies.ts` 组装默认本地 IO，`session.ts` 消费端口与分支快照。独立替换与失败契约见 [Session 依赖注入](./session-dependencies.md)
+  - 架构 gate 禁止 `session.ts` 直接导入 storage、tools、source、tui；不以默认组装替代可注入宿主
+  - `session-runtime/harness/operation.ts` 统一取消与完成等待；`session/compact-session.ts`、`navigate-session.ts` 管理独占会话操作
+  - pi 两包精确锁定同一版本；架构检查禁止 TypeScript 路径别名覆盖和绕过 kernel 的协议实现导入
 
 ## 推荐的依赖方向
+
+`agent` 和 `artifact` 共用 `research/input.ts` 的归档核验及七类计算重算；`research/state.ts` 消费结构化分支快照并生成内部状态，见 [研究状态](./research-state.md)。Research 只可向 quant、market、storage、types 依赖；低层和 TUI 不反向依赖 research。数据归档修订/缺失的判定在报告与恢复上下文中一致，新增核验逻辑无需依赖 HTML 或 TUI。
 
 ```text
 cli/tui
@@ -83,10 +108,10 @@ cli/tui
 tools
   -> runtime/source-runtime
   -> storage
-  -> types
+  -> market/types
 
 source
-  -> types
+  -> market/types
 
 app services (`app-runtime`, `app-watchlist`, `insight`)
   -> storage
@@ -97,7 +122,7 @@ runtime/source-runtime
   -> storage
 
 storage
-  -> types
+  -> market/types
 ```
 
 避免反向依赖：`source` 和 `storage` 不应互相依赖，`tui` 不应直接依赖 provider adapter，也不应手工拼 `.ohquant` 路径。`scripts/architecture-boundary-baseline.json` 当前为空，新增违规由 `bun run check:architecture` 阻止。
@@ -115,9 +140,10 @@ storage
 
 ## 当前文档
 
-- [CLI 设计与参考](./interactive-cli-design.md)
-- [Agent System Spec](./agent-system-spec.md)
+- [Quant UI/UX](./quant-uiux.md)
+- [Quant Harness](./quant-harness.md)
 - [pi Agent Loop 与 Harness](./pi-agent-loop-harness.md)
+- [Pi 量化生态、CLI 对比与插件开发](./pi-quant-ecosystem.md)
 - [OhQuant 存储策略](./ohquant-storage-policy.md)
 - [内置工具注册表](./builtin-tool-registry.md)
 - [数据源 Provider](./source-data-providers.md)

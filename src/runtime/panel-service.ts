@@ -1,9 +1,13 @@
 import type { AppState, PanelSection } from "../tui/src/types.ts";
+import { normalizeMarketColorScheme, type MarketColorScheme } from "../types/theme-colors.ts";
+import { normalizeHudMode, type HudMode } from "../types/config.ts";
 
 interface RuntimeSettingsLike {
   preferences: {
     currentPortfolioFile?: string;
     source?: string;
+    marketColorScheme?: MarketColorScheme;
+    hudMode?: HudMode;
   };
   showPortfolioPanel?: boolean;
 }
@@ -23,12 +27,13 @@ export function activePanelPortfolioName(portfolio: PanelPortfolioLike, fallback
 export function buildLocalStorageState(
   settings: RuntimeSettingsLike,
   portfolio: PanelPortfolioLike,
-): Pick<AppState, "activePortfolio" | "source" | "showPortfolioPanel"> {
-  const portfolioFile = settings.preferences.currentPortfolioFile || "holdings.json";
+): Pick<AppState, "activePortfolio" | "source" | "showPortfolioPanel" | "marketColorScheme" | "hudMode"> {
   return {
-    activePortfolio: activePanelPortfolioName(portfolio, portfolioFile),
+    activePortfolio: activePanelPortfolioName(portfolio, "No portfolios"),
     source: settings.preferences.source || "llmquant-data",
     showPortfolioPanel: settings.showPortfolioPanel !== false,
+    marketColorScheme: normalizeMarketColorScheme(settings.preferences.marketColorScheme),
+    hudMode: normalizeHudMode(settings.preferences.hudMode),
   };
 }
 

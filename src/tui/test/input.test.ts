@@ -3,6 +3,14 @@ import { buildSuggestions, hitTestScrollRegion, nextInputAction } from "../src/i
 import type { Layout } from "../src/types.ts";
 
 describe("nextInputAction", () => {
+  it("decodes configurable control chords while preserving Return, Tab and Backspace", () => {
+    for (const [sequence, name] of [["\x01", "a"], ["\x05", "e"], ["\x0c", "l"], ["\x0f", "o"]]) {
+      expect(nextInputAction(sequence! + "x")).toMatchObject({ action: { type: "key", name, ctrl: true }, rest: "x" });
+    }
+    for (const [sequence, name] of [["\r", "return"], ["\t", "tab"], ["\b", "backspace"]]) {
+      expect(nextInputAction(sequence!).action).toMatchObject({ type: "key", name, ctrl: false });
+    }
+  });
   it("parses printable input", () => {
     const { action, rest } = nextInputAction("a");
     expect(rest).toBe("");

@@ -16,5 +16,6 @@ describe("tool result helpers", () => {
     if (first?.type !== "text") throw new Error("expected text content");
     expect(first.text).toContain("No cached data for this symbol");
     expect(first.text).toContain("000300.SH");
+    expect(result.details).toEqual({ error: { code: "DATA_NO_CACHE", message: first.text } });
   });
 });

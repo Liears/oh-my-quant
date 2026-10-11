@@ -2,11 +2,37 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { PythonReadiness } from "../../types/data-readiness.ts";
 
 type PythonCandidate = { command: string; args: string[] };
 
 export interface RunPythonOptions {
   timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+/** Uses the same interpreter selection as market requests; never installs dependencies. */
+export async function checkAkshareDependency(options: RunPythonOptions = {}): Promise<PythonReadiness> {
+  try {
+    const { stdout } = await runPython([
+      "import json, platform",
+      "try:",
+      "    import akshare as ak",
+      "    print(json.dumps({'status': 'ready', 'python': platform.python_version(), 'akshare': str(getattr(ak, '__version__', 'unknown'))}))",
+      "except ImportError:",
+      "    print(json.dumps({'status': 'missing-package', 'python': platform.python_version()}))",
+    ].join("\n"), [], options);
+    const result: unknown = JSON.parse(stdout.trim());
+    if (!result || typeof result !== "object" || !("status" in result)
+      || (result.status !== "ready" && result.status !== "missing-package")) throw new Error("Invalid dependency probe response");
+    return { status: result.status,
+      python: "python" in result && typeof result.python === "string" ? result.python : undefined,
+      akshare: "akshare" in result && typeof result.akshare === "string" ? result.akshare : undefined };
+  } catch (error) {
+    options.signal?.throwIfAborted();
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { status: "missing-python" };
+    throw error;
+  }
 }
 
 export function runPython(
@@ -20,16 +46,21 @@ export function runPython(
     let index = 0;
 
     const attempt = () => {
+      if (options.signal?.aborted) { reject(options.signal.reason); return; }
       const candidate = candidates[index++];
       if (!candidate) {
         reject(new Error(`AKShare failed (python unavailable): ${pythonAvailabilityMessage()}`));
         return;
       }
 
+      let failedToSpawn = false;
       let stdout = "";
       let stderr = "";
       const proc = spawn(candidate.command, [...candidate.args, "-c", script, ...args], {
         stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+        signal: options.signal,
+        env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" },
         timeout: timeoutMs,
       });
 
@@ -37,6 +68,7 @@ export function runPython(
       proc.stderr.on("data", (d: Buffer) => (stderr += d.toString()));
 
       proc.on("close", (code) => {
+        if (failedToSpawn) return;
         if (code === 0) {
           resolvePromise({ stdout, stderr });
           return;
@@ -46,6 +78,7 @@ export function runPython(
       });
 
       proc.on("error", (err: NodeJS.ErrnoException) => {
+        failedToSpawn = true;
         if (err.code === "ENOENT" && index < candidates.length) {
           attempt();
           return;
@@ -59,7 +92,7 @@ export function runPython(
 }
 
 function getPythonCandidates(): PythonCandidate[] {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+  const root = packageRoot();
   const venvCandidates = process.platform === "win32"
     ? [
       resolve(root, ".venv/Scripts/python.exe"),
@@ -90,7 +123,7 @@ function getPythonCandidates(): PythonCandidate[] {
 }
 
 function pythonAvailabilityMessage(): string {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+  const root = packageRoot();
   return [
     resolve(root, ".venv/Scripts/python.exe"),
     resolve(root, ".venv/Scripts/python"),
@@ -100,4 +133,15 @@ function pythonAvailabilityMessage(): string {
     "python3",
     "python",
   ].join(", ");
+}
+
+// Resolve the same package in both src/source/src and the bundled dist entry.
+function packageRoot(): string {
+  let current = dirname(fileURLToPath(import.meta.url));
+  while (!existsSync(resolve(current, "package.json"))) {
+    const parent = dirname(current);
+    if (parent === current) return process.cwd();
+    current = parent;
+  }
+  return current;
 }

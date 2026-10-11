@@ -51,8 +51,8 @@ describe("skillHandler", () => {
     expect(result.message).toContain("/skill install");
   });
 
-  it("rejects invalid install repo format before invoking git", () => {
-    const result = installSkills("not-a-github-repo");
+  it("rejects invalid install repo format before invoking git", async () => {
+    const result = await installSkills("not-a-github-repo");
     expect(result.success).toBe(false);
     expect(result.message).toContain("owner/repo");
   });

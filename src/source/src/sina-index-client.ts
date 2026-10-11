@@ -8,19 +8,22 @@ const SINA_INDEX_QUOTE_GROUPS: Record<string, string[]> = {
   "中证系列指数": ["000300", "000905", "000852", "000903", "000904", "000906", "000907", "000908", "000909", "000910"],
 };
 
-export async function fetchSinaAIndexSpotQuotes(categories: string[]): Promise<AkshareIndexQuote[]> {
+export async function fetchSinaAIndexSpotQuotes(categories: string[], signal?: AbortSignal): Promise<AkshareIndexQuote[]> {
+  signal?.throwIfAborted();
   const codes = resolveSinaIndexSymbols(categories);
   if (codes.length === 0) return [];
 
   const response = await fetch(`https://hq.sinajs.cn/list=${codes.map(sinaIndexQuoteSymbol).join(",")}`, {
+    signal,
     headers: {
       "User-Agent": "Mozilla/5.0",
       "Referer": "https://finance.sina.com.cn/",
     },
   });
-  if (!response.ok) return [];
+  if (!response.ok) throw new Error(`Sina index quotes HTTP ${response.status}`);
 
   const text = new TextDecoder("gb18030" as never).decode(await response.arrayBuffer());
+  signal?.throwIfAborted();
   const rows = parseSinaIndexQuotes(text);
   const byCode = new Map(rows.map((row) => [row.code, row]));
   return codes.map((code) => byCode.get(code)).filter((row): row is AkshareIndexQuote => Boolean(row));

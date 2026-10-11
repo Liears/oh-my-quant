@@ -42,15 +42,23 @@
     "test:fence": "bun run scripts/check-test-fence.ts",
     "test:manual-artifacts": "bun test --path-ignore-patterns 'reference/**' src/artifact/test/gen-kline.test.ts src/artifact/test/gen-kc50.test.ts src/artifact/test/gen-fund.test.ts src/artifact/test/gen-fund-006265.test.ts src/artifact/test/gen-sst-all.test.ts src/artifact/test/gen-stock-300308.test.ts",
     "test:providers": "bun run scripts/provider-smoke.ts",
+    "bench:model": "bun run scripts/measure-model.ts",
+    "eval:research": "bun run scripts/evaluate-research.ts",
     "test:watch": "bun test --watch",
     "prepublishOnly": "bun run gen:insights && bun run build && bun run typecheck"
   },
   "dependencies": {
-    "@earendil-works/pi-agent-core": "^0.78.0",
-    "typebox": "^1.1.39"
+    "@earendil-works/pi-agent-core": "1.1.0",
+    "@earendil-works/pi-ai": "1.1.0",
+    "@mozilla/readability": "0.6.0",
+    "linkedom": "0.18.13",
+    "proper-lockfile": "4.1.2",
+    "strip-json-comments": "5.0.3",
+    "typebox": "1.3.7"
   },
   "devDependencies": {
     "@types/bun": "^1.2.0",
+    "@types/proper-lockfile": "4.1.4",
     "typescript": "^5.7.0"
   }
 }

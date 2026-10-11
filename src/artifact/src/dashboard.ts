@@ -2,6 +2,7 @@
 import type { GenCtx, NavLineData } from "./types.ts";
 import { esc } from "./template.ts";
 import { renderComparisonRadar, renderEchartsKline, renderFactorRadar } from "./renderers.ts";
+import { displayedMovement, metricTone } from "../../types/metric-semantics.ts";
 
 export function renderDashboardOverview(ctx: GenCtx): string {
   const hasKline = ctx.klines.length > 0;
@@ -46,7 +47,7 @@ function renderKpiTape(ctx: GenCtx): string {
   const coverage = quantDatasetCount(ctx);
   const cells = [
     { label: market.label, value: market.value, note: market.note, tone: market.tone },
-    { label: "RISK MARKER", value: risk?.value ?? "N/A", note: risk?.label ?? "no explicit risk metric", tone: risk && risk.num < 0 ? "negative" : "neutral" },
+    { label: "RISK MARKER", value: risk?.value ?? "N/A", note: risk?.label ?? "no explicit risk metric", tone: risk ? metricTone(risk.value, risk.label) ?? "neutral" : "neutral" },
     { label: "FACTOR SCORE", value: factorAverage === null ? "N/A" : factorAverage.toFixed(1), note: factorAverage === null ? "awaiting factor data" : `${ctx.factors.length} factors`, tone: factorAverage === null ? "neutral" : factorAverage >= 50 ? "positive" : "negative" },
     { label: "DATA COVERAGE", value: String(coverage), note: `${ctx.klines.length} OHLC · ${ctx.navCharts.length} NAV · ${ctx.metrics.length} metrics`, tone: coverage > 0 ? "positive" : "neutral" },
   ];
@@ -58,15 +59,15 @@ function marketSnapshot(ctx: GenCtx): { label: string; value: string; note: stri
   if (kline && kline.rows.length > 0) {
     const latest = kline.rows[kline.rows.length - 1]!;
     const previous = kline.rows[kline.rows.length - 2];
-    const change = previous ? (latest.close - previous.close) / previous.close * 100 : 0;
-    return { label: "LATEST CLOSE", value: formatNumber(latest.close), note: `${change >= 0 ? "+" : ""}${change.toFixed(2)}% · ${latest.date}`, tone: change >= 0 ? "positive" : "negative" };
+    const change = displayedMovement(previous && previous.close !== 0 ? (latest.close - previous.close) / previous.close * 100 : null);
+    return { label: "LATEST CLOSE", value: formatNumber(latest.close), note: `${change.text} · ${latest.date}`, tone: change.tone };
   }
   const nav = ctx.navCharts[0];
   if (nav && nav.rows.length > 0) {
     const first = nav.rows[0]!;
     const latest = nav.rows[nav.rows.length - 1]!;
-    const change = first.nav === 0 ? 0 : (latest.nav / first.nav - 1) * 100;
-    return { label: "LATEST NAV", value: formatNumber(latest.nav), note: `${change >= 0 ? "+" : ""}${change.toFixed(2)}% period return`, tone: change >= 0 ? "positive" : "negative" };
+    const change = displayedMovement(nav.rows.length > 1 && first.nav !== 0 ? (latest.nav / first.nav - 1) * 100 : null);
+    return { label: "LATEST NAV", value: formatNumber(latest.nav), note: `${change.text} period return`, tone: change.tone };
   }
   return { label: "MARKET SERIES", value: "N/A", note: "no OHLC or NAV detected", tone: "neutral" };
 }
@@ -74,7 +75,7 @@ function marketSnapshot(ctx: GenCtx): { label: string; value: string; note: stri
 function renderDecisionPanel(ctx: GenCtx): string {
   const market = marketSnapshot(ctx);
   const risk = ctx.metrics.find((metric) => /回撤|drawdown|risk|风险|volatility|波动|var/i.test(metric.label));
-  const status = risk && risk.num < 0 || market.tone === "negative" ? "WATCH" : market.tone === "positive" ? "CONSTRUCTIVE" : "AWAIT DATA";
+  const status = risk && metricTone(risk.value, risk.label) === "negative" || market.tone === "down" ? "WATCH" : market.tone === "up" ? "CONSTRUCTIVE" : "AWAIT DATA";
   const statusTone = status === "WATCH" ? "negative" : status === "CONSTRUCTIVE" ? "positive" : "neutral";
   const bullets = [
     ctx.klines.length > 0 ? `${ctx.klines[0]!.rows.length} candles · ${ctx.klines.length} timeframes` : "No OHLC series detected",

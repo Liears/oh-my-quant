@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { Buffer } from "../src/buffer.ts";
+import { EventEmitter } from "node:events";
+import { Writable } from "node:stream";
+import { Buffer, Screen, ansi } from "../src/buffer.ts";
 import { CANVAS, S } from "../src/styles.ts";
 
 describe("buffer render", () => {
@@ -22,5 +24,77 @@ describe("buffer render", () => {
     const tail = rendered.slice(rendered.indexOf("think") + 5);
     const nextStyle = tail.match(/\x1b\[[0-9;]*m/);
     expect(nextStyle?.[0]).toBe("\x1b[0m");
+  });
+});
+
+class SlowOutput extends EventEmitter {
+  columns = 24;
+  rows = 3;
+  writable = false;
+  writes: string[] = [];
+  write(value: string): boolean { this.writes.push(value); return this.writable; }
+}
+
+describe("screen output backpressure", () => {
+  it("coalesces blocked paints into the latest synchronized frame", () => {
+    const out = new SlowOutput();
+    const screen = new Screen(out as unknown as NodeJS.WriteStream);
+    screen.buf.text(0, 0, "first"); screen.flush();
+    screen.buf.clear(); screen.buf.text(0, 0, "intermediate"); screen.flush();
+    screen.buf.clear(); screen.buf.text(0, 0, "latest"); screen.flush();
+    expect(out.writes).toHaveLength(1);
+    out.writable = true; out.emit("drain");
+    expect(out.writes).toHaveLength(2);
+    expect(out.writes[1]).toContain("latest");
+    expect(out.writes[1]).not.toContain("intermediate");
+    expect(out.writes[1]).toStartWith(ansi.syncOn);
+    expect(out.writes[1]).toEndWith(ansi.syncOff);
+  });
+
+  it("drops a pending frame on exit and queues terminal restoration", () => {
+    const out = new SlowOutput();
+    const screen = new Screen(out as unknown as NodeJS.WriteStream);
+    screen.buf.text(0, 0, "first"); screen.flush();
+    screen.buf.clear(); screen.buf.text(0, 0, "pending"); screen.flush();
+    screen.exit(); out.writable = true; out.emit("drain");
+    expect(out.writes).toHaveLength(2);
+    expect(out.writes[1]).toContain(ansi.altOff);
+    expect(out.writes.join("")).not.toContain("pending");
+  });
+
+  it("waits for an initial blocked terminal setup and resumes after repeated stalls", () => {
+    const out = new SlowOutput();
+    const screen = new Screen(out as unknown as NodeJS.WriteStream);
+    screen.enter();
+    screen.buf.text(0, 0, "ready"); screen.flush();
+    expect(out.writes).toHaveLength(1);
+    out.writable = true; out.emit("drain");
+    expect(out.writes[1]).toContain("ready");
+    out.writable = false;
+    screen.buf.clear(); screen.buf.text(0, 0, "again"); screen.flush();
+    screen.buf.clear(); screen.buf.text(0, 0, "final"); screen.flush();
+    expect(out.writes).toHaveLength(3);
+    out.writable = true; out.emit("drain");
+    expect(out.writes[3]).toContain("final");
+    expect(out.writes[3]).not.toContain("again");
+    screen.exit();
+  });
+
+  it("delivers the newest frame after real Writable backpressure clears", async () => {
+    const writes: string[] = [];
+    const sink = Object.assign(new Writable({ highWaterMark: 1, write(chunk, _encoding, done) {
+      writes.push(String(chunk)); setTimeout(done, 20);
+    } }), { columns: 24, rows: 3 });
+    const screen = new Screen(sink as unknown as NodeJS.WriteStream);
+    screen.buf.text(0, 0, "first"); screen.flush();
+    screen.buf.clear(); screen.buf.text(0, 0, "skipped"); screen.flush();
+    screen.buf.clear(); screen.buf.text(0, 0, "current"); screen.flush();
+    await new Promise<void>(resolve => sink.once("drain", resolve));
+    expect(writes).toHaveLength(2);
+    expect(writes[1]).toContain("current");
+    expect(writes.join("")).not.toContain("skipped");
+    screen.exit(); sink.end();
+    await new Promise<void>(resolve => sink.once("finish", resolve));
+    expect(writes.at(-1)).toContain(ansi.altOff);
   });
 });

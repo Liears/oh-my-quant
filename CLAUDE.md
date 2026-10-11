@@ -13,7 +13,7 @@ description: WhyJ Quant — 量化分析交互终端 (Bun + TypeScript + frame-b
 - 技术因子计算（动量、反转、波动率、RSI、均线偏离、成交量比）
 - 双均线策略回测 + 风险指标（VaR、CVaR、夏普、最大回撤）
 - Benchmark 三维度评分（收益/风险/稳健性 100分制）
-- AI Agent（自然语言驱动分析，基于 pi agent core + Anthropic SDK）
+- AI Agent（自然语言驱动分析，基于 pi-agent-core / pi-ai + WhyJ 会话适配）
 - 个人投资组合看板
 
 - ## Conversational Style
@@ -33,7 +33,7 @@ oh-my-quant/
 │   ├── index.ts              # 入口 (interactive REPL 或 one-shot)
 │   ├── app.ts                # TUI 启动编排
 │   ├── tui/                  # frame-buffer TUI (src/ + test/)
-│   ├── agent/                # AI Agent (pi core + Anthropic shim + session)
+│   ├── agent/                # AI Agent (pi kernel + WhyJ session-runtime)
 │   ├── tools/                # AgentTool 定义 (TypeBox schemas)
 │   ├── cli/                  # Slash command parser + dispatcher
 │   ├── skill/                # Skill 模块 (安装/发现/调用)
@@ -89,8 +89,8 @@ oh-my-quant/
 
 | 实现领域 | 必须先读的参考文档 |
 |---------|-------------------|
-| CLI 架构、slash 命令参考、`src/cli/` 模块、数据流、实施计划 | `docs/interactive-cli-design.md` |
-| AI Agent 架构、Tool 系统、System Prompt、数据存储、Session 管理 | `docs/agent-system-spec.md` |
+| CLI 架构、slash 命令、数据流与场景布局 | `docs/quant-uiux.md`、`docs/slash-commands.md` |
+| AI Agent 架构、Tools/Skills、Prompt、数据与研究会话 | `docs/quant-harness.md`、`docs/pi-agent-loop-harness.md` |
 | 颜色、字体、间距、组件样式、品牌规则 | `DESIGN.md` |
 | 数据源 API、Python 库速记 | `docs/source-data-providers.md` |
 
@@ -102,7 +102,7 @@ oh-my-quant/
 |---|------|
 | Runtime | Bun + TypeScript (strict) |
 | TUI | Custom frame-buffer cell grid (详见 docs/tui-layout-design.md) |
-| AI Agent | @anthropic-ai/sdk + pi agent core (vendor) |
+| AI Agent | pi-agent-core / pi-ai 1.1.0 + WhyJ session-runtime |
 | 数据 | direct adapters + 本地文件 |
 | Schema | TypeBox (agent tools) + Zod |
 | 构建 | bun build |

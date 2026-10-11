@@ -157,6 +157,15 @@ export const FACTOR_NAMES = [
 
 export type FactorName = (typeof FACTOR_NAMES)[number];
 
+/** Latest observation compared with preceding valid observations. */
+export function summarizeFactor(values: Array<number | null>): { last: number | undefined; mean: number | null; percentile: number | null } {
+  const previous = values.filter((value): value is number => value !== null);
+  const last = previous.pop();
+  const mean = previous.length ? previous.reduce((sum, value) => sum + value, 0) / previous.length : null;
+  const percentile = last !== undefined && previous.length ? previous.filter(value => value <= last).length / previous.length : null;
+  return { last, mean, percentile };
+}
+
 /** Compute a factor by name */
 export function computeFactor(
   name: FactorName,

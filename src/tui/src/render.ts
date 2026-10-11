@@ -1,6 +1,6 @@
 /**
  * Region renderers for the r2 full-screen docked TUI.
- * Each function is pure: (Buffer, Rect, AppState) → void.
+ * Insight loading is deferred until an active conversation actually displays it.
  */
 import { Buffer, truncate, sanitizeTerminalText, charWidth } from "./buffer.ts";
 import type { Style } from "./buffer.ts";
@@ -153,7 +153,7 @@ export function drawConversation(
   });
 
   if (msgs.length === 0 && activity !== "ready" && activity !== "compacting") {
-    drawLoadingOverlay(buf, inner, activity, clipEnd, LOADING_INSIGHTS, activityVerb);
+    drawLoadingOverlay(buf, inner, activity, clipEnd, loadingInsights ??= getQuotes(), activityVerb);
     return;
   }
 
@@ -187,7 +187,7 @@ export function activeConversationStatusRows(activity: string, msgs: UIMessage[]
   return activity !== "ready" && msgs.length > 0 ? Math.min(2, innerH) : 0;
 }
 
-const LOADING_INSIGHTS = getQuotes();
+let loadingInsights: ReturnType<typeof getQuotes> | undefined;
 const ORA_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 function oraFrame(): string {
@@ -195,8 +195,9 @@ function oraFrame(): string {
 }
 
 function thinkingQuote(): string {
-  const idx = Math.floor(Date.now() / 5000) % LOADING_INSIGHTS.length;
-  const q = LOADING_INSIGHTS[idx];
+  const quotes = loadingInsights ??= getQuotes();
+  const idx = Math.floor(Date.now() / 5000) % quotes.length;
+  const q = quotes[idx];
   return `"${q.quote}" — ${q.author}`;
 }
 

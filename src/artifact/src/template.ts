@@ -5,26 +5,29 @@
  */
 
 import { artifactThemeCss } from "./theme.ts";
+import { researchCss, sharePreviewCss } from "./research-theme.ts";
+import { marketColorLabel, normalizeMarketColorScheme, type MarketColorScheme } from "../../types/theme-colors.ts";
 
 export interface ArtifactTemplateInput {
   title: string; sessionId: string; model?: string; quantModel?: string; messageCount: number;
   createdAt: string; dashboardHtml?: string; bodyHtml: string; dockHtml: string; trajectoryHtml: string; generatedAt: string;
-  /** External reference URLs (雪球, 同花顺, etc.) */
-  sourceUrls?: { label: string; url: string }[];
+  /** Independently rendered public projection. Never pass a copy of the full report. */
+  shareHtml?: string;
+  marketColorScheme?: MarketColorScheme;
 }
 
 export function renderArtifactTemplate(input: ArtifactTemplateInput): string {
-  const theme = artifactThemeCss();
+  const theme = artifactThemeCss(input.marketColorScheme);
   const js = artifactScript();
 
   return `<!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="dark" data-market-colors="${normalizeMarketColorScheme(input.marketColorScheme)}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="generator" content="WhyJ Quant Artifacts">
 <title>${esc(input.title)} — WhyJ Quant</title>
-<style>${theme}</style>
+<style>${theme}${researchCss}${sharePreviewCss}</style>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"></script>
 </head>
 <body>
@@ -53,7 +56,9 @@ export function renderArtifactTemplate(input: ArtifactTemplateInput): string {
         <span><b>${input.messageCount}</b> messages</span>
         <span><b>${esc(input.model || "ai")}</b> model</span>
         <span><b>${esc(input.sessionId.slice(0,8))}</b> session</span>
+        <span><b>${marketColorLabel(input.marketColorScheme)}</b> · Flat / N/A neutral</span>
       </div>
+      <button class="research-share-open" id="share-preview-open" ${input.shareHtml ? "" : "disabled title=\"No verified public inputs are available in this report\""}>Share preview</button>
     </div>
     <div class="hero-sigil" aria-hidden="true"><span>WHYJ</span><b>Q</b><small>QUANT RESEARCH</small></div>
   </section>
@@ -77,6 +82,7 @@ export function renderArtifactTemplate(input: ArtifactTemplateInput): string {
 </footer>
 
 </div>
+${input.shareHtml ? `<dialog class="research-share-preview" id="share-preview" aria-labelledby="share-preview-title"><header><h2 id="share-preview-title">分享副本预览</h2><button id="share-download">Download HTML</button><button class="share-close" id="share-preview-close">Close</button></header><p>请检查研究标的和区间。下载仅包含下方副本；完整会话、模型叙述、轨迹、凭证、本地路径和资金金额不会加入文件。</p><iframe id="share-preview-frame" title="Public research copy" sandbox=""></iframe></dialog><script type="application/json" id="share-document">${JSON.stringify(input.shareHtml).replace(/</g, "\\u003c")}</script>` : ""}
 <script>${js}</script>
 </body>
 </html>`;
@@ -87,6 +93,24 @@ function artifactScript(): string {
 (function(W,D){
 'use strict';
 var ttEl=null;
+
+/* Public copy: preview the exact bytes that will be downloaded, with no network action. */
+var shareSource=D.getElementById('share-document'),shareDialog=D.getElementById('share-preview');
+if(shareSource&&shareDialog){
+  var shareHtml=JSON.parse(shareSource.textContent||'""');
+  D.getElementById('share-preview-open').addEventListener('click',function(){
+    shareDialog.showModal();
+    // Mount a fresh sandboxed frame in the visible dialog; a frame created while hidden can remain unpainted.
+    var previous=D.getElementById('share-preview-frame'),frame=previous.cloneNode(false);
+    frame.srcdoc=shareHtml;previous.replaceWith(frame);
+  });
+  D.getElementById('share-preview-close').addEventListener('click',function(){shareDialog.close();});
+  D.getElementById('share-download').addEventListener('click',function(){
+    var url=URL.createObjectURL(new Blob([shareHtml],{type:'text/html;charset=utf-8'})),link=D.createElement('a');
+    link.href=url;link.download='whyj-public-research.html';D.body.appendChild(link);link.click();link.remove();
+    setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  });
+}
 
 function tt(){if(!ttEl){ttEl=D.createElement('div');ttEl.className='whyj-tt';D.body.appendChild(ttEl);}return ttEl;}
 
@@ -116,6 +140,7 @@ W.toggleTheme=function(){
   h.setAttribute('data-theme',n);
   try{localStorage.setItem('whyj-thm',n)}catch(e){}
   setTimeout(function(){
+    if(typeof echarts==='undefined')return;
     var cs=D.querySelectorAll('.tab-panel:not([style*=\"display:none\"]) .ec-box > div > [id]');
     cs.forEach(function(d){var i=echarts.getInstanceByDom(d);if(i)i.resize();});
   },100);
@@ -130,8 +155,8 @@ W.toggleView=function(btn,mode){
   btns.forEach(function(b){b.classList.remove('on');});
   btn.classList.add('on');
   if(mode==='chart'){body.style.display='';raw.style.display='none';}
-  else{body.style.display='none';raw.style.display='';}
-  if(mode==='chart'){var d=body.querySelector('[id]');if(d){var i=echarts.getInstanceByDom(d);if(i)i.resize();}}
+  else{body.style.display='none';raw.style.display='block';}
+  if(mode==='chart'&&typeof echarts!=='undefined'){var d=body.querySelector('[id]');if(d){var i=echarts.getInstanceByDom(d);if(i)i.resize();}}
 };
 
   /* Trajectory view mode (Compact / Audit / Raw) */

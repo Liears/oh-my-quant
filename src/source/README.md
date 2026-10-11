@@ -28,6 +28,7 @@
 | `src/source/src/source-providers.ts` | provider registry, symbol normalization, fallback order, and symbol search |
 | `src/source/src/sources.ts` | cache-aware fetch facade and live fetch attribution over provider pulls |
 | `src/source/src/akshare.ts` | AKShare fetch orchestration and compatibility re-exports |
+| `src/source/src/akshare-global-bars.ts` | market-checked public Sina US/HK daily histories through Python |
 | `src/source/src/akshare-types.ts` | AKShare DTOs shared by parser, client, and tools |
 | `src/source/src/akshare-normalize.ts` | AKShare payload parsers and row normalizers |
 | `src/source/src/akshare-python.ts` | Python interpreter discovery and subprocess execution |
@@ -58,6 +59,11 @@ For ordinary A-share daily bars, fallback is deliberately layered:
 3. Empty/error endpoint attempts are retained by `fetchFromAKShareDetailed()`.
 4. If AKShare returns no bars or raises an adapter-level error, `source-providers.ts` tries Tushare.
 5. `fetchBars()` may finally use date-matching provider cache; `fetchLiveBars()` never reads or writes cache.
+6. Cross-provider `attempts.error` carries a stable failure category only; arbitrary provider exception text can contain private URLs, headers or response bodies and must not enter research/Agent output.
+
+`SourceRuntimeDeps.loadCache()` returns bars/freshness/DatasetRef together from one snapshot. Cache, archive, preferred-source and credential ports receive the active AbortSignal; the storage-backed runtime implements them with async file I/O. `saveBars()` accepts the same signal and returns the reference for the exact returned observations. Storage adapters preserve immutable revisions; source does not construct paths or read paired metadata separately. Cancellation is rechecked after preference/settings reads, cache lookup, provider pull, lock acquisition and each commit boundary. Host replacements may still be synchronous, so their own JavaScript cannot be preempted by the facade.
+
+US defaults to LLMQuant → Financial Datasets → AKShare `stock_us_daily`; HK defaults to LLMQuant → AKShare `stock_hk_daily`. The public Python adapter accepts only the matching market symbol, strips `.HK` for the Hong Kong endpoint, and returns unadjusted daily bars. It does not turn a data subscription failure into a verified subscription.
 
 Callers may configure `providers.akshare.sourcePriority`, override a `BarProviderAdapter`, or set a market
 `fallbackOrder`. These are separate controls: endpoint order is internal to AKShare, while fallback order chooses

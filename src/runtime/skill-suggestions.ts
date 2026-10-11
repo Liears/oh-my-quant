@@ -1,8 +1,9 @@
 import { discoverSkills } from "../agent/src/skills.ts";
-import { NodeExecutionEnv } from "../agent/src/pi/node.ts";
+import { NodeExecutionEnv } from "../agent/src/session-runtime/node.ts";
 import { skillPaths } from "../skill/index.ts";
 import { loadSettings } from "../storage/index.ts";
 import type { SkillEntry } from "../types/skills.ts";
+import { prepareRuntimeSkills } from "./skill-readiness.ts";
 
 export type { SkillEntry };
 
@@ -29,5 +30,5 @@ export async function loadRuntimeSkillSuggestions(cwd = process.cwd()): Promise<
     extraPaths: skillPaths(),
     integrations: settings.skillIntegrations,
   });
-  return toSkillEntries(discovered.skills);
+  return toSkillEntries(prepareRuntimeSkills(discovered.skills, undefined, cwd));
 }

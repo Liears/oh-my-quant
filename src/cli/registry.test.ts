@@ -266,15 +266,15 @@ describe("executeCommand", () => {
 describe("catalog", () => {
   it("keeps one descriptive entry for every public slash command", () => {
     expect(COMMAND_CATALOG).toEqual([
-      { name: "/compact", desc: "Compact current session context" },
-      { name: "/resume", desc: "Browse and restore saved sessions" },
-      { name: "/portfolio", desc: "Browse and select local portfolios" },
-      { name: "/config", desc: "Review and edit runtime settings" },
-      { name: "/doctor", desc: "Configure and diagnose runtime" },
-      { name: "/skill", desc: "Discover, inspect, and run skills" },
+      { name: "/compact", desc: "Compact research session context" },
+      { name: "/resume", desc: "Resume saved research sessions" },
+      { name: "/portfolio", desc: "Manage observation portfolios" },
+      { name: "/config", desc: "Configure models and research data" },
+      { name: "/doctor", desc: "Check model and market data readiness" },
+      { name: "/skill", desc: "Discover, audit, and run skills" },
       { name: "/help", desc: "Browse commands and shortcuts" },
-      { name: "/clear", desc: "Clear conversation and reset agent" },
-      { name: "/artifact", desc: "Browse, restore, and open reports" },
+      { name: "/clear", desc: "Reset the current research session" },
+      { name: "/artifact", desc: "Browse and restore research reports" },
       { name: "/exit", desc: "Exit WhyJ Quant" },
     ]);
     for (const entry of COMMAND_CATALOG) {
@@ -291,7 +291,7 @@ describe("catalog", () => {
     expect(help).toContain("Commands");
     expect(help).toContain("/config");
     expect(help).toContain("/doctor");
-    expect(help).toContain("Browse, restore, and open reports");
+    expect(help).toContain("Browse and restore research reports");
     expect(help).not.toContain("/factor");
     expect(help).not.toContain("/backtest");
     expect(help).not.toContain("/risk");
@@ -302,17 +302,17 @@ describe("catalog", () => {
 
   it("keeps portfolio as a single catalog entry", () => {
     const portfolio = COMMAND_CATALOG.find((entry) => entry.name === "/portfolio");
-    expect(portfolio).toEqual({ name: "/portfolio", desc: "Browse and select local portfolios" });
+    expect(portfolio).toEqual({ name: "/portfolio", desc: "Manage observation portfolios" });
   });
 
   it("keeps resume as a single catalog entry", () => {
     const resume = COMMAND_CATALOG.find((entry) => entry.name === "/resume");
-    expect(resume).toEqual({ name: "/resume", desc: "Browse and restore saved sessions" });
+    expect(resume).toEqual({ name: "/resume", desc: "Resume saved research sessions" });
   });
 
   it("keeps artifact as a single panel entry", () => {
     const artifact = COMMAND_CATALOG.find((entry) => entry.name === "/artifact");
-    expect(artifact).toEqual({ name: "/artifact", desc: "Browse, restore, and open reports" });
+    expect(artifact).toEqual({ name: "/artifact", desc: "Browse and restore research reports" });
   });
 
   it("does not list /session in the public slash catalog", () => {
@@ -327,7 +327,6 @@ describe("catalog", () => {
     const references = [
       readFileSync("README.md", "utf8"),
       readFileSync("docs/slash-commands.md", "utf8"),
-      readFileSync("docs/interactive-cli-design.md", "utf8"),
     ];
     for (const entry of COMMAND_CATALOG) {
       for (const reference of references) {

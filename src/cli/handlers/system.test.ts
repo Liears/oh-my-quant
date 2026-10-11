@@ -3,9 +3,10 @@ import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadPanelPortfolio, loadSettings, savePanelPortfolio } from "../../storage/index.ts";
-import { compactHandler, configHandler, doctorHandler, portfolioHandler, resumeHandler, sessionHandler } from "./system.ts";
+import { compactHandler, configHandler, createDoctorHandler, doctorHandler, portfolioHandler, resumeHandler, sessionHandler } from "./system.ts";
 import { skillHandler } from "../../skill/handler.ts";
 import type { QuantAgentSession } from "../../agent/src/session.ts";
+import { projectResearchState } from "../../research/state.ts";
 
 const OHQ = join(tmpdir(), `whyj-portfolio-handler-${Date.now()}`);
 
@@ -44,6 +45,7 @@ function mockAgent(overrides: Partial<QuantAgentSession> = {}): QuantAgentSessio
       pendingToolCalls: new Set<string>(),
     },
     subscribe: mock(() => () => {}),
+    updateContext: mock(() => {}),
     prompt: mock(async () => {}),
     waitForIdle: mock(async () => {}),
     appendContextNote: mock(async () => {}),
@@ -60,6 +62,7 @@ function mockAgent(overrides: Partial<QuantAgentSession> = {}): QuantAgentSessio
     getSessionMetadata: mock(async () => ({ id: "s1", createdAt: "2026-06-10T00:00:00.000Z", cwd: "C:/tmp", path: "C:/tmp/s1.jsonl" })),
     getSessionEntries: mock(async () => [{ id: "e1", parentId: null, timestamp: "2026-06-10T00:00:00.000Z", type: "message", message: { role: "user", content: "hi", timestamp: 0 } } as any]),
     getSessionBranch: mock(async () => []),
+    getResearchState: mock(async () => projectResearchState([], [])),
     getLeafId: mock(async () => "e1"),
     listSessions: mock(async () => [
       { id: "s1", createdAt: "2026-06-10T00:00:00.000Z", cwd: "C:/tmp", path: "C:/tmp/s1.jsonl" },
@@ -233,12 +236,7 @@ describe("doctorHandler", () => {
   });
 
   it("replaces the loading doctor panel with a structured failure state when collection throws in TUI", async () => {
-    const realDoctor = await import("../doctor.ts");
-    mock.module("../doctor.ts", () => ({
-      ...realDoctor,
-      collectDoctor: async () => { throw new Error("doctor exploded"); },
-    }));
-    const { doctorHandler: failingDoctorHandler } = await import(`./system.ts?case=doctor-fail-${Date.now()}`);
+    const failingDoctorHandler = createDoctorHandler(async () => { throw new Error("doctor exploded"); });
     const seen: unknown[] = [];
 
     const result = await failingDoctorHandler({}, [], {
@@ -264,7 +262,7 @@ describe("portfolioHandler", () => {
     expect(result.effects).toEqual([{ type: "openPortfolio" }]);
   });
 
-  it("lists local portfolio files outside TUI", async () => {
+  it("lists legacy files only on explicit import", async () => {
     await withTempOhq(async () => {
       mkdirSync(join(OHQ, "portfolio"), { recursive: true });
       await Bun.write(join(OHQ, "portfolio", "holdings_v2_kc50.json"), JSON.stringify({
@@ -272,11 +270,10 @@ describe("portfolioHandler", () => {
         updated: "2026-05-30T00:00:00+08:00",
         funds: [{ code: "011613", name: "华夏科创50ETF联接C" }],
       }, null, 2));
-      const list = await portfolioHandler({}, [], {});
+      const list = await portfolioHandler({}, ["import"], {});
       expect(list.success).toBe(true);
-      expect(list.message).toContain("Local portfolios");
+      expect(list.message).toContain("holdings_v2_kc50.json");
       expect(list.message).toContain("科创50宽基");
-      expect(list.message).not.toContain("holdings_v2_kc50.json");
     });
   });
 
@@ -298,10 +295,10 @@ describe("portfolioHandler", () => {
     });
   });
 
-  it("rejects legacy portfolio edit subcommands", async () => {
+  it("explains missing portfolio edit arguments", async () => {
     const result = await portfolioHandler({}, ["add"], {});
     expect(result.success).toBe(false);
-    expect(result.message).toContain("/portfolio use");
+    expect(result.message).toContain("/portfolio add");
   });
 
   it("selects a local portfolio and syncs panel portfolio storage", async () => {
@@ -315,10 +312,10 @@ describe("portfolioHandler", () => {
           { code: "011613", name: "华夏科创50ETF联接C" },
         ],
       }, null, 2));
-      const result = await portfolioHandler({}, ["use", "科创50宽基"], {});
+      const result = await portfolioHandler({}, ["import", "科创50宽基"], {});
       expect(result.success).toBe(true);
       expect(result.effects).toEqual([{ type: "portfolioChanged" }]);
-      expect(loadSettings().preferences.currentPortfolioFile).toBe("holdings_kc50.json");
+      expect(loadSettings().preferences.currentPortfolioFile).toBe("holdings.json");
       const panel = loadPanelPortfolio();
       expect(panel.symbols.map((item) => item.code)).toEqual(["588000", "011613"]);
       expect(panel.groups[0]?.name).toBe("科创50宽基");

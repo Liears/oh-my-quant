@@ -1,13 +1,15 @@
 # WhyJ Quant Artifact 与 Trajectory 设计
 
-> 当前实现基线：WhyJ Quant 1.2.0
+> 当前实现基线：工作区开发版，2026-09-14。版本/恢复规则以 [存储策略](./ohquant-storage-policy.md#artifacts) 为准；下文 Trajectory Design 的演进方案不代表全部实现。
 
 Artifact 报告由两个职责明确的一级视图组成：
 
 - **Dashboard** 只呈现量化研究结果：K 线/OHLCV、NAV 与收益曲线、风险收益指标、因子、benchmark 和数据覆盖度。K 线位于 Dashboard 主图区域，蜡烛、涨跌、网格和背景直接使用 WhyJ TUI 主题 token。
 - **Trajectory** 只呈现执行审计：每个 Turn 的 calls、returns、skills、outputs 数量，以及用户输入、模型输入、assistant 输出、thinking/compact、Tool/Bash/Skill 名称、Call ID、参数和完整返回。用户命令与关键结果使用独立高亮样式。
 
-报告标题从研究对象名称和代码推断，不使用用户输入的第一句话。`/artifact` 只浏览、恢复和打开已有报告；自动生成由 `/config` 的 `Auto Artifacts` 控制，并在量化 turn 完成后自动打开浏览器。列表展示和恢复前都会清理来源 session 已失效的报告。
+报告标题从研究对象名称和代码推断，不使用用户输入的第一句话。`/artifact` 只浏览、恢复和打开已有报告版本；自动生成由 `/config` 的 `Auto Artifacts` 控制，并在量化 turn 完成后自动打开浏览器。来源失效的版本隐藏并保留文件，不自动删除。
+
+HTML、元数据和 provenance 作为单份原子快照提交并保留不可变版本。恢复选中的 `id@revision` 时验证原 entries 并移动到生成时的分支，打开保存的 HTML，不根据最新会话重新生成。Research inputs 从归档 DatasetRef 绘制独立价格图；缺失归档不替换成新行情。文本检测的指标与图表单独标为 Session interpretation，不能据此宣称所有结论已核验。源码与浏览器验证见 [实施记录 R02](./feature-delivery.md)。
 
 Trajectory 是独立的审计层，不是简单的 `trace.ts` 工具折叠面板：
 

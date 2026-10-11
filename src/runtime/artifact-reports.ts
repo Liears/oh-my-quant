@@ -1,13 +1,16 @@
 import { spawn } from "node:child_process";
+import { verifyReportSession } from "../artifact/src/report-input.ts";
 import { generateArtifact } from "../artifact/src/generator.ts";
 import {
   artifactPath,
-  deleteArtifact,
   listStoredSessions,
-  loadArtifact,
-  loadArtifactMeta,
+  loadArtifactSnapshot,
+  artifactReference,
+  materializeArtifact,
+  listArtifactVersions,
   pruneUnrestorableArtifacts,
   saveArtifact,
+  loadSettings,
   type ArtifactMeta,
 } from "../storage/index.ts";
 import type { CommandContext, CommandResult } from "../types/commands.ts";
@@ -20,20 +23,19 @@ function openLocalFile(path: string): void {
   child.unref();
 }
 
-function artifactDisplayPath(sessionId: string): string {
-  return `.ohquant/artifacts/${sessionId}.html`;
-}
-
 function storedJsonlSessions() {
   const cwd = process.cwd();
   return listStoredSessions({ cwd, scope: "all", limit: Number.MAX_SAFE_INTEGER })
     .filter((session) => session.format === "jsonl" && session.cwd === cwd);
 }
 
-/** Validate the report index and remove derived reports whose source session is gone. */
+/** List committed versions with available source sessions; retain unavailable files for repair. */
 export function listRestorableArtifactReports(): ArtifactMeta[] {
   const sourceSessionIds = new Set(storedJsonlSessions().map((session) => session.id));
-  return pruneUnrestorableArtifacts(sourceSessionIds).artifacts;
+  return pruneUnrestorableArtifacts(sourceSessionIds).artifacts.flatMap(meta => {
+    const versions = listArtifactVersions(meta.sessionId).filter(version => sourceSessionIds.has(version.sourceSessionId ?? version.sessionId));
+    return versions.length ? versions : [meta];
+  }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 function buildArtifactContextNote(input: {
@@ -57,94 +59,42 @@ function buildArtifactContextNote(input: {
 
 /** Restore a report selected in the Artifact panel. This is an internal UI action, not a slash command. */
 export async function restoreArtifactReport(reportId: string, ctx: CommandContext): Promise<CommandResult> {
-  const html = loadArtifact(reportId);
-  const meta = loadArtifactMeta(reportId);
-  const sourceSessionId = meta?.sourceSessionId ?? meta?.sessionId ?? reportId;
-  const stored = storedJsonlSessions().find((session) => session.id === sourceSessionId);
-  if (!html || !meta || !stored) {
-    const removed = deleteArtifact(reportId);
-    return {
-      success: true,
-      message: removed
-        ? `Removed stale artifact ${reportId} because its source session is unavailable.`
-        : `Artifact ${reportId} is no longer available.`,
-    };
+  const snapshot = loadArtifactSnapshot(reportId);
+  if (!snapshot) return { success: false, message: "Report version is unavailable or damaged. Saved revisions have been retained." };
+  const { meta } = snapshot;
+  const sourceSessionId = meta.sourceSessionId ?? meta.sessionId;
+  const stored = storedJsonlSessions().find(session => session.id === sourceSessionId);
+  if (!stored) return { success: false, message: "Report source session is unavailable. The saved report has been retained for recovery." };
+  if (meta.provenance && !verifyReportSession(stored.path, meta.provenance)) {
+    return { success: false, message: "Report source entries changed or are unavailable. The current session was not replaced." };
   }
-
-  const outputPath = artifactPath(reportId);
-  const openReport = () => (ctx.openFile ?? openLocalFile)(outputPath);
+  const selected = artifactReference(meta);
+  // Materialize before switching: a failed disk write must not replace the user's session.
+  const outputPath = materializeArtifact(selected);
   const agentSession = ctx.agentSession;
-
   if (!agentSession) {
-    const refreshed = generateArtifact({ sessionPath: stored.path });
-    if (refreshed) {
-      saveArtifact(reportId, refreshed.html, {
-        title: refreshed.title,
-        messageCount: refreshed.messageCount,
-        sourceSessionId: stored.id,
-      });
-      openReport();
-      return { success: true, message: `Opened artifact ${reportId} · trajectory rebuilt` };
-    }
-    openReport();
-    return { success: true, message: `Opened artifact ${reportId} · using saved trajectory` };
+    (ctx.openFile ?? openLocalFile)(outputPath);
+    return { success: true, message: `Opened artifact ${selected} · saved version` };
   }
-
-  let resumedMeta;
   try {
-    resumedMeta = await agentSession.resumeSession(sourceSessionId);
+    if (meta.provenance) await agentSession.resumeSession(sourceSessionId, { report: meta.provenance });
+    else await agentSession.resumeSession(sourceSessionId);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/session not found/i.test(message)) {
-      deleteArtifact(reportId);
-      return {
-        success: true,
-        message: `Removed stale artifact ${reportId} because its source session is unavailable.`,
-      };
-    }
-    return {
-      success: false,
-      message: `Could not restore artifact ${reportId}: ${message}`,
-    };
+    return { success: false, message: `Could not restore artifact: ${error instanceof Error ? error.message : String(error)}` };
   }
-
-  const refreshed = generateArtifact({ sessionPath: resumedMeta.path });
-  if (refreshed) {
-    saveArtifact(reportId, refreshed.html, {
-      title: refreshed.title,
-      messageCount: refreshed.messageCount,
-      sourceSessionId: resumedMeta.id,
-    });
-  }
-
-  const displayPath = artifactDisplayPath(reportId);
   let contextNoteFailed = false;
-  if (agentSession.appendContextNote) {
-    try {
-      const title = refreshed?.title ?? meta?.title ?? reportId;
-      const bytes = refreshed ? Buffer.byteLength(refreshed.html, "utf-8") : meta?.bytes ?? Buffer.byteLength(html, "utf-8");
-      const messageCount = refreshed?.messageCount ?? meta?.messageCount ?? 0;
-      await agentSession.appendContextNote("artifact_restore", buildArtifactContextNote({
-        event: "restored",
-        title,
-        sessionId: resumedMeta.id,
-        displayPath,
-        bytes,
-        messageCount,
-      }), { title, sessionId: resumedMeta.id, path: displayPath, bytes, messageCount });
-    } catch {
-      contextNoteFailed = true;
-    }
-  }
-
-  openReport();
-  const suffix = contextNoteFailed ? " · context note failed" : " · context updated";
-  const trajectory = refreshed ? " · trajectory rebuilt" : " · using saved trajectory";
-  return {
-    success: true,
-    message: `Restored artifact ${reportId}${trajectory}${suffix}`,
-    effects: [{ type: "sessionChanged" }],
-  };
+  try {
+    await agentSession.appendContextNote?.("artifact_restore", buildArtifactContextNote({
+      event: "restored", title: meta.title, sessionId: sourceSessionId, displayPath: outputPath,
+      bytes: meta.bytes, messageCount: meta.messageCount,
+    }) + `\nreport_ref: ${selected}\nUse this saved report version and its referenced observations, not newer prices.`, {
+      title: meta.title, sessionId: sourceSessionId, reportRef: selected, path: outputPath,
+      bytes: meta.bytes, messageCount: meta.messageCount, provenance: meta.provenance,
+    });
+  } catch { contextNoteFailed = true; }
+  (ctx.openFile ?? openLocalFile)(outputPath);
+  return { success: true, message: `Restored artifact ${selected} · saved version · ${contextNoteFailed ? "context note failed" : "context updated"}`,
+    effects: [{ type: "sessionChanged" }] };
 }
 
 /** Generate a report after an eligible turn when Auto Artifacts is enabled. */
@@ -156,16 +106,20 @@ export async function generateCurrentSessionArtifact(
   const sessionPath = meta?.path;
   if (!sessionPath) return { success: false, message: "No active session is available for automatic artifact generation." };
 
-  const result = generateArtifact({ sessionPath, title: titleOverride });
+  const leafId = await ctx.agentSession?.getLeafId?.();
+  const marketColorScheme = loadSettings().preferences.marketColorScheme;
+  const result = generateArtifact({ sessionPath, title: titleOverride, leafId, marketColorScheme });
   if (!result) return { success: false, message: "Failed to generate artifact from session." };
 
-  saveArtifact(result.sessionId, result.html, {
+  const saved = saveArtifact(result.sessionId, result.html, {
     title: result.title,
     messageCount: result.messageCount,
     sourceSessionId: result.sessionId,
+    provenance: result.provenance,
   });
-  const outputPath = artifactPath(result.sessionId);
-  const displayPath = artifactDisplayPath(result.sessionId);
+  const reportRef = artifactReference(saved);
+  const outputPath = artifactPath(reportRef);
+  const displayPath = outputPath;
   let contextNoteFailed = false;
   if (ctx.agentSession?.appendContextNote) {
     try {
@@ -174,13 +128,15 @@ export async function generateCurrentSessionArtifact(
         title: result.title,
         sessionId: result.sessionId,
         displayPath,
-        bytes: result.html.length,
+        bytes: saved.bytes,
         messageCount: result.messageCount,
       }), {
         title: result.title,
         sessionId: result.sessionId,
         path: displayPath,
-        bytes: result.html.length,
+        reportRef,
+        provenance: result.provenance,
+        bytes: saved.bytes,
         messageCount: result.messageCount,
       });
     } catch {
@@ -190,5 +146,5 @@ export async function generateCurrentSessionArtifact(
   (ctx.openFile ?? openLocalFile)(outputPath);
 
   const suffix = contextNoteFailed ? " · context note failed" : " · context updated";
-  return { success: true, message: `${result.title} — ${(result.html.length / 1024).toFixed(0)}KB · ${result.messageCount} msgs${suffix}` };
+  return { success: true, message: `${result.title} — ${(saved.bytes / 1024).toFixed(0)}KB · ${result.messageCount} msgs${suffix}` };
 }

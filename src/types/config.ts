@@ -1,7 +1,17 @@
+import type { MarketColorScheme } from "./theme-colors.ts";
+
 export type Market = "A" | "HK" | "US" | "Fund" | "Crypto";
 export type DataSource = "akshare" | "tushare" | "llmquant-data" | "financial-datasets";
+export type HudMode = "full" | "context" | "off";
+
+export function normalizeHudMode(value: unknown): HudMode {
+  return value === "context" || value === "off" ? value : "full";
+}
 
 export interface UserPreferences {
+  /** Missing legacy values normalize to red-up. Applies to all displayed markets. */
+  marketColorScheme?: MarketColorScheme;
+  hudMode?: HudMode;
   defaultMarket: Market;
   defaultBenchmark: string;
   defaultCash: number;
@@ -30,12 +40,18 @@ export interface ArtifactGenerationSettings {
 }
 
 export interface OhQuantSettings {
+  /** Disk version carried by an editing draft; excluded from the persisted payload. */
+  revision?: string;
   version: number;
   /** Claude Code-style env vars (API keys, base URLs, etc.) */
   env: Record<string, string>;
-  /** Claude model: "sonnet" | "opus" | "haiku" */
+  /** Pi provider ID. Absent only for legacy configuration. */
+  provider?: string;
+  /** Provider-scoped connections; switching models never reuses another provider's key. */
+  providers?: Record<string, ModelProviderSettings>;
+  /** Actual model ID; legacy configuration also accepts role aliases. */
   model: string;
-  /** Thinking/reasoning level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" */
+  /** Thinking level constrained by the selected Pi model, including off and max. */
   thinkingLevel: string;
   /** Whether the right-side overview/portfolio panel is visible. */
   showPortfolioPanel: boolean;
@@ -45,8 +61,58 @@ export interface OhQuantSettings {
   skillIntegrations: SkillIntegrationSettings;
   /** Tool allow/deny lists */
   permissions: { allow?: string[]; deny?: string[] };
+  /** Explicitly disabled compiled extension IDs; absent means all catalog entries enabled. */
+  disabledExtensions?: string[];
   /** User business preferences */
   preferences: UserPreferences;
+}
+
+export type ModelProtocol = "openai-completions" | "openai-responses" | "anthropic-messages" | "google-generative-ai"
+  | "azure-openai-responses" | "bedrock-converse-stream" | "google-vertex" | "mistral-conversations" | "openai-codex-responses" | "pi-messages";
+
+export interface ModelProviderSettings {
+  /** A separate credential record; settings never contain OAuth access/refresh tokens. */
+  oauthId?: string;
+  name?: string;
+  headers?: Record<string, string>;
+  authHeader?: boolean;
+  compat?: Record<string, unknown>;
+  /** Explicitly declares a named endpoint outside the Pi built-in provider catalog. */
+  custom?: boolean;
+  apiKey?: string;
+  /** Provider environment, for example AWS_PROFILE or CLOUDFLARE_ACCOUNT_ID. */
+  env?: Record<string, string>;
+  baseUrl?: string;
+  api?: ModelProtocol;
+  model?: string;
+  /** Capability overrides belong to an exact model ID, not the whole provider. */
+  models?: Record<string, ModelCapabilitySettings>;
+}
+
+export interface ModelCapabilitySettings {
+  baseUrl?: string;
+  headers?: Record<string, string>;
+  compat?: Record<string, unknown>;
+  samplingParams?: Record<string, unknown>;
+  thinkingLevelMap?: Partial<Record<"off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max", string | null>>;
+  /** Model protocol takes precedence over the provider default. */
+  api?: ModelProtocol;
+  /** A full imported model definition replaces catalog metadata rather than merging it. */
+  replaceCatalog?: boolean;
+  name?: string;
+  input?: ("text" | "image")[];
+  cost?: ModelCostSettings;
+  contextWindow?: number;
+  maxTokens?: number;
+  reasoning?: boolean;
+}
+
+export interface ModelCostSettings {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  tiers?: Array<{ inputTokensAbove: number; input: number; output: number; cacheRead: number; cacheWrite: number }>;
 }
 
 export const DEFAULT_SETTINGS: OhQuantSettings = {
@@ -63,6 +129,8 @@ export const DEFAULT_SETTINGS: OhQuantSettings = {
   },
   permissions: {},
   preferences: {
+    marketColorScheme: "red-up",
+    hudMode: "full",
     defaultMarket: "A",
     defaultBenchmark: "000300.SH",
     defaultCash: 100_000,

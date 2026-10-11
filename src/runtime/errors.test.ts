@@ -20,4 +20,14 @@ describe("runtime error formatting", () => {
     expect(providerStopReasonText("weird")).toBe("The provider ended the response unexpectedly (weird).");
     expect(errorText("plain error")).toBe("plain error");
   });
+
+  it("directs authentication and model failures to the shared connection editor", () => {
+    for (const message of ["401 Unauthorized", "Missing model credentials", "404 model not found"]) {
+      const formatted = formatAgentError("Agent", message);
+      expect(formatted).toContain("/config → Model");
+      expect(formatted).toContain("Save & Verify");
+      expect(formatted).not.toContain("WHYJ_QUANT_API_KEY");
+      expect(formatted).not.toContain("automatically");
+    }
+  });
 });

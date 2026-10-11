@@ -1,14 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { JsonlSessionRepo } from "./agent/src/pi/index.ts";
-import { NodeExecutionEnv } from "./agent/src/pi/node.ts";
+import { JsonlSessionRepo } from "./agent/src/session-runtime/index.ts";
+import { NodeExecutionEnv } from "./agent/src/session-runtime/node.ts";
 import { loadPanelPortfolio, resolveSkillsDir, savePanelPortfolio, saveSettings } from "./storage/index.ts";
 import { DEFAULT_SETTINGS } from "./types/config.ts";
 import { AppRuntime, createInitialAppState, createRuntimeAgent } from "./app-runtime.ts";
 import { shellDisplayName } from "./tools/catalog.ts";
 import type { AppState, PanelSection, UIMessage } from "./tui/src/types.ts";
 
+const runtimes: AppRuntime[] = [];
 const OHQ = join(process.cwd(), ".ohquant-test-app-runtime");
 
 beforeEach(() => {
@@ -23,6 +24,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  for (const runtime of runtimes.splice(0)) {
+    const agent = (runtime as unknown as { agent: { abort?: () => void } | null }).agent;
+    if (agent && !agent.abort) agent.abort = () => {};
+    runtime.dispose();
+  }
   delete process.env.OHQUANT_DIR;
   if (existsSync(OHQ)) rmSync(OHQ, { recursive: true, force: true });
 });
@@ -65,6 +71,7 @@ function harness(
   autoArtifactRunner: ConstructorParameters<typeof AppRuntime>[4] | undefined = undefined,
   artifactRestoreRunner: ConstructorParameters<typeof AppRuntime>[5] | undefined = undefined,
   marketRefreshTimeoutMs: ConstructorParameters<typeof AppRuntime>[6] | undefined = undefined,
+  marketRefreshIntervalMs = 0,
 ) {
   const messages: UIMessage[][] = [];
   const activities: AppState["activity"][] = [];
@@ -95,7 +102,9 @@ function harness(
     autoArtifactRunner,
     artifactRestoreRunner,
     marketRefreshTimeoutMs,
+    marketRefreshIntervalMs,
   );
+  runtimes.push(runtime);
   return { runtime, messages, activities, statuses, panels, queues, localStates, huds, get configOpened() { return configOpened; }, get resumeOpened() { return resumeOpened; }, get portfolioOpened() { return portfolioOpened; } };
 }
 
@@ -218,6 +227,158 @@ description: Use for crypto market analysis.
     expect(autoArtifactRunner).not.toHaveBeenCalled();
   });
 
+  it("flags a fund answer contradicted by the current verified task and skips its automatic artifact", async () => {
+    saveSettings({ ...DEFAULT_SETTINGS, artifactGeneration: { auto: true } });
+    const parameters = { symbol: "270042", start_date: "2026-02-01", end_date: "2026-03-01", invest_amount: 100,
+      frequency: "monthly", invest_day: 1, purchase_fee_rate: 0, purchase_fee_unit: "decimal" };
+    const research = { task: { status: "complete", spec: { criteria: ["Principal return", "Time-weighted return", "Maximum drawdown (TWR)"].map(
+      (label, index) => ({ id: `c${index + 1}`, tool: "fund_dca_backtest", metrics: [label], parameters })) } },
+      operations: [{ tool: "fund_dca_backtest", status: "verified", parameters,
+        findings: { metrics: [{ label: "Principal return", value: 0.25 }, { label: "Time-weighted return", value: 0.5 },
+          { label: "Maximum drawdown (TWR)", value: 0 }] } }] };
+    let answer = "Principal return 20.00%; Time-weighted return 50.00%; Maximum drawdown (TWR) 0.00%.";
+    const fakeAgent = Object.assign(makeFakeAgent(async agent => {
+      await agent.emit({ type: "message_start", message: { role: "assistant", content: [] } });
+      await agent.emit({ type: "message_end", message: { role: "assistant", stopReason: "stop",
+        content: [{ type: "text", text: answer }], usage: { output: 10 } } });
+      agent.state.isStreaming = false;
+      await agent.emit({ type: "agent_end", messages: [] });
+    }), { getResearchState: async () => research });
+    const autoArtifactRunner = mock(async () => ({ success: true, message: "fund report" }));
+    const h = harness(async () => [], async () => [], () => fakeAgent as never, autoArtifactRunner as never);
+    await h.runtime.bootstrap();
+    await h.runtime.submit("分析基金 270042.OF 的定投收益和回撤");
+    expect(autoArtifactRunner).not.toHaveBeenCalled();
+    expect(h.messages.at(-1)?.at(-1)).toEqual(expect.objectContaining({ role: "error", text: expect.stringContaining("本金收益率与已核验工具结果不一致") }));
+    expect(h.statuses.at(-1)?.kind).toBe("error");
+
+    answer = "Principal return 25.00% （末期模拟市值 200 − 投入 200 本金）/ 200";
+    await h.runtime.submit("继续分析基金 270042.OF 的定投收益和回撤");
+    expect(autoArtifactRunner).not.toHaveBeenCalled();
+    expect(h.messages.at(-1)?.at(-1)?.text).toContain("本金收益公式与已核验工具结果不一致");
+
+    answer = "Principal return 25.00%; Time-weighted return 50.00%; Maximum drawdown (TWR) 0.00%.";
+    await h.runtime.submit("继续分析基金 270042.OF 的定投收益和回撤");
+    expect(autoArtifactRunner).toHaveBeenCalledTimes(1);
+    expect(h.statuses.at(-1)).toEqual({ kind: "info", text: "Artifact ready · fund report" });
+  });
+
+  it("flags an unsupported factor conclusion in the current task and pauses its automatic artifact", async () => {
+    saveSettings({ ...DEFAULT_SETTINGS, artifactGeneration: { auto: true } });
+    const parameters = { symbol: "AAPL", factor: "momentum", period: 2, start: "2026-01-01", end: "2026-02-09" };
+    const evidence = { callId: "factor-1", callEntryId: "factor-entry-1" };
+    const research = { task: { status: "complete", spec: { scope: { symbols: ["AAPL"], market: "US",
+      start: "2026-01-01", end: "2026-02-09" }, criteria: [{ id: "factor", tool: "compute_factor", parameters, metrics: ["Latest"] }] },
+      criteria: [{ id: "factor", status: "satisfied", evidence }] },
+      operations: [{ ...evidence, tool: "compute_factor", status: "verified", parameters,
+        findings: { kind: "factor", metrics: [{ label: "Latest", value: 139 / 137 - 1, unit: "number" }] } }] };
+    let answer = "动量分位 0%，属短周期均值回归型特征。";
+    const fakeAgent = Object.assign(makeFakeAgent(async agent => {
+      await agent.emit({ type: "message_start", message: { role: "assistant", content: [] } });
+      await agent.emit({ type: "message_end", message: { role: "assistant", stopReason: "stop",
+        content: [{ type: "text", text: answer }], usage: { output: 10 } } });
+      agent.state.isStreaming = false;
+      await agent.emit({ type: "agent_end", messages: [] });
+    }), { getResearchState: async () => research });
+    const autoArtifactRunner = mock(async () => ({ success: true, message: "factor report" }));
+    const h = harness(async () => [], async () => [], () => fakeAgent as never, autoArtifactRunner as never);
+    await h.runtime.bootstrap();
+    await h.runtime.submit("分析 AAPL 的动量和风险");
+    expect(autoArtifactRunner).not.toHaveBeenCalled();
+    expect(h.messages.at(-1)?.at(-1)?.text).toContain("不能据此断言均值回归");
+    expect(h.statuses.at(-1)?.kind).toBe("error");
+
+    answer = "Latest 0.0946。";
+    await h.runtime.submit("继续分析 AAPL 的动量和风险");
+    expect(autoArtifactRunner).not.toHaveBeenCalled();
+    expect(h.messages.at(-1)?.at(-1)?.text).toContain("最新因子值与已核验工具结果不一致");
+
+    answer = "Latest 0.0146。动量分位 0% 不构成均值回归或未来收益证据。";
+    await h.runtime.submit("继续分析 AAPL 的动量和风险");
+    expect(autoArtifactRunner).toHaveBeenCalledTimes(1);
+    expect(h.statuses.at(-1)).toEqual({ kind: "info", text: "Artifact ready · factor report" });
+  });
+
+  it("flags a risk percentage that contradicts the selected task evidence and pauses its automatic artifact", async () => {
+    saveSettings({ ...DEFAULT_SETTINGS, artifactGeneration: { auto: true } });
+    const parameters = { symbol: "AAPL", market: "US", start: "2026-01-01", end: "2026-02-09" };
+    const evidence = { callId: "risk-1", callEntryId: "risk-entry-1" };
+    const research = { task: { status: "complete", spec: { scope: { symbols: ["AAPL"], market: "US",
+      start: "2026-01-01", end: "2026-02-09" }, criteria: [{ id: "risk", tool: "check_risk", parameters }] },
+      criteria: [{ id: "risk", status: "satisfied", evidence }] }, operations: [{ ...evidence, tool: "check_risk",
+      status: "verified", parameters, findings: { kind: "risk", metrics: [
+        { label: "Annual volatility", value: 0.013038293078614618, unit: "percent" },
+        { label: "Maximum drawdown", value: -0.08, unit: "percent" },
+        { label: "Downside volatility", value: 0.01, unit: "percent" },
+        { label: "VaR 95%", value: -0.03, unit: "percent" },
+        { label: "CVaR 95%", value: -0.04, unit: "percent" },
+        { label: "Drawdown duration", value: 3, unit: "periods" },
+      ] } }] };
+    let answer = "Annual volatility 9.00%; Max DD 8.00%.";
+    const fakeAgent = Object.assign(makeFakeAgent(async agent => {
+      await agent.emit({ type: "message_start", message: { role: "assistant", content: [] } });
+      await agent.emit({ type: "message_end", message: { role: "assistant", stopReason: "stop",
+        content: [{ type: "text", text: answer }], usage: { output: 10 } } });
+      agent.state.isStreaming = false;
+      await agent.emit({ type: "agent_end", messages: [] });
+    }), { getResearchState: async () => research });
+    const autoArtifactRunner = mock(async () => ({ success: true, message: "risk report" }));
+    const h = harness(async () => [], async () => [], () => fakeAgent as never, autoArtifactRunner as never);
+    await h.runtime.bootstrap();
+    await h.runtime.submit("分析 AAPL 年化波动率和最大回撤");
+    expect(autoArtifactRunner).not.toHaveBeenCalled();
+    expect(h.messages.at(-1)?.at(-1)?.text).toContain("年化波动率与已核验工具结果不一致");
+    expect(h.statuses.at(-1)?.kind).toBe("error");
+
+    answer = "CVaR 95% -9.00%; 回撤持续期 4 期。";
+    await h.runtime.submit("继续分析 AAPL 尾部风险");
+    expect(autoArtifactRunner).not.toHaveBeenCalled();
+    expect(h.messages.at(-1)?.at(-1)?.text).toContain("CVaR 95%、回撤持续期与已核验工具结果不一致");
+
+    answer = "Annual volatility 1.30%; Max DD 8.00%; CVaR 95% -4.00%; 回撤持续期 3 期。";
+    await h.runtime.submit("继续分析 AAPL 风险");
+    expect(autoArtifactRunner).toHaveBeenCalledTimes(1);
+    expect(h.statuses.at(-1)).toEqual({ kind: "info", text: "Artifact ready · risk report" });
+  });
+
+  it("keeps a wrong portfolio comparison answer visible but pauses its automatic artifact", async () => {
+    saveSettings({ ...DEFAULT_SETTINGS, artifactGeneration: { auto: true } });
+    const evidence = { callId: "compare-1", callEntryId: "entry-1" };
+    const parameters = { group_a: "core", group_b: "stable", start: "2026-01-01", end: "2026-02-09", benchmark: "SPY" };
+    const research = { task: { status: "complete", spec: { scope: { symbols: ["AAPL", "MSFT"], market: "US",
+      start: "2026-01-01", end: "2026-02-09" }, criteria: [{ id: "returns", tool: "compare_portfolios", parameters }] },
+      criteria: [{ id: "returns", status: "satisfied", evidence }] }, operations: [{ ...evidence, tool: "compare_portfolios",
+      status: "verified", parameters, findings: { kind: "portfolio-comparison", metrics: [
+        { label: "Portfolio A / Total return", value: 0.39 }, { label: "Portfolio B / Total return", value: 0 },
+        { label: "Portfolio A / Max drawdown", value: -0.08 }, { label: "Portfolio B / Max drawdown", value: 0 },
+      ] }, comparison: { groups: [{ id: "core", name: "Core" }, { id: "stable", name: "Stable" }] } }] };
+    let answer = "Core 累计收益 +38.00%，最大回撤 8.00%；Stable 累计收益 0.00%，最大回撤 0.00%。";
+    const fakeAgent = Object.assign(makeFakeAgent(async agent => {
+      await agent.emit({ type: "message_start", message: { role: "assistant", content: [] } });
+      await agent.emit({ type: "message_end", message: { role: "assistant", stopReason: "stop",
+        content: [{ type: "text", text: answer }], usage: { output: 10 } } });
+      agent.state.isStreaming = false;
+      await agent.emit({ type: "agent_end", messages: [] });
+    }), { getResearchState: async () => research });
+    const autoArtifactRunner = mock(async () => ({ success: true, message: "comparison report" }));
+    const h = harness(async () => [], async () => [], () => fakeAgent as never, autoArtifactRunner as never);
+    await h.runtime.bootstrap();
+    await h.runtime.submit("分析 Core 与 Stable 组合的累计收益和风险");
+    expect(autoArtifactRunner).not.toHaveBeenCalled();
+    expect(h.messages.at(-1)?.at(-1)?.text).toContain("组合 A 累计收益与已核验工具结果不一致");
+    expect(h.statuses.at(-1)?.kind).toBe("error");
+
+    answer = "| Series | TR | DD |\n| Core | 38% | 8% |\n| Stable | 0% | 0% |";
+    await h.runtime.submit("按表格复核 Core 与 Stable 的收益和回撤");
+    expect(autoArtifactRunner).not.toHaveBeenCalled();
+    expect(h.messages.at(-1)?.at(-1)?.text).toContain("组合 A 累计收益与已核验工具结果不一致");
+
+    answer = "Core 累计收益 +39.00%，最大回撤 8.00%；Stable 累计收益 0.00%，最大回撤 0.00%。";
+    await h.runtime.submit("继续分析 Core 与 Stable 组合的累计收益和风险");
+    expect(autoArtifactRunner).toHaveBeenCalledTimes(1);
+    expect(h.statuses.at(-1)).toEqual({ kind: "info", text: "Artifact ready · comparison report" });
+  });
+
   it("restores an artifact panel selection without submitting a second-level slash command", async () => {
     const fakeAgent = makeFakeAgent(async () => {});
     const artifactRestoreRunner = mock(async (reportId: string) => ({
@@ -257,7 +418,7 @@ description: Use for crypto market analysis.
           now = 3_200;
           await agent.emit({
             type: "message_update",
-            assistantMessageEvent: { type: "text_start" },
+            assistantMessageEvent: { type: "text_delta", delta: "A" },
             message: { role: "assistant", content: [{ type: "text", text: "A" }] },
           });
           now = 4_000;
@@ -273,7 +434,7 @@ description: Use for crypto market analysis.
           now = 5_000;
           await agent.emit({
             type: "message_update",
-            assistantMessageEvent: { type: "text_start" },
+            assistantMessageEvent: { type: "text_delta", delta: "B" },
             message: { role: "assistant", content: [{ type: "text", text: "B" }] },
           });
           now = 5_400;
@@ -482,7 +643,7 @@ description: Use for crypto market analysis.
     expect(h.activities.at(-1)).toBe("ready");
   });
 
-  it("refreshes overview panel after successful command result", async () => {
+  it("loads overview explicitly without making help fetch market data", async () => {
     const marketSeen: string[][] = [];
     const portfolioSeen: string[][] = [];
     const h = harness(
@@ -496,12 +657,14 @@ description: Use for crypto market analysis.
       },
     );
     await h.runtime.submit("/help");
+    expect(marketSeen).toHaveLength(0);
+    await h.runtime.refreshOverviewPanel();
     expect(marketSeen[0]).toContain("000300.SH");
-    expect(portfolioSeen[0]).toEqual(expect.arrayContaining(["510300.SH", "510300"]));
+    expect(portfolioSeen[0]).toEqual(expect.arrayContaining(["510300.SH"]));
     expect(h.panels[0]).toMatchObject({ loading: true });
     expect(h.panels.at(-1)?.loading).toBe(false);
     const latestPanel = h.panels.at(-1)?.panel ?? [];
-    expect(latestPanel[0]).toMatchObject({ kind: "group", title: "Default" });
+    expect(latestPanel[0]).toMatchObject({ kind: "holdings", title: "Portfolio" });
     expect(latestPanel.some((section) => section.title === "Market")).toBe(true);
     expect(latestPanel.some((section) => section.title === "Source")).toBe(true);
   });
@@ -522,7 +685,11 @@ description: Use for crypto market analysis.
     await h.runtime.refreshOverviewPanel();
 
     expect(h.panels.at(-2)).toMatchObject({ loading: true });
-    expect(h.panels.at(-1)).toEqual({ panel: readyPanel, loading: false });
+    expect(h.panels.at(-1)?.loading).toBe(false);
+    expect(h.panels.at(-1)?.panel.slice(1)).toEqual(readyPanel);
+    expect(h.panels.at(-1)?.panel[0]).toMatchObject({ title: "Market Refresh", rows: expect.arrayContaining([
+      { label: "数值", value: "stale · 保留上次结果" },
+    ]) });
   });
 
   it("recovers from a timed-out pull and ignores its stale late result", async () => {
@@ -809,6 +976,7 @@ description: Use for crypto market analysis.
 
   it("renders portfolio groups even when only group codes are present", async () => {
     savePanelPortfolio({
+      ...loadPanelPortfolio(),
       updated: "2026-06-10",
       symbols: [],
       groups: [{ id: "group-1", name: "核心组合", symbolCodes: ["510300.SH"] }],
@@ -818,12 +986,12 @@ description: Use for crypto market analysis.
       holdingSeen.push(entries.map((entry) => entry.code));
       return [];
     });
-    await h.runtime.submit("/help");
+    await h.runtime.refreshOverviewPanel();
     const latestPanel = h.panels.at(-1)?.panel ?? [];
     const portfolioSection = latestPanel.find((section) => section.kind === "group" && section.title === "核心组合") as Extract<PanelSection, { kind: "group" }> | undefined;
     expect(portfolioSection).toBeTruthy();
-    expect(portfolioSection?.rows.map((row) => row.code)).toEqual(["510300"]);
-    expect(holdingSeen.at(-1)).toEqual(expect.arrayContaining(["510300.SH", "510300"]));
+    expect(portfolioSection?.rows.map((row) => row.code)).toEqual(["510300.SH"]);
+    expect(holdingSeen.at(-1)).toEqual(expect.arrayContaining(["510300.SH"]));
   });
   it("selects local portfolio storage and refreshes overview state", async () => {
     mkdirSync(join(OHQ, "portfolio"), { recursive: true });
@@ -840,16 +1008,18 @@ description: Use for crypto market analysis.
         return entries.map((entry) => ({ code: entry.code, name: entry.name, price: 1, pct: 0 }));
       },
     );
-    await h.runtime.submit("/portfolio use Alpha组合");
+    await h.runtime.submit("/portfolio import Alpha组合");
+    // The command schedules refresh; let the immediate fixture response publish without requesting another round.
+    await new Promise<void>(resolve => setImmediate(resolve));
     expect(h.localStates.at(-1)?.activePortfolio).toBe("Alpha组合");
-    expect(loadPanelPortfolio().symbols.map((item) => item.code)).toEqual(["510300"]);
-    expect(loadPanelPortfolio().symbols[0]?.instrument).toBe("fund");
+    expect(loadPanelPortfolio().symbols.map((item) => item.code)).toEqual(["510300.SH", "510300"]);
+    expect(loadPanelPortfolio().symbols.at(-1)?.instrument).toBe("fund");
     expect(instrumentsSeen).toContain("fund");
     const latestPanel = h.panels.at(-1)?.panel ?? [];
     expect(latestPanel.some((section) => section.title === "Alpha组合")).toBe(true);
   });
 
-  it("restores fund identity for an existing bare-code active portfolio", async () => {
+  it("never infers instrument identity from legacy holdings during refresh", async () => {
     mkdirSync(join(OHQ, "portfolio"), { recursive: true });
     await Bun.write(join(OHQ, "portfolio", "holdings_semicon.json"), JSON.stringify({
       name: "聚焦半导体",
@@ -861,6 +1031,7 @@ description: Use for crypto market analysis.
     });
     savePanelPortfolio({
       updated: "2026-07-15",
+      revision: loadPanelPortfolio().revision,
       symbols: [
         { code: "022364", name: "永赢科技智选发起A", added: "2026-07-15" },
         { code: "000001", name: "平安银行", added: "2026-07-15" },
@@ -875,11 +1046,11 @@ description: Use for crypto market analysis.
 
     await h.runtime.refreshOverviewPanel();
 
-    expect(instrumentsSeen.get("022364")).toBe("fund");
+    expect(instrumentsSeen.get("022364")).toBeUndefined();
     expect(instrumentsSeen.get("000001")).toBeUndefined();
   });
 
-  it("refreshes overview panel after /clear", async () => {
+  it("redraws overview after /clear without refetching data", async () => {
     const marketSeen: string[][] = [];
     const h = harness(async (entries) => {
       marketSeen.push(entries.map((entry) => entry.code));
@@ -890,10 +1061,60 @@ description: Use for crypto market analysis.
     await h.runtime.submit("/clear");
     expect(h.messages.at(-1)).toEqual([]);
     expect(h.panels.length).toBeGreaterThan(panelsBefore);
-    expect(marketSeen.length).toBeGreaterThan(0);
+    expect(marketSeen).toHaveLength(0);
   });
 });
 
 
 
 
+it("refreshes automatically after a failure and stops immediately on disposal", async () => {
+  let calls = 0;
+  let secondPull: (() => void) | undefined;
+  const observed = new Promise<void>(resolve => { secondPull = resolve; });
+  const h = harness(async () => {
+    calls++;
+    if (calls === 1) throw new Error("offline");
+    secondPull?.();
+    return [];
+  }, async () => [], undefined, undefined, undefined, 100, 10);
+  await h.runtime.refreshOverviewPanel();
+  await Promise.race([observed, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("No automatic refresh")), 500))]);
+  h.runtime.dispose();
+  const count = calls;
+  await new Promise(resolve => setTimeout(resolve, 30));
+  expect(calls).toBe(count);
+});
+
+it("coalesces repeated refreshes and uses the latest portfolio in the next pull", async () => {
+  let finish: (() => void) | undefined;
+  const symbolsSeen: string[][] = [];
+  let calls = 0;
+  const h = harness(async () => {
+    if (++calls === 1) await new Promise<void>(resolve => { finish = resolve; });
+    return [];
+  }, async entries => { symbolsSeen.push(entries.map(entry => entry.code)); return []; });
+  const first = h.runtime.refreshOverviewPanel();
+  const queued = h.runtime.refreshOverviewPanel();
+  const alsoQueued = h.runtime.refreshOverviewPanel();
+  savePanelPortfolio({ ...loadPanelPortfolio(), updated: "", symbols: [{ code: "AAPL", name: "Apple", added: "" }], groups: [] });
+  finish?.();
+  await Promise.all([first, queued, alsoQueued]);
+  expect(calls).toBe(2);
+  expect(symbolsSeen).toEqual([["510300.SH"], ["AAPL"]]);
+});
+
+it("disposal aborts pending I/O, settles refresh, and prevents late UI updates", async () => {
+  let signal: AbortSignal | undefined;
+  const h = harness(async (_entries, meta) => {
+    signal = meta.signal;
+    return new Promise(() => {});
+  });
+  const pending = h.runtime.refreshOverviewPanel();
+  const updates = h.panels.length;
+  h.runtime.dispose();
+  await pending;
+  expect(signal?.aborted).toBe(true);
+  await h.runtime.refreshOverviewPanel();
+  expect(h.panels).toHaveLength(updates);
+});

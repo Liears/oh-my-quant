@@ -7,7 +7,7 @@
 ```
 src/skill/          ← whyj skill 模块（安装/CLI handler/TUI suggestions）
 src/agent/src/      ← 桥接层：discoverSkills() → QuantSkill → AgentHarness
-src/agent/src/pi/   ← pi harness 通用引擎：文件加载、验证、formatSkillInvocation
+src/agent/src/session-runtime/   ← pi harness 通用引擎：文件加载、验证、formatSkillInvocation
 src/tui/src/        ← 对话渲染（`SKILL.name` 状态行）和 Composer 建议
 ```
 
@@ -17,6 +17,9 @@ src/tui/src/        ← 对话渲染（`SKILL.name` 状态行）和 Composer 建
 |---|---|
 | `types.ts` | `SkillEntry`（TUI 建议）、`SkillState`（对话展示） |
 | `store.ts` | `SKILLS_DIR`、`ensureDefaultSkills()`、`installSkills()` |
+| `installer.ts` | Git 来源与工作区校验、临时克隆发布、失败保留与实际版本回执 |
+| `catalog.ts` | 精选仓库固定提交、逐仓库白名单、分模式依赖声明 |
+| `readiness.ts` / `python-probe.ts` | 分模式依赖判定、进程内 Python 版本观察与取消 |
 | `handler.ts` | CLI 命令：list / info / run / install / `:name` 直接调用 |
 | `index.ts` | 公共导出 |
 
@@ -24,17 +27,19 @@ src/tui/src/        ← 对话渲染（`SKILL.name` 状态行）和 Composer 建
 
 ### 1. 安装
 
-启动时自动安装，无需用户操作：
+终端进入可用状态后，在后台安装缺失的默认仓库；安装期间仍可使用已有技能和本地命令：
 
 ```
-app.ts:startApp()
-  → ensureDefaultSkills()
-    → git clone --depth 1 LLMQuant/skills           → .ohquant/skills/LLMQuant-skills/
-    → git clone --depth 1 tradermonty/claude-trading-skills → .ohquant/skills/tradermonty-claude-trading-skills/
+app.ts:startApp() → runtime.bootstrap()
+  → runtime.startSkillInstallation() → ensureDefaultSkills()
+    → fetch 固定 commit + detached checkout → .ohquant/skills/LLMQuant-skills/
+    → fetch 固定 commit + detached checkout → .ohquant/skills/tradermonty-claude-trading-skills/
 ```
 
-- 首次运行 clone，后续跳过（目录已存在）
-- 手动安装：`/skill install <owner/repo>`，已存在则 `git pull`
+- 首次运行按 [精选版本](./curated-skills.md) 安装，后续跳过已有目录；不据目录存在推定它匹配固定版本。
+- 手动安装：`/skill install <owner/repo>`，默认仓库使用 catalog 固定提交，其他仓库沿用 `git pull --ff-only`；更新要求来源一致、工作区干净，失败保留原安装，不删除重克隆。
+- 新安装先在 `.install-*` 临时目录准备并核验 HEAD/核心入口，再移入正式位置；临时目录不进入 skill 发现。成功回执显示实际 commit，失败显示原因与重试命令；退出取消安装并等待清理。联合依赖就绪状态仍待实现，详见 [安装契约](./skill-installation.md)。
+- 安装成功后清除发现缓存，终端补全刷新；空闲时 `/skill` 或下一次独立请求载入新技能，不重建会话或清空研究。运行中的工具循环及排队续问保持原技能快照。
 - 路径由 `OHQUANT_SKILLS_DIR` 环境变量覆盖
 - 默认安装的两个仓库只暴露 `CORE_SKILL_NAMES` 白名单中的 10 个核心 skill；避免递归扫描仓库示例、模板、元工具或完整 trading skill 集
 - 非默认手动安装仓库仍优先加载其 `skills/` 子目录；如果没有 `skills/` 子目录，则加载仓库根目录
@@ -68,7 +73,7 @@ WhyJ Quant 默认不加载用户级 Codex/Claude skill，避免 `docx`、`figma`
 
 ### 3. 发现
 
-AgentHarness 初始化时加载所有 skill：
+AgentHarness 初始化时加载 skill；安装成功或集成配置变化后，在空闲查看列表或新请求开始前刷新：
 
 ```
 session.ts:initialize()
@@ -170,8 +175,8 @@ Composer 输入 "/skill:llmquant-macro 分析当前宏观环境"
 - Skill **不是可执行函数**，是指令文本 — 通过 `formatSkillInvocation()` 包装后作为 user message 注入 agent turn
 - `AgentHarness.skill(name, extra)` 流程：查找 → 格式化 → `executeTurn()`，返回 `AssistantMessage`
 - Skill turn 中 LLM 可调用所有 Tool（`equity_historical_prices`、`compute_factor` 等），与普通对话无异
-- `disableModelInvocation: true` 的 skill 不会出现在 system prompt，只能通过 `/skill:name` 显式调用
-- Skill 发现结果被缓存（`WHYJ_SKILL_CACHE=off` 可禁用，调试用）
+- `disableModelInvocation: true` 的 skill 不会出现在 system prompt；普通显式技能仍可通过 `/skill:name` 调用，精选技能若 blocked/unverified 则先返回依赖缺项，见 [技能依赖](./skill-readiness.md)。
+- Skill 发现结果被缓存，成功安装使缓存失效；`WHYJ_SKILL_CACHE=off` 可禁用发现缓存，但不主动重载运行中的会话。
 
 ## 关键文件
 
@@ -180,9 +185,9 @@ Composer 输入 "/skill:llmquant-macro 分析当前宏观环境"
 | `src/skill/store.ts` | 安装、路径、默认 repo |
 | `src/skill/handler.ts` | CLI 命令实现 |
 | `src/agent/src/skills.ts` | `discoverSkills()` 桥接函数 |
-| `src/agent/src/pi/harness/skills.ts` | pi 通用 loader：`loadSkills()`、`formatSkillInvocation()` |
-| `src/agent/src/pi/harness/agent-harness.ts:645` | `AgentHarness.skill()` |
-| `src/agent/src/pi/harness/system-prompt.ts` | `formatSkillsForSystemPrompt()` → XML |
+| `src/agent/src/session-runtime/harness/skills.ts` | pi 通用 loader：`loadSkills()`、`formatSkillInvocation()` |
+| `src/agent/src/session-runtime/harness/agent-harness.ts` | `AgentHarness.skill()` |
+| `src/agent/src/session-runtime/harness/system-prompt.ts` | `formatSkillsForSystemPrompt()` → XML |
 | `src/agent/src/context.ts` | `buildSystemPrompt()` 拼装 |
 | `src/agent/src/session.ts` | `QuantAgentSession.skill()`、`getSkills()` |
 | `src/tui/src/render.ts:595` | skill 消息渲染 |

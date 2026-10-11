@@ -1,6 +1,6 @@
 import type { CurrentSessionMeta } from "./panel.ts";
-import type { ArtifactItemView, ArtifactMetaView, ConfigRowView, PortfolioItemView, PortfolioMetaView, ResumeListItemView, ResumeMetaView } from "./panel-views.ts";
-import type { ArtifactMeta, LocalPortfolioSummary, StoredSessionContextUsage, StoredSessionSummary } from "../../runtime/panel-data.ts";
+import type { ArtifactItemView, ArtifactMetaView, ConfigRowView, ResumeListItemView, ResumeMetaView } from "./panel-views.ts";
+import type { ArtifactMeta, StoredSessionContextUsage, StoredSessionSummary } from "../../runtime/panel-data.ts";
 import { COMMAND_CATALOG } from "../../runtime/command-catalog.ts";
 
 export function buildConfigRowViews(
@@ -37,13 +37,12 @@ export function buildResumePanelData(args: {
   meta?: ResumeMetaView;
   items: ResumeListItemView[];
   footer: string;
+  emptyMessage?: string;
 } {
   const { sessions, selection, currentSessionMeta: meta, resumeFilter, resumeSort, status, innerWidth, formatRelativeAge } = args;
   const selected = sessions[selection];
   const isCurrent = selected && meta && selected.id === meta.id;
-  const footer = status || (sessions.length === 0
-    ? "No saved sessions yet. Start a conversation first, then come back to /resume."
-    : `${sessions.length} session${sessions.length === 1 ? "" : "s"}`);
+  const footer = status || `${sessions.length} session${sessions.length === 1 ? "" : "s"}`;
 
   const metaView = selected ? (() => {
     const label = isCurrent ? "Current" : "Selected";
@@ -89,6 +88,7 @@ export function buildResumePanelData(args: {
       legacy: session.format === "markdown",
     })),
     footer,
+    emptyMessage: "No saved sessions yet.\n\nStart a conversation first, then come back to /resume.",
   };
 }
 
@@ -105,38 +105,6 @@ function formatHistoricalStats(session: StoredSessionSummary): string {
   return `JSONL session · Msgs ${session.entryCount.messages}  Comps ${session.entryCount.compactions}  Branches ${session.entryCount.branches}`;
 }
 
-export function buildPortfolioPanelData(args: {
-  items: LocalPortfolioSummary[];
-  selection: number;
-  activeFile: string;
-  status: string;
-  formatRelativeAge: (value: string) => string;
-}): {
-  meta?: PortfolioMetaView;
-  items: PortfolioItemView[];
-  footer: string;
-} {
-  const { items, selection, activeFile, status, formatRelativeAge } = args;
-  const selected = items[selection];
-  return {
-    meta: selected ? {
-      title: `${selected.fileName === activeFile ? "Active" : "Selected"}: ${selected.name}`,
-      details: `${selected.strategy}  Risk: ${selected.riskTag}  ·  ${selected.count} holdings`,
-      subdetails: `${selected.focusSectors.length > 0 ? selected.focusSectors.join(", ") : "No sector tags"}  ·  ${selected.updated ? formatRelativeAge(selected.updated) : "-"}`,
-    } : undefined,
-    items: items.map((item, index) => ({
-      age: item.updated ? formatRelativeAge(item.updated).padEnd(8) : "-".padEnd(8),
-      name: item.name,
-      selected: index === selection,
-      active: item.fileName === activeFile,
-    })),
-    footer: items.length === 0
-      ? "Add portfolio JSON files under .ohquant/portfolio/, then reopen /portfolio."
-      : (status || `${items.length} portfolio${items.length === 1 ? "" : "s"}`),
-  };
-}
-
-
 export function buildArtifactPanelData(args: {
   items: ArtifactMeta[];
   selection: number;
@@ -146,6 +114,7 @@ export function buildArtifactPanelData(args: {
   meta?: ArtifactMetaView;
   items: ArtifactItemView[];
   footer: string;
+  emptyMessage?: string;
 } {
   const { items, selection, status, formatRelativeAge } = args;
   const selected = items[selection];
@@ -153,17 +122,16 @@ export function buildArtifactPanelData(args: {
     meta: selected ? {
       title: `Selected: ${selected.title}`,
       details: `${selected.sessionId}  ·  ${selected.messageCount} messages  ·  ${formatBytes(selected.bytes)}`,
-      subdetails: selected.createdAt ? formatRelativeAge(selected.createdAt) : "-",
+      subdetails: `${selected.createdAt || "-"}${selected.revision ? ` · version ${selected.revision.slice(0, 8)}` : " · legacy"}`,
     } : undefined,
     items: items.map((item, index) => ({
       age: item.createdAt ? formatRelativeAge(item.createdAt).padEnd(8) : "-".padEnd(8),
       title: item.title || item.sessionId,
-      stats: `${item.messageCount} msg · ${formatBytes(item.bytes)}`,
+      stats: `${item.messageCount} msg · ${formatBytes(item.bytes)}${item.revision ? ` · ${item.revision.slice(0, 8)}` : ""}`,
       selected: index === selection,
     })),
-    footer: items.length === 0
-      ? "No reports yet. Enable Auto Artifacts in /config, then complete a quant-analysis turn."
-      : (status || `${items.length} report${items.length === 1 ? "" : "s"}`),
+    footer: status || `${items.length} report${items.length === 1 ? "" : "s"}`,
+    emptyMessage: "No artifacts yet.\n\nEnable Auto Artifacts in /config, then complete a quant-analysis turn.",
   };
 }
 
@@ -193,6 +161,6 @@ export function buildHelpPanelData(selection: number): {
       { key: "1-9", desc: "Quick-select" },
       { key: "/", desc: "Slash command mode" },
     ],
-    footer: "",
+    footer: `Usage: /help ${COMMAND_CATALOG[selection]?.name.slice(1) ?? "COMMAND"}`,
   };
 }

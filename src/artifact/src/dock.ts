@@ -6,7 +6,11 @@ import { esc } from "./template.ts";
 import type { GenCtx, Card } from "./types.ts";
 // Import renderers needed by dock
 import { renderScoreTable, renderComparisonRadar, renderFactorRadar } from "./renderers.ts";
-export function renderDock(ctx: GenCtx, quantModel: string, sourceUrls?: { label: string; url: string }[]): string {
+import { displayedMovement } from "../../types/metric-semantics.ts";
+import { metricValueClass } from "./semantic-colors.ts";
+import type { InstrumentLookupUrl } from "./source-links.ts";
+
+export function renderDock(ctx: GenCtx, quantModel: string, sourceUrls?: InstrumentLookupUrl[]): string {
   const sections: string[] = [];
 
   // ── Agent Stats ──
@@ -24,16 +28,16 @@ export function renderDock(ctx: GenCtx, quantModel: string, sourceUrls?: { label
       const k0 = ctx.klines[0]!;
       const last = k0.rows[k0.rows.length - 1]!;
       const prev = k0.rows[k0.rows.length - 2]!;
-      const chg = ((last.close - prev.close) / prev.close * 100);
-      const chgCls = chg >= 0 ? "up" : "dn";
-      sections.push(dockSection("Market pulse", "market", `<div class="mgrid">${metricCard("price", "Last price", last.close.toFixed(2), chgCls)}${metricCard("trend", "Change", `${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%`, chgCls)}${metricCard("volume", "Volume", last.vol ? (last.vol > 1e8 ? (last.vol/1e8).toFixed(1)+"亿" : (last.vol/1e4).toFixed(1)+"万") : "-")}${metricCard("candles", "Candles", String(k0.rows.length))}</div>`));
+      const chg = displayedMovement(prev && prev.close !== 0 ? (last.close - prev.close) / prev.close * 100 : null);
+      const chgCls = metricValueClass(chg.text, "Change");
+      sections.push(dockSection("Market pulse", "market", `<div class="mgrid">${metricCard("price", "Last price", last.close.toFixed(2), chgCls)}${metricCard("trend", "Change", chg.text, chgCls)}${metricCard("volume", "Volume", last.vol ? (last.vol > 1e8 ? (last.vol/1e8).toFixed(1)+"亿" : (last.vol/1e4).toFixed(1)+"万") : "-")}${metricCard("candles", "Candles", String(k0.rows.length))}</div>`));
     }
   }
 
   // ── Risk metrics ──
   if (ctx.metrics.length > 0) {
     sections.push(dockSection("Risk metrics", "risk", `<div class="mgrid">${ctx.metrics.map((c) => {
-      const cls = c.num > 0.001 ? "pos" : c.num < -0.001 ? "neg" : "nt";
+      const cls = metricValueClass(c.value, c.label);
       return metricCard("risk", esc(c.label), esc(c.value), cls);
     }).join("")}</div>`));
   }
@@ -53,9 +57,9 @@ export function renderDock(ctx: GenCtx, quantModel: string, sourceUrls?: { label
     sections.push(dockSection("Factor performance", "factor", renderFactorRadar(ctx.factors)));
   }
 
-  // ── Data Sources ──
+  // ── External instrument lookups, separate from archived price evidence ──
   if (sourceUrls && sourceUrls.length > 0) {
-    sections.push(dockSection("Source desk", "source", `<div class="source-list">${sourceUrls.map(u =>
+    sections.push(dockSection("Instrument lookup", "source", `<p class="source-note">External reference pages; archived observations above remain the price evidence.</p><div class="source-list">${sourceUrls.map(u =>
       `<a class="src-card" href="${esc(u.url)}" target="_blank" rel="noopener"><span class="metric-icon">${icon("source")}</span><span><b>${esc(u.label)}</b><small>${esc(u.url.replace("https://",""))}</small></span><i>↗</i></a>`
     ).join("")}</div>`));
   }

@@ -1,6 +1,7 @@
 import { charWidth, sanitizeTerminalText, strWidth, truncate, wrap } from "./buffer.ts";
 import type { Style } from "./buffer.ts";
 import { S } from "./styles.ts";
+import { metricTone } from "../../types/metric-semantics.ts";
 import type { UIMessage } from "./types.ts";
 import { formatToolLine } from "../../runtime/tool-display.ts";
 
@@ -344,9 +345,11 @@ function renderTableContentRow(
 ): RenderLine {
   const columns = widths.map((width, colIndex) => {
     const raw = row.cells[colIndex] ?? "";
+    const header = headerCells[colIndex] ?? "";
+    const label = colIndex === 1 && /^(value|值|数值)?$/i.test(header) ? row.cells[0] ?? "" : header;
     return {
       text: padDisplayRight(truncate(raw, width), width),
-      style: tableCellStyle(raw, headerCells[colIndex] ?? "", colIndex, isHeader),
+      style: tableCellStyle(raw, label, colIndex, isHeader),
     };
   });
   return joinStyledColumnsWithExactSpacing(columns);
@@ -380,23 +383,10 @@ function tableCellStyle(cell: string, header: string, colIndex: number, isHeader
 }
 
 function semanticCellStyle(cell: string, header: string): Style | null {
-  const text = cell.trim();
-  if (!text) return S.tableNote;
-  const lower = text.toLowerCase();
-  const headerLower = header.toLowerCase();
-  if (/^(ok|ready|kept|pass|passed|healthy|valid|buy|long|up)$/.test(lower)) return S.tablePositive;
-  if (/^(missing|error|failed|fail|invalid|breach|risk|sell|short|down)$/.test(lower)) return S.tableNegative;
-  if (/[▲↑]/.test(text) || /^\+\d/.test(text)) return S.tableGain;
-  if (/[▼↓]/.test(text) || /^-\d/.test(text)) return S.tableLoss;
-  if (/(dd|drawdown|var|cvar|loss|breach|risk|回撤|风险)/i.test(headerLower) && /^-?\d/.test(text)) return S.tableLoss;
-  if (/(score|grade|sharpe|cagr|return|收益|评分|夏普)/i.test(headerLower) && /^[-+]?\d/.test(text)) {
-    if (/(score|grade|sharpe|评分|夏普)/i.test(headerLower)) {
-      return /^-/.test(text) ? S.tableNegative : S.tablePositive;
-    }
-    return /^-/.test(text) ? S.tableLoss : S.tableGain;
-  }
-  if (/^(n\/a|-)$/.test(lower)) return S.tableNote;
-  return null;
+  const tone = metricTone(cell, header);
+  if (!tone) return null;
+  return { up: S.tableGain, down: S.tableLoss, positive: S.tablePositive,
+    negative: S.tableNegative, neutral: S.tableNeutral }[tone];
 }
 
 const SPARK_CHARS = "▁▂▃▄▅▆▇█";
@@ -409,6 +399,8 @@ function containsChartGlyph(text: string): boolean {
 }
 
 function chartGlyphStyle(text: string): Style {
+  const semantic = semanticCellStyle(text, "");
+  if (semantic) return semantic;
   if (/[▼▽↓]/.test(text) || /^-\d/.test(text.trim())) return S.chartDown;
   if (/[▲△↑]/.test(text) || /^\+\d/.test(text.trim())) return S.chartUp;
   return S.chartLine;
@@ -417,14 +409,17 @@ function chartGlyphStyle(text: string): Style {
 function renderChartGlyphLine(rawLine: string): RenderLine {
   const segments: { text: string; style?: Style }[] = [];
   const parts = rawLine.match(/\s+|\S+/g) ?? [];
+  const label = rawLine.trim().split(/\s{2,}/)[0] ?? "";
   for (const part of parts) {
-    segments.push({ text: part, style: chartTokenStyle(part) });
+    segments.push({ text: part, style: chartTokenStyle(part, label) });
   }
   return { text: rawLine, segments };
 }
 
-function chartTokenStyle(token: string): Style {
+function chartTokenStyle(token: string, label: string): Style {
   if (/^\s+$/.test(token)) return S.tableSpacing;
+  const semantic = semanticCellStyle(token, label);
+  if (semantic) return semantic;
   if ([...token].some((ch) => SPARK_CHARS.includes(ch))) return S.chartLine;
   if ([...token].some((ch) => BAR_CHARS.includes(ch))) return S.chartLine;
   if (/[▲△↑]/.test(token) || /^\+\d/.test(token)) return S.chartUp;

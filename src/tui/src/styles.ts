@@ -1,6 +1,7 @@
 /** Style presets matching DESIGN.md palette. */
 import type { Style } from "./buffer.ts";
-import { WHYJ_THEME } from "../../types/theme-colors.ts";
+import { marketColors, WHYJ_THEME, type MarketColorScheme } from "../../types/theme-colors.ts";
+import { displayedMovement } from "../../types/metric-semantics.ts";
 
 export const GOLD = WHYJ_THEME.gold;
 export const GOLD_HIGHLIGHT = WHYJ_THEME.goldHighlight;
@@ -66,20 +67,26 @@ export const S = {
   tableSpacing:  { fg: MUTED, dim: true } as Style,
   tablePositive: { fg: POSITIVE } as Style,
   tableNegative: { fg: NEGATIVE } as Style,
-  tableGain:     { fg: MARKET_UP } as Style,
-  tableLoss:     { fg: MARKET_DOWN } as Style,
+  tableGain:     { fg: MARKET_UP, fgRole: "market-up" } as Style,
+  tableLoss:     { fg: MARKET_DOWN, fgRole: "market-down" } as Style,
   tableNeutral:  { fg: MUTED } as Style,
   chartTitle:    { fg: GOLD, bold: true } as Style,
   chartLine:     { fg: GOLD } as Style,
-  chartUp:       { fg: MARKET_UP } as Style,
-  chartDown:     { fg: MARKET_DOWN } as Style,
+  chartUp:       { fg: MARKET_UP, fgRole: "market-up" } as Style,
+  chartDown:     { fg: MARKET_DOWN, fgRole: "market-down" } as Style,
   chartAxis:     { fg: HAIRLINE } as Style,
   chartMuted:    { fg: MUTED, dim: true } as Style,
 };
 
 export function pctStyle(pct: number): Style {
-  if (pct > 0.001) return { fg: MARKET_UP };
-  if (pct < -0.001) return { fg: MARKET_DOWN };
+  const tone = displayedMovement(pct).tone;
+  if (tone === "up") return S.tableGain;
+  if (tone === "down") return S.tableLoss;
   return S.muted;
+}
+
+export function marketForegrounds(scheme?: MarketColorScheme): Readonly<Record<string, string>> {
+  const colors = marketColors(scheme);
+  return { "market-up": colors.up, "market-down": colors.down };
 }
 

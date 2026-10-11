@@ -1,41 +1,42 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { resolveOhquantDir, resolveSkillsDir } from "../storage/index.ts";
+import { existsSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { resolveSkillsDir } from "../storage/index.ts";
+import { installSkillRepository, type SkillGit, type SkillInstallResult } from "./installer.ts";
+import { CURATED_SKILL_REPOSITORIES, curatedSkillRepository } from "./catalog.ts";
+import { invalidateSkillDiscovery } from "../agent/src/skills.ts";
 
 export const SKILLS_DIR = resolveSkillsDir();
 const skillsDir = () => resolveSkillsDir();
 
-const DEFAULT_REPOS = [
-  "LLMQuant/skills",
-  "tradermonty/claude-trading-skills",
-];
+const DEFAULT_REPO_DIRS = new Map(CURATED_SKILL_REPOSITORIES.map(entry => [entry.repo.replace("/", "-"), entry]));
 
-const DEFAULT_REPO_DIRS = new Set(DEFAULT_REPOS.map((repo) => repo.replace("/", "-")));
+export const CORE_SKILL_NAMES = CURATED_SKILL_REPOSITORIES.flatMap(entry => entry.skills.map(skill => skill.name));
 
-export const CORE_SKILL_NAMES = [
-  "llmquant-data",
-  "llmquant-macro",
-  "llmquant-equities",
-  "llmquant-portfolio",
-  "llmquant-risk",
-  "market-breadth-analyzer",
-  "technical-analyst",
-  "position-sizer",
-  "macro-regime-detector",
-  "market-environment-analysis",
-];
+/** Path identity avoids attaching curated claims to an unrelated same-name project skill. */
+export function curatedSkillInfo(filePath: string) {
+  const file = resolve(filePath), normalized = process.platform === "win32" ? file.toLowerCase() : file;
+  for (const repository of CURATED_SKILL_REPOSITORIES) {
+    for (const skill of repository.skills) {
+      const expected = resolve(skillsDir(), repository.repo.replace("/", "-"), "skills", skill.name, "SKILL.md");
+      if (normalized === (process.platform === "win32" ? expected.toLowerCase() : expected)) {
+        return { repo: repository.repo, expectedRevision: repository.revision, modes: skill.modes, limitations: skill.limitations, reviewedFiles: skill.reviewedFiles };
+      }
+    }
+  }
+  return undefined;
+}
 
 export function skillPaths(): string[] {
   if (!existsSync(skillsDir())) return [];
   const paths: string[] = [];
   for (const entry of readdirSync(skillsDir(), { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    if (DEFAULT_REPO_DIRS.has(entry.name)) {
+    if (!entry.isDirectory() || entry.name.startsWith(".install-")) continue;
+    const curated = DEFAULT_REPO_DIRS.get(entry.name);
+    if (curated) {
       const repoPath = join(skillsDir(), entry.name);
       const nestedSkills = join(repoPath, "skills");
-      for (const skillName of CORE_SKILL_NAMES) {
-        const skillPath = join(nestedSkills, skillName);
+      for (const skill of curated.skills) {
+        const skillPath = join(nestedSkills, skill.name);
         if (existsSync(skillPath)) paths.push(skillPath);
       }
       continue;
@@ -47,50 +48,38 @@ export function skillPaths(): string[] {
   return paths;
 }
 
-export function installSkills(repo: string): { success: boolean; message: string } {
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) {
-    return {
-      success: false,
-      message: "Use a GitHub repo in owner/repo format, for example: /skill install LLMQuant/skills",
-    };
-  }
-  const target = join(skillsDir(), repo.replace("/", "-"));
-  const url = `https://github.com/${repo}.git`;
-
-  if (existsSync(target)) {
-    try {
-      execFileSync("git", ["-C", target, "pull", "--ff-only"], { stdio: "pipe", timeout: 30_000 });
-      return { success: true, message: `Updated ${repo}\nLocation  ${target}\nNext      Run /skill to see available skills.` };
-    } catch {
-      rmSync(target, { recursive: true, force: true });
-    }
-  }
-
-  mkdirSync(skillsDir(), { recursive: true });
-  try {
-    execFileSync("git", ["clone", "--depth", "1", "--filter=blob:none", url, target], { stdio: "pipe", timeout: 60_000 });
-    return { success: true, message: `Installed ${repo}\nLocation  ${target}\nNext      Run /skill to see new skills.` };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return {
-      success: false,
-      message: `Could not install ${repo}.\nCause: ${msg}\nNext: Check network/proxy access to GitHub, then retry /skill install ${repo}.`,
-    };
-  }
+export async function installSkills(repo: string, signal?: AbortSignal): Promise<SkillInstallResult> {
+  const curated = curatedSkillRepository(repo);
+  const result = await installSkillRepository(skillsDir(), curated?.repo ?? repo, undefined, signal, curated ? {
+    revision: curated.revision, requiredFiles: curated.skills.map(skill => `skills/${skill.name}/SKILL.md`),
+  } : undefined);
+  if (result.success) invalidateSkillDiscovery();
+  return result;
 }
 
-/** Install default skill repos on first run (idempotent). */
-export function ensureDefaultSkills(): void {
-  mkdirSync(resolveOhquantDir(), { recursive: true });
-  mkdirSync(skillsDir(), { recursive: true });
+export interface SkillInstallProgress {
+  repo: string;
+  status: "present" | "installing" | "installed" | "failed" | "cancelled";
+  message: string;
+}
 
-  for (const repo of DEFAULT_REPOS) {
-    const target = join(skillsDir(), repo.replace("/", "-"));
-    if (existsSync(target)) continue;
-
-    const url = `https://github.com/${repo}.git`;
-    try {
-      execFileSync("git", ["clone", "--depth", "1", "--filter=blob:none", url, target], { stdio: "pipe", timeout: 60_000 });
-    } catch { /* silent */ }
+/** No network for existing directories. Installed does not imply discovered or dependency-ready. */
+export async function ensureDefaultSkills(options: { root?: string; git?: SkillGit; signal?: AbortSignal;
+  onProgress?: (progress: SkillInstallProgress) => void } = {}): Promise<void> {
+  const root = options.root ?? skillsDir();
+  for (const curated of CURATED_SKILL_REPOSITORIES) {
+    const repo = curated.repo;
+    if (options.signal?.aborted) break;
+    const target = join(root, repo.replace("/", "-"));
+    if (existsSync(target)) {
+      options.onProgress?.({ repo, status: "present", message: `${repo}: local directory present; no network update. Skill discovery and dependencies are checked separately.` });
+      continue;
+    }
+    options.onProgress?.({ repo, status: "installing", message: `Installing ${repo} in the background. Existing skills remain available.` });
+    const result = await installSkillRepository(root, repo, options.git, options.signal, {
+      revision: curated.revision, requiredFiles: curated.skills.map(skill => `skills/${skill.name}/SKILL.md`),
+    });
+    if (result.success) invalidateSkillDiscovery();
+    options.onProgress?.({ repo, status: options.signal?.aborted ? "cancelled" : result.success ? "installed" : "failed", message: result.message });
   }
 }

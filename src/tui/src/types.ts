@@ -1,10 +1,14 @@
 /** Domain types for the r2 frame-buffer TUI. */
+import type { QuoteObservation } from "../../types/market-observation.ts";
+import type { MarketColorScheme } from "../../types/theme-colors.ts";
+import type { HudMode } from "../../types/config.ts";
 
 export interface Holding {
   code: string;
   name: string;
   price: number;
   pct: number;
+  observation?: QuoteObservation;
 }
 
 export interface Quote {
@@ -12,6 +16,7 @@ export interface Quote {
   name: string;
   price: number;
   pct: number;
+  observation?: QuoteObservation;
 }
 
 import type { SkillState } from "../../types/skills.ts";
@@ -75,6 +80,8 @@ export interface AppState {
   source: string;
   /** Whether the right-side overview panel is visible. */
   showPortfolioPanel: boolean;
+  marketColorScheme?: MarketColorScheme;
+  hudMode?: HudMode;
   /** Bottom HUD metrics for the current session and latest assistant turn. */
   hud?: HudMetrics;
 }

@@ -78,7 +78,7 @@ try:
         fund_df["high"] = fund_df["close"]
         fund_df["low"] = fund_df["close"]
         fund_df["volume"] = 0
-        fund_df["amount"] = 0
+        fund_df["amount"] = None
         fund_df["date"] = pd.to_datetime(fund_df["date"]).dt.strftime("%Y-%m-%d")
         if start:
             fund_df = fund_df[fund_df["date"] >= pd.to_datetime(start).strftime("%Y-%m-%d")]
@@ -129,7 +129,7 @@ try:
     df = df.rename(columns=col_map)
     if selected_endpoint == "${AKSHARE_BAR_SOURCE_ENDPOINTS.tencent}" and "amount" in df.columns:
         df["volume"] = df["amount"]
-        df["amount"] = 0
+        df["amount"] = None
     cols = ["date","open","high","low","close","volume","amount"]
     df = df[[c for c in cols if c in df.columns]]
     df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")

@@ -116,16 +116,16 @@ function leafIdAfterEntry(entry: StoredSessionTreeEntry): string | null {
   return entry.type === "leaf" ? entry.targetId ?? null : entry.id;
 }
 
-function normalizeSessionEntry(parsed: Record<string, unknown>, currentLeafId: string | null): StoredSessionTreeEntry | null {
-  if (typeof parsed.type !== "string" || typeof parsed.id !== "string" || typeof parsed.timestamp !== "string") {
+function normalizeSessionEntry(parsed: Record<string, unknown>): StoredSessionTreeEntry | null {
+  if (typeof parsed.type !== "string" || typeof parsed.id !== "string" || !parsed.id || typeof parsed.timestamp !== "string" || !parsed.timestamp) {
     return null;
   }
   const entry = { ...parsed } as Record<string, unknown>;
   if (entry.parentId !== null && typeof entry.parentId !== "string") {
-    entry.parentId = currentLeafId;
+    return null;
   }
   if (entry.type === "leaf" && entry.targetId !== null && typeof entry.targetId !== "string") {
-    entry.targetId = null;
+    return null;
   }
   return entry as StoredSessionTreeEntry;
 }
@@ -136,11 +136,11 @@ function buildCurrentBranch(entries: StoredSessionTreeEntry[], leafId: string | 
   const path: StoredSessionTreeEntry[] = [];
   let current = byId.get(leafId);
   while (current) {
-    path.unshift(current);
+    path.push(current);
     if (!current.parentId) break;
     current = byId.get(current.parentId);
   }
-  return path;
+  return path.reverse();
 }
 
 function normalizeModelLookupId(modelId: string): string {
@@ -322,13 +322,13 @@ function safeJsonStringify(value: unknown): string {
 
 function parseSessionFile(filePath: string): StoredSessionSummary | null {
   try {
-    const raw = readFileSync(filePath, "utf-8");
-    const lines = raw.split(/\r?\n/).filter(Boolean);
+    const raw = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(readFileSync(filePath));
+    const lines = raw.split(/\r?\n/).filter(line => line.trim());
     if (lines.length === 0) return null;
 
     const header = JSON.parse(lines[0]!) as Record<string, unknown>;
     if (header.type !== "session" || header.version !== 3) return null;
-    if (typeof header.id !== "string" || typeof header.timestamp !== "string" || typeof header.cwd !== "string") {
+    if (typeof header.id !== "string" || !header.id || typeof header.timestamp !== "string" || !header.timestamp || typeof header.cwd !== "string" || !header.cwd) {
       return null;
     }
 
@@ -338,6 +338,7 @@ function parseSessionFile(filePath: string): StoredSessionSummary | null {
     let messageCount = 0;
     const recentMessages: StoredSessionSummary["recentMessages"] = [];
     const entries: StoredSessionTreeEntry[] = [];
+    const seen = new Set<string>();
     let leafId: string | null = null;
 
     for (const line of lines.slice(1)) {
@@ -345,13 +346,16 @@ function parseSessionFile(filePath: string): StoredSessionSummary | null {
       try {
         parsed = JSON.parse(line) as Record<string, unknown>;
       } catch {
-        continue;
+        return null;
       }
-      const entry = normalizeSessionEntry(parsed, leafId);
-      if (entry) {
-        entries.push(entry);
-        leafId = leafIdAfterEntry(entry);
-      }
+      if (!isRecord(parsed)) return null;
+      const entry = normalizeSessionEntry(parsed);
+      if (!entry || seen.has(entry.id)) return null;
+      if (entry.parentId !== null && !seen.has(entry.parentId)) return null;
+      if ((entry.type === "leaf" || entry.type === "label") && entry.targetId !== null && (typeof entry.targetId !== "string" || !seen.has(entry.targetId))) return null;
+      seen.add(entry.id);
+      entries.push(entry);
+      leafId = leafIdAfterEntry(entry);
       if (typeof parsed.timestamp === "string") updatedAt = parsed.timestamp;
       if (parsed.type === "session_info" && typeof parsed.name === "string" && parsed.name.trim()) {
         sessionName = parsed.name.trim();

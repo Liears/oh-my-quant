@@ -4,15 +4,15 @@ export interface CommandCatalogEntry {
 }
 
 export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
-  { name: "/compact", desc: "Compact current session context" },
-  { name: "/resume", desc: "Browse and restore saved sessions" },
-  { name: "/portfolio", desc: "Browse and select local portfolios" },
-  { name: "/config", desc: "Review and edit runtime settings" },
-  { name: "/doctor", desc: "Configure and diagnose runtime" },
-  { name: "/skill", desc: "Discover, inspect, and run skills" },
+  { name: "/compact", desc: "Compact research session context" },
+  { name: "/resume", desc: "Resume saved research sessions" },
+  { name: "/portfolio", desc: "Manage observation portfolios" },
+  { name: "/config", desc: "Configure models and research data" },
+  { name: "/doctor", desc: "Check model and market data readiness" },
+  { name: "/skill", desc: "Discover, audit, and run skills" },
   { name: "/help", desc: "Browse commands and shortcuts" },
-  { name: "/clear", desc: "Clear conversation and reset agent" },
-  { name: "/artifact", desc: "Browse, restore, and open reports" },
+  { name: "/clear", desc: "Reset the current research session" },
+  { name: "/artifact", desc: "Browse and restore research reports" },
   { name: "/exit", desc: "Exit WhyJ Quant" },
 ];
 
@@ -33,6 +33,11 @@ export function buildCommandHelpText(): string {
     "  Shift+PgUp/PgDown  Scroll overview",
     "",
     "No / prefix → AI analysis",
+    "Command usage → /help COMMAND or /COMMAND --help",
+    "Current research task → /resume --task",
+    "Compare portfolios → ask the agent with groups, dates, benchmark and currency",
+    "Plugin management → /config --extensions list",
+    "Pi connection import → /config --pi list",
   ];
   return lines.join("\n");
 }

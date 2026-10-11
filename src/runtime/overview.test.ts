@@ -18,12 +18,12 @@ describe("runtime overview service", () => {
     });
 
     expect(MARKET_INDICES.map((entry) => entry.code)).toEqual(["000001.SH", "399001.SZ", "000300.SH", "000905.SH", "399006.SZ"]);
-    expect(portfolioSymbols.map((entry) => entry.code)).toEqual(["510300.SH", "510300"]);
+    expect(portfolioSymbols.map((entry) => entry.code)).toEqual(["510300.SH"]);
     expect(sections[0]).toEqual({
       kind: "group",
       groupId: "group-1",
       title: "核心组合",
-      rows: [{ code: "510300", name: "沪深300ETF", price: Number.NaN, pct: Number.NaN }],
+      rows: [{ code: "510300.SH", name: "沪深300ETF", price: Number.NaN, pct: Number.NaN }],
       collapsed: false,
     });
     expect(sections.some((section) => section.title === "Market")).toBe(true);

@@ -1,26 +1,26 @@
+import { editPortfolio, type PortfolioEdit } from "./portfolio.ts";
 import {
   hasWhyjEnvValue,
-  listLocalPortfolios,
+  artifactReference,
   listStoredSessions,
   loadPanelPortfolio,
   loadSettings,
   saveSettings,
   stripTerminalControlCodes,
-  syncPanelPortfolioFromLocalPortfolio,
   type ArtifactMeta,
-  type LocalPortfolioSummary,
   type PanelPortfolioFile,
   type StoredSessionContextUsage,
   type StoredSessionSummary,
-  type SyncedPanelPortfolio,
   type WhyjEnvAliasKey,
 } from "../storage/index.ts";
 import { listRestorableArtifactReports } from "./artifact-reports.ts";
 import type { OhQuantSettings } from "../types/config.ts";
 
+export type { PanelPortfolioFile, PortfolioEdit };
+export { artifactReference };
+
 export type {
   ArtifactMeta,
-  LocalPortfolioSummary,
   StoredSessionContextUsage,
   StoredSessionSummary,
   WhyjEnvAliasKey,
@@ -39,10 +39,9 @@ export interface PanelDataService {
     scope: PanelSessionScope;
     sort: PanelSessionSort;
   }): StoredSessionSummary[];
-  listLocalPortfolios(): LocalPortfolioSummary[];
   listArtifacts(): ArtifactMeta[];
   loadPanelPortfolio(): PanelPortfolioFile;
-  syncPanelPortfolioFromLocalPortfolio(fileName: string): SyncedPanelPortfolio | null;
+  editPortfolio(edit: PortfolioEdit): PanelPortfolioFile;
   hasWhyjEnvValue(env: Record<string, string | undefined>, key: WhyjEnvAliasKey): boolean;
   stripTerminalControlCodes(value: string): string;
 }
@@ -53,10 +52,9 @@ export function createStoragePanelDataService(): PanelDataService {
     loadSettings,
     saveSettings,
     listStoredSessions,
-    listLocalPortfolios,
     listArtifacts: listRestorableArtifactReports,
     loadPanelPortfolio,
-    syncPanelPortfolioFromLocalPortfolio,
+    editPortfolio,
     hasWhyjEnvValue,
     stripTerminalControlCodes,
   };

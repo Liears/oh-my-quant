@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { discoverSkills } from "../src/skills.ts";
-import { NodeExecutionEnv } from "../src/pi/node.ts";
+import { discoverSkills, invalidateSkillDiscovery } from "../src/skills.ts";
+import { NodeExecutionEnv } from "../src/session-runtime/node.ts";
 
 let TEST_DIR = "";
 
@@ -25,6 +25,20 @@ afterEach(() => {
 });
 
 describe("discoverSkills", () => {
+  it("reloads updated content at the same path after installation invalidates discovery", async () => {
+    TEST_DIR = mkdtempSync(join(tmpdir(), "whyj-skills-"));
+    mkdirSync(join(TEST_DIR, ".git"));
+    const installed = join(TEST_DIR, "installed");
+    writeSkill(installed, "revision-test");
+    const options = { cwd: TEST_DIR, env: new NodeExecutionEnv({ cwd: TEST_DIR }), extraPaths: [installed] };
+    const before = await discoverSkills(options);
+    writeFileSync(join(installed, "revision-test", "SKILL.md"), "---\nname: revision-test\ndescription: Updated research instructions\n---\nUPDATED_CONTENT");
+    expect((await discoverSkills(options)).skills[0]!.content).toBe(before.skills[0]!.content);
+    invalidateSkillDiscovery();
+    const after = await discoverSkills(options);
+    expect(after.skills[0]!.content).toContain("UPDATED_CONTENT");
+    expect(after.skills[0]!.description).toBe("Updated research instructions");
+  });
   it("defaults to project and explicit skill paths without user-level Codex or Claude sources", async () => {
     TEST_DIR = mkdtempSync(join(tmpdir(), "whyj-skills-"));
     const cwd = join(TEST_DIR, "repo");

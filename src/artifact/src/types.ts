@@ -5,10 +5,16 @@
  * and trajectory (per docs/artifacts-design.md sections 7-8).
  */
 
+import type { ReportProvenance } from "../../types/research-evidence.ts";
+import type { Bar, DatasetRef } from "../../types/data.ts";
+import type { FundNavDatasetRef, FundNavSnapshot } from "../../types/fund-data.ts";
+import type { MarketColorScheme } from "../../types/theme-colors.ts";
+import type { PortfolioComparisonArtifact } from "../../types/portfolio-comparison.ts";
+
 // ── Public API ──
 
-export interface GenerateArtifactInput { sessionPath: string; title?: string }
-export interface GenerateArtifactResult { html: string; title: string; sessionId: string; messageCount: number }
+export interface GenerateArtifactInput { sessionPath: string; title?: string; leafId?: string | null; marketColorScheme?: MarketColorScheme; resolveDataset?: (ref: DatasetRef) => Bar[]; resolveFundDataset?: (ref: FundNavDatasetRef) => FundNavSnapshot; resolveComparison?: (id: string) => PortfolioComparisonArtifact }
+export interface GenerateArtifactResult { html: string; title: string; sessionId: string; messageCount: number; provenance: ReportProvenance }
 
 // ── Generator context ──
 

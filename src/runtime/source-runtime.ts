@@ -2,28 +2,32 @@ import {
   fetchBars as fetchSourceBars,
   fetchLiveBars as fetchSourceLiveBars,
   searchSymbols as searchSourceSymbols,
+  type BarsFetchResult,
   type DataSource,
-  type LiveFetchResult,
+  type LiveBarsFetchResult,
   type SourceFetchOptions,
   type SourceProviderOptions,
   type SourceRuntimeDeps,
 } from "../source/index.ts";
-import { isCacheFresh, loadBars, loadSettings, saveBars } from "../storage/index.ts";
-import type { Bar, Market } from "../types/data.ts";
+import { loadArchivedBarsBefore, loadCachedBars, loadSettings, readSettingsAsync, saveBars } from "../storage/index.ts";
+import type { Market } from "../types/data.ts";
 import type { SymbolInfo } from "../types/data.ts";
+import type { OhQuantSettings } from "../types/config.ts";
+
+const REGULAR_SOURCE_REQUEST_BUDGET_MS = 60_000;
 
 export function createStorageSourceRuntimeDeps(): SourceRuntimeDeps {
   return {
-    loadBars,
+    loadCache: loadCachedBars,
+    loadArchiveBefore: loadArchivedBarsBefore,
     saveBars,
-    isCacheFresh,
-    getPreferredSource: () => loadSettings().preferences.source,
+    getPreferredSource: async (_market, signal) => (await readSettingsAsync(signal)).preferences.source,
   };
 }
 
 /** Pass settings-backed credentials to providers so /config changes work immediately. */
-export function createStorageSourceProviderOptions(): SourceProviderOptions {
-  const env = loadSettings().env;
+export function createStorageSourceProviderOptions(settings: OhQuantSettings = loadSettings()): SourceProviderOptions {
+  const env = { ...process.env, ...settings.env };
   return {
     tushare: { token: env.WHYJ_QUANT_TUSHARE_TOKEN, baseUrl: env.TUSHARE_BASE_URL, env },
     llmquant: { apiKey: env.WHYJ_QUANT_LLMQUANT_API_KEY, baseUrl: env.LLMQUANT_BASE_URL, env },
@@ -38,8 +42,16 @@ export async function fetchBars(
   end?: string,
   source?: DataSource,
   options: SourceFetchOptions = {},
-): Promise<{ bars: Bar[]; source: string }> {
-  return fetchSourceBars(symbol, market, start, end, source, withStorageDeps(options));
+): Promise<BarsFetchResult> {
+  // An archive-only query has no provider dependency. Avoid preparing credentials
+  // or reading provider settings before its local revision lookup.
+  const bound = options.observedBefore === undefined ? withStorageDeps(options, REGULAR_SOURCE_REQUEST_BUDGET_MS)
+    : { ...options, deps: options.deps ?? createStorageSourceRuntimeDeps() };
+  return fetchSourceBars(symbol, market, start, end, source, bound);
+}
+
+export async function createStorageSourceProviderOptionsAsync(signal?: AbortSignal): Promise<SourceProviderOptions> {
+  return createStorageSourceProviderOptions(await readSettingsAsync(signal));
 }
 
 export async function fetchLiveBars(
@@ -48,18 +60,25 @@ export async function fetchLiveBars(
   start?: string,
   end?: string,
   options: Pick<SourceFetchOptions, "deps" | "providers"> = {},
-): Promise<LiveFetchResult> {
-  return fetchSourceLiveBars(symbol, market, start, end, withStorageDeps(options));
+): Promise<LiveBarsFetchResult> {
+  return fetchSourceLiveBars(symbol, market, start, end, withStorageDeps(options, REGULAR_SOURCE_REQUEST_BUDGET_MS));
 }
 
-export async function searchSymbols(keyword: string, market?: Market): Promise<SymbolInfo[]> {
-  return searchSourceSymbols(keyword, market, createStorageSourceProviderOptions());
+export async function searchSymbols(keyword: string, market?: Market, signal?: AbortSignal): Promise<SymbolInfo[]> {
+  signal?.throwIfAborted();
+  return searchSourceSymbols(keyword, market, { loadCredentials: createStorageSourceProviderOptionsAsync,
+    signal, budgetMs: REGULAR_SOURCE_REQUEST_BUDGET_MS });
 }
 
-function withStorageDeps<T extends Pick<SourceFetchOptions, "deps" | "providers">>(options: T): T & { deps: SourceRuntimeDeps } {
+function withStorageDeps<T extends Pick<SourceFetchOptions, "deps" | "providers">>(options: T, defaultBudgetMs?: number): T & { deps: SourceRuntimeDeps } {
+  const requestedBudget = options.providers?.budgetMs;
+  const budgetMs = requestedBudget !== undefined && defaultBudgetMs !== undefined
+    && Number.isSafeInteger(requestedBudget) && requestedBudget <= 2_147_483_647
+    ? Math.min(requestedBudget, defaultBudgetMs) : requestedBudget ?? defaultBudgetMs;
   return {
     ...options,
     deps: options.deps ?? createStorageSourceRuntimeDeps(),
-    providers: { ...createStorageSourceProviderOptions(), ...options.providers },
+    providers: { ...options.providers, budgetMs,
+      loadCredentials: options.providers?.loadCredentials ?? createStorageSourceProviderOptionsAsync },
   };
 }

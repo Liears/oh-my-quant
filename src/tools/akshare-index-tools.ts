@@ -53,11 +53,12 @@ export const fetchIndexSpotTool: AgentTool<typeof FetchIndexSpot> = {
   label: "Index Spot",
   parameters: FetchIndexSpot,
   executionMode: "sequential",
-  async execute(_id: string, args: Static<typeof FetchIndexSpot>): Promise<AgentToolResult<unknown>> {
+  async execute(_id: string, args: Static<typeof FetchIndexSpot>, signal?: AbortSignal): Promise<AgentToolResult<unknown>> {
+    signal?.throwIfAborted();
     const categories = args.symbol
       ? [args.symbol]
       : ["沪深重要指数", "上证系列指数", "深证系列指数", "中证系列指数"];
-    const quotes = await fetchAkshareAIndexSpot(categories);
+    const quotes = await fetchAkshareAIndexSpot(categories, signal);
     const filtered = filterIndexQuotes(quotes, args.keyword);
     const rows = filtered.slice(0, outputLimit(args.limit));
     if (rows.length === 0) {
@@ -88,8 +89,9 @@ export const fetchIndexInfoTool: AgentTool<typeof FetchIndexInfo> = {
   label: "Index Info",
   parameters: FetchIndexInfo,
   executionMode: "sequential",
-  async execute(_id: string, args: Static<typeof FetchIndexInfo>): Promise<AgentToolResult<unknown>> {
-    const data = await fetchAkshareIndexInfo(args.keyword);
+  async execute(_id: string, args: Static<typeof FetchIndexInfo>, signal?: AbortSignal): Promise<AgentToolResult<unknown>> {
+    signal?.throwIfAborted();
+    const data = await fetchAkshareIndexInfo(args.keyword, undefined, signal);
     const rows = data.rows.slice(0, outputLimit(args.limit, 20, 500));
     return ok(
       formatIndexInfoText(data.rowCount, data.rows.length, rows, args.keyword),
@@ -111,8 +113,9 @@ export const fetchIndexConstituentsTool: AgentTool<typeof FetchIndexConstituents
   label: "Index Constituents",
   parameters: FetchIndexConstituents,
   executionMode: "sequential",
-  async execute(_id: string, args: Static<typeof FetchIndexConstituents>): Promise<AgentToolResult<unknown>> {
-    const data = await fetchAkshareIndexConstituents(args.symbol, args.source_priority);
+  async execute(_id: string, args: Static<typeof FetchIndexConstituents>, signal?: AbortSignal): Promise<AgentToolResult<unknown>> {
+    signal?.throwIfAborted();
+    const data = await fetchAkshareIndexConstituents(args.symbol, args.source_priority, signal);
     const filtered = filterIndexConstituents(data.constituents, args.keyword);
     const rows = filtered.slice(0, outputLimit(args.limit, 20, 500));
     return ok(
@@ -138,7 +141,8 @@ export const fetchIndexRowsTool: AgentTool<typeof FetchIndexRows> = {
   label: "Index Rows",
   parameters: FetchIndexRows,
   executionMode: "sequential",
-  async execute(_id: string, args: Static<typeof FetchIndexRows>): Promise<AgentToolResult<unknown>> {
+  async execute(_id: string, args: Static<typeof FetchIndexRows>, signal?: AbortSignal): Promise<AgentToolResult<unknown>> {
+    signal?.throwIfAborted();
     const endpoint = args.endpoint.trim();
     if (!AKSHARE_PUBLIC_INDEX_ENDPOINTS.includes(endpoint as AksharePublicIndexEndpoint)) {
       return ok(
@@ -150,7 +154,7 @@ export const fetchIndexRowsTool: AgentTool<typeof FetchIndexRows> = {
       );
     }
     const params = isRecord(args.params) ? args.params : {};
-    const data = await fetchAkshareIndexRows(endpoint as AksharePublicIndexEndpoint, params);
+    const data = await fetchAkshareIndexRows(endpoint as AksharePublicIndexEndpoint, params, signal);
     const filtered = filterRowsByKeyword(data.rows, args.keyword);
     const rows = filtered.slice(0, outputLimit(args.limit));
     return ok(

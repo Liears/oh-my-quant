@@ -3,8 +3,15 @@ import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from "node:f
 import { join } from "node:path";
 import { Buffer } from "../src/buffer.ts";
 import { PanelController } from "../src/panel.ts";
+import { probeDataConnection } from "../../runtime/data-readiness.ts";
+import { setImmediate } from "node:timers/promises";
 import { saveArtifact, savePanelPortfolio, loadSettings, saveSettings } from "../../storage/index.ts";
 import type { DoctorResult } from "../../cli/doctor.ts";
+import { resolveConfiguredModel } from "../../runtime/model-settings.ts";
+
+const dataOptions = { processEnv: {}, probe: ((cfg, request, options) => probeDataConnection(cfg, request, { ...options,
+  adapters: { [request.source]: { fetchBars: async () => [{ date: request.start, open: 10, high: 10, low: 10, close: 10, volume: 1, amount: 10 }] } },
+})) as typeof probeDataConnection };
 
 const OHQ = join(process.cwd(), ".ohquant-test-panel-ctrl");
 
@@ -24,13 +31,23 @@ function key(name: string, char = "") {
   return { name, sequence: char, shift: false, ctrl: false, meta: false };
 }
 
+function selectField(panel: PanelController, label: string): void {
+  for (let count = 0; count < 25; count++) {
+    const buffer = new Buffer(120, 32);
+    panel.render(buffer);
+    if (buffer.toPlain().some(line => line.includes(`> ${label} `))) return;
+    panel.handleKey("", key("down"));
+  }
+  throw new Error(`Field not found: ${label}`);
+}
+
 function encodeCwd(cwd: string): string {
   return `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`;
 }
 
 describe("PanelController portfolio UI", () => {
   it("renders a doctor panel with report data", () => {
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("doctor");
     panel.setDoctor({
       ready: true,
@@ -72,8 +89,30 @@ describe("PanelController portfolio UI", () => {
     panel.close();
   });
 
+  it("labels a successful data-only Doctor run without implying the pending phases passed", () => {
+    const panel = new PanelController(undefined, dataOptions);
+    panel.open("doctor");
+    const doctor: DoctorResult = { ready: true, mode: "diagnostic", overall: "all_pass", requestedPhases: ["data"],
+      phases: [
+        { phase: "model", status: "pending", label: "Model", detail: "pending" },
+        { phase: "tools", status: "pending", label: "Tools", detail: "pending" },
+        { phase: "data", status: "pass", label: "Data", detail: "23 valid rows" },
+      ], auth: {}, config: { settingsPath: "fixture", model: "fixture", baseUrl: "", endpointMode: "",
+        dataSource: "akshare" }, hints: [] };
+    panel.setDoctor(doctor);
+    const scoped = new Buffer(80, 24);
+    panel.render(scoped);
+    expect(scoped.toPlain().join("\n")).toContain("WhyJ Doctor · data pass · model+tools untested");
+
+    panel.setDoctor({ ...doctor, requestedPhases: ["model", "tools", "data"],
+      phases: doctor.phases.map(phase => ({ ...phase, status: "pass" as const })) as DoctorResult["phases"] });
+    const complete = new Buffer(80, 24);
+    panel.render(complete);
+    expect(complete.toPlain().join("\n")).toContain("WhyJ Doctor · all_pass");
+  });
+
   it("retries doctor directly from the diagnostic panel", () => {
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("doctor");
     panel.setDoctor({
       ready: false,
@@ -99,7 +138,7 @@ describe("PanelController portfolio UI", () => {
   });
 
   it("retries tools and data phases from the diagnostic panel", () => {
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("doctor");
     panel.setDoctor({
       ready: false,
@@ -145,7 +184,7 @@ describe("PanelController portfolio UI", () => {
   });
 
   it("enters configure mode from the diagnostic panel", () => {
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("doctor");
     panel.setDoctor({
       ready: false,
@@ -172,12 +211,12 @@ describe("PanelController portfolio UI", () => {
     panel.render(buf);
     const plain = buf.toPlain().join("\n");
     expect(plain).toContain("Doctor · Configure");
-    expect(plain).toContain("Provider");
-    expect(plain).toContain("Save & Verify");
+    expect(plain).toContain("Model connection");
+    expect(plain).toContain("Run diagnostics");
   });
 
   it("keeps doctor first-setup edits in draft until save", () => {
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("doctor");
     panel.setDoctor({
       ready: false,
@@ -199,21 +238,32 @@ describe("PanelController portfolio UI", () => {
       hints: ["Configure API and data credentials."],
     } as DoctorResult);
 
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
+    selectField(panel, "Market Data");
+    panel.handleKey("", key("return"));
+    selectField(panel, "API key");
     panel.handleKey("", key("return"));
     for (const ch of "sk-draft-only") panel.handleKey(ch, key("", ch));
     panel.handleKey("", key("return"));
-    expect(loadSettings().env.WHYJ_QUANT_API_KEY).toBeUndefined();
+    expect(loadSettings().env.WHYJ_QUANT_LLMQUANT_API_KEY).toBeUndefined();
+    panel.handleKey("", key("escape"));
+
+    selectField(panel, "Model connection");
+    panel.handleKey("", key("return"));
+    selectField(panel, "API key");
+    panel.handleKey("", key("return"));
+    panel.handleKey("saved-model-key", key("", "saved-model-key"));
+    panel.handleKey("", key("return"));
+    selectField(panel, "Save");
+    panel.handleKey("", key("return"));
+    expect(loadSettings().providers?.deepseek?.apiKey).toBe("saved-model-key");
+    expect(loadSettings().env.WHYJ_QUANT_LLMQUANT_API_KEY).toBeUndefined();
 
     expect(panel.handleKey("", key("escape"))).toEqual({ close: true });
-    expect(loadSettings().env.WHYJ_QUANT_API_KEY).toBeUndefined();
+    expect(loadSettings().env.WHYJ_QUANT_LLMQUANT_API_KEY).toBeUndefined();
   });
 
-  it("saves doctor first-setup draft and reruns doctor on save", () => {
-    const panel = new PanelController();
+  it("verifies data before saving and runs diagnostics independently of model saving", async () => {
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("doctor");
     panel.setDoctor({
       ready: false,
@@ -235,34 +285,41 @@ describe("PanelController portfolio UI", () => {
       hints: ["Configure API and data credentials."],
     } as DoctorResult);
 
-    panel.handleKey("", key("down"));
+    selectField(panel, "Model connection");
+    panel.handleKey("", key("return"));
+    selectField(panel, "API key");
     panel.handleKey("", key("return"));
     for (const ch of "sk-live-1234") panel.handleKey(ch, key("", ch));
     panel.handleKey("", key("return"));
 
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("return"));
-    for (const ch of "https://api.deepseek.com/anthropic") panel.handleKey(ch, key("", ch));
+    selectField(panel, "Save");
     panel.handleKey("", key("return"));
 
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
+    selectField(panel, "Market Data");
+    panel.handleKey("", key("return"));
+    selectField(panel, "API key");
     panel.handleKey("", key("return"));
     for (const ch of "llmq-key-5678") panel.handleKey(ch, key("", ch));
     panel.handleKey("", key("return"));
 
-    panel.handleKey("", key("down"));
+    expect(loadSettings().env.WHYJ_QUANT_LLMQUANT_API_KEY).toBeUndefined();
+    selectField(panel, "Check data");
+    panel.handleKey("", key("return"));
+    await setImmediate();
+    selectField(panel, "Save verified");
+    expect(panel.handleKey("", key("return"))).toEqual({ refreshPanel: true });
+    selectField(panel, "Run diagnostics");
     const result = panel.handleKey("", key("return"));
     expect(result).toEqual({ command: "/doctor" });
 
     const settings = loadSettings();
-    expect(settings.env.WHYJ_QUANT_API_KEY).toBe("sk-live-1234");
-    expect(settings.env.WHYJ_QUANT_BASE_URL).toBe("https://api.deepseek.com/anthropic");
+    expect(settings.providers?.deepseek?.apiKey).toBe("sk-live-1234");
+    expect(resolveConfiguredModel(settings).baseUrl).toBe("https://api.deepseek.com");
     expect(settings.env.WHYJ_QUANT_LLMQUANT_API_KEY).toBe("llmq-key-5678");
   });
 
   it("maps the MiniMax doctor preset to the supported runtime endpoint", () => {
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("doctor");
     panel.setDoctor({
       ready: false,
@@ -284,9 +341,15 @@ describe("PanelController portfolio UI", () => {
       hints: [],
     } as DoctorResult);
 
-    (panel as any).setDoctorProviderPreset("MiniMax");
-    expect((panel as any).doctorDraft.env.WHYJ_QUANT_BASE_URL).toBe("https://api.minimaxi.com/anthropic");
-    expect((panel as any).doctorProviderPreset()).toBe("MiniMax");
+    panel.handleKey("", key("return"));
+    selectField(panel, "Provider");
+    panel.handleKey("", key("return"));
+    panel.handleKey("(minimax-cn)", key("", "(minimax-cn)"));
+    panel.handleKey("", key("return"));
+    selectField(panel, "Save");
+    panel.handleKey("", key("return"));
+    expect(loadSettings().provider).toBe("minimax-cn");
+    expect(resolveConfiguredModel(loadSettings()).baseUrl).toBe("https://api.minimaxi.com/anthropic");
   });
 
   it("accepts a legacy auth token when saving doctor configure flow", () => {
@@ -296,7 +359,7 @@ describe("PanelController portfolio UI", () => {
     settings.env.WHYJ_QUANT_LLMQUANT_API_KEY = "llmq-key-5678";
     saveSettings(settings);
 
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("doctor");
     panel.setDoctor({
       ready: true,
@@ -319,103 +382,24 @@ describe("PanelController portfolio UI", () => {
     } as DoctorResult);
 
     panel.handleKey("c", key("", "c"));
-    for (let i = 0; i < 5; i++) panel.handleKey("", key("down"));
+    selectField(panel, "Run diagnostics");
     const result = panel.handleKey("", key("return"));
     expect(result).toEqual({ command: "/doctor" });
   });
 
-  it("lets config switch the current portfolio file used by the portfolio panel", () => {
-    const portfolioDir = join(OHQ, "portfolio");
-    mkdirSync(portfolioDir, { recursive: true });
-    writeFileSync(join(portfolioDir, "holdings.json"), JSON.stringify({
-      name: "当前主组合",
-      updated: "2026-06-01T00:00:00+08:00",
-      funds: [{ code: "161725", name: "招商中证白酒" }, { code: "_CASH_", name: "现金" }],
-      focusSectors: ["消费"],
-    }, null, 2));
-    writeFileSync(join(portfolioDir, "holdings_v2_semicon.json"), JSON.stringify({
-      name: "聚焦半导体",
-      updated: "2026-05-31T00:00:00+08:00",
-      funds: [{ code: "008888", name: "半导体芯片ETF联接C" }],
-      focusSectors: ["半导体"],
-    }, null, 2));
-
-    const configPanel = new PanelController();
+  it("opens the custom portfolio editor from config without reading legacy files", () => {
+    const configPanel = new PanelController(undefined, dataOptions);
     configPanel.open("config");
-    const configBuf = new Buffer(120, 28);
-    configPanel.render(configBuf);
-    expect(configBuf.toPlain().join("\n")).toContain("Research  holdings.json · llmquant-data");
-    expect(configBuf.toPlain().join("\n")).toContain("Active Portfolio");
-    expect(configBuf.toPlain().join("\n")).toContain("Market Data");
-    expect(configBuf.toPlain().join("\n")).toContain("Data Token");
-    expect(configBuf.toPlain().join("\n")).toContain("External Skills");
-    expect(configBuf.toPlain().join("\n")).not.toContain("Codex Skills");
-    expect(configBuf.toPlain().join("\n")).not.toContain("Claude Skills");
-    expect(configBuf.toPlain().join("\n")).not.toContain("Changes save immediately");
-    expect(configBuf.toPlain().join("\n")).toContain("-- Agent Runtime --");
-    expect(configBuf.toPlain().join("\n")).not.toContain("↑↓ select");
-    expect(configBuf.toPlain().join("\n")).not.toContain("change/edit");
-    expect(configBuf.toPlain().join("\n")).not.toContain("esc done");
-    expect(configBuf.toPlain().join("\n")).not.toContain("About ·");
-    expect(configBuf.toPlain().join("\n")).not.toContain("Use slash commands for data");
-    expect(configBuf.toPlain().join("\n")).toContain("holdings.json");
-    for (let i = 0; i < 6; i++) configPanel.handleKey("", key("down"));
-    configPanel.handleKey("", key("return"));
-    configPanel.close();
-
-    const settings = loadSettings();
-    expect(settings.preferences.currentPortfolioFile).toBe("holdings_v2_semicon.json");
-
-    const portfolioPanel = new PanelController();
-    portfolioPanel.open("portfolio");
     const buf = new Buffer(120, 28);
-    portfolioPanel.render(buf);
-    const plain = buf.toPlain().join("\n");
-    expect(plain).toContain("Selected: 当前主组合");
-    expect(plain).toContain("聚焦半导体");
-    expect(plain).toContain("当前主组合");
-  });
-
-  it("renders local portfolio comparison rows in the portfolio panel", () => {
-    const panel = new PanelController();
-    const portfolioDir = join(OHQ, "portfolio");
-    mkdirSync(portfolioDir, { recursive: true });
-    writeFileSync(join(portfolioDir, "holdings.json"), JSON.stringify({
-      name: "当前主组合",
-      updated: "2026-06-01T00:00:00+08:00",
-      funds: [{ code: "161725", name: "招商中证白酒" }, { code: "_CASH_", name: "现金" }],
-      focusSectors: ["消费"],
-    }, null, 2));
-    writeFileSync(join(portfolioDir, "holdings_v2_kc50.json"), JSON.stringify({
-      name: "科创50宽基",
-      updated: "2026-05-30T00:00:00+08:00",
-      funds: [{ code: "011613", name: "华夏科创50ETF联接C" }, { code: "_CASH_", name: "现金" }],
-      focusSectors: ["科创50", "AI"],
-    }, null, 2));
-    writeFileSync(join(portfolioDir, "holdings_v2_semicon.json"), JSON.stringify({
-      name: "聚焦半导体",
-      updated: "2026-05-31T00:00:00+08:00",
-      funds: [{ code: "008888", name: "半导体芯片ETF联接C" }],
-      focusSectors: ["半导体"],
-    }, null, 2));
-    const settings = loadSettings();
-    settings.preferences.currentPortfolioFile = "holdings_v2_semicon.json";
-    saveSettings(settings);
-
-    panel.open("portfolio");
-    const buf = new Buffer(120, 28);
-    panel.render(buf);
-    const plain = buf.toPlain().join("\n");
-    expect(plain).toContain("Local portfolios");
-    expect(plain).toContain("Selected: 当前主组合");
-    expect(plain).toContain("聚焦半导体");
-    expect(plain).toContain("当前主组合");
-
-    panel.close();
+    configPanel.render(buf);
+    expect(buf.toPlain().join("\n")).toContain("No portfolios");
+    expect(buf.toPlain().join("\n")).toContain("Portfolios");
+    selectField(configPanel, "Portfolios");
+    expect(configPanel.handleKey("", key("return"))).toEqual({ command: "/portfolio", close: true });
   });
 
   it("keeps Settings free of per-field explanation rows", () => {
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("config");
 
     for (let index = 0; index < 10; index++) {
@@ -429,10 +413,10 @@ describe("PanelController portfolio UI", () => {
   });
 
   it("masks provider credentials while they are being edited", () => {
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("config");
-    panel.handleKey("", key("down"));
-    panel.handleKey("", key("down"));
+    panel.handleKey("", key("return"));
+    selectField(panel, "API key");
     panel.handleKey("", key("return"));
     for (const ch of "super-secret-key") panel.handleKey(ch, key("", ch));
 
@@ -445,26 +429,36 @@ describe("PanelController portfolio UI", () => {
     panel.close();
   });
 
-  it("lets config save a source-specific key", () => {
-    const panel = new PanelController();
+  it("lets config save a source-specific key after successful verification", async () => {
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("config");
-    for (let i = 0; i < 5; i++) panel.handleKey("", key("down"));
+    selectField(panel, "Data Token");
     panel.handleKey("", key("return"));
     for (const ch of "test-llmquant-key") {
       panel.handleKey(ch, key("", ch));
     }
     panel.handleKey("", key("return"));
+    expect(loadSettings().env.WHYJ_QUANT_LLMQUANT_API_KEY).toBeUndefined();
+    selectField(panel, "Check data"); panel.handleKey("", key("return"));
+    await setImmediate();
+    selectField(panel, "Save verified"); panel.handleKey("", key("return"));
     panel.close();
 
     const settings = loadSettings();
     expect(settings.env.WHYJ_QUANT_LLMQUANT_API_KEY).toBe("test-llmquant-key");
   });
 
-  it("lets config cycle through data sources", () => {
-    const panel = new PanelController();
+  it("keeps a changed data source in draft until it is checked and saved", async () => {
+    const cfg = loadSettings(); cfg.env.WHYJ_QUANT_FINANCIAL_DATASETS_KEY = "fixture-fd-key"; saveSettings(cfg);
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("config");
-    for (let i = 0; i < 4; i++) panel.handleKey("", key("down"));
+    selectField(panel, "Market Data");
     panel.handleKey("", key("return"));
+    selectField(panel, "Source"); panel.handleKey("", key("return"));
+    expect(loadSettings().preferences.source).toBe("llmquant-data");
+    selectField(panel, "Check data"); panel.handleKey("", key("return"));
+    await setImmediate();
+    selectField(panel, "Save verified"); panel.handleKey("", key("return"));
     panel.close();
 
     const settings = loadSettings();
@@ -472,9 +466,9 @@ describe("PanelController portfolio UI", () => {
   });
 
   it("lets config toggle user-level skill integrations", () => {
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("config");
-    for (let i = 0; i < 7; i++) panel.handleKey("", key("down"));
+    selectField(panel, "External Skills");
     panel.handleKey("", key("return"));
     panel.close();
 
@@ -483,9 +477,9 @@ describe("PanelController portfolio UI", () => {
   });
 
   it("lets config enable automatic artifact generation", () => {
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("config");
-    for (let i = 0; i < 9; i++) panel.handleKey("", key("down"));
+    selectField(panel, "Auto Artifacts");
     panel.handleKey("", key("return"));
     panel.close();
 
@@ -504,7 +498,7 @@ describe("PanelController portfolio UI", () => {
       join(cwdDir, `2026-06-13T08-00-00-000Z_${activeId}.jsonl`),
       [
         JSON.stringify({ type: "session", version: 3, id: activeId, timestamp: "2026-06-13T08:00:00.000Z", cwd: process.cwd() }),
-        JSON.stringify({ type: "message", id: "m1", timestamp: "2026-06-13T08:03:00.000Z", message: { role: "user", content: "请你参考 https://github.com/earendil-works/pi 这个进行一次修改" } }),
+        JSON.stringify({ type: "message", id: "m1", parentId: null, timestamp: "2026-06-13T08:03:00.000Z", message: { role: "user", content: "请你参考 https://github.com/earendil-works/pi 这个进行一次修改" } }),
       ].join("\n"),
       "utf-8",
     );
@@ -512,12 +506,12 @@ describe("PanelController portfolio UI", () => {
       join(otherDir, `2026-06-10T08-00-00-000Z_${otherId}.jsonl`),
       [
         JSON.stringify({ type: "session", version: 3, id: otherId, timestamp: "2026-06-10T08:00:00.000Z", cwd: "C:\\tmp\\other-project" }),
-        JSON.stringify({ type: "message", id: "m2", timestamp: "2026-06-10T08:05:00.000Z", message: { role: "user", content: "Install gstack: run git clone --single-branch" } }),
+        JSON.stringify({ type: "message", id: "m2", parentId: null, timestamp: "2026-06-10T08:05:00.000Z", message: { role: "user", content: "Install gstack: run git clone --single-branch" } }),
       ].join("\n"),
       "utf-8",
     );
 
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("resume");
     panel.setCurrentSessionMeta({
       id: activeId,
@@ -551,7 +545,7 @@ describe("PanelController portfolio UI", () => {
       join(cwdDir, `2026-06-13T08-00-00-000Z_${firstId}.jsonl`),
       [
         JSON.stringify({ type: "session", version: 3, id: firstId, timestamp: "2026-06-13T08:00:00.000Z", cwd: process.cwd() }),
-        JSON.stringify({ type: "message", id: "m1", timestamp: "2026-06-13T08:03:00.000Z", message: { role: "user", content: "第一个会话" } }),
+        JSON.stringify({ type: "message", id: "m1", parentId: null, timestamp: "2026-06-13T08:03:00.000Z", message: { role: "user", content: "第一个会话" } }),
       ].join("\n"),
       "utf-8",
     );
@@ -587,7 +581,7 @@ describe("PanelController portfolio UI", () => {
       "utf-8",
     );
 
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("resume");
     panel.handleKey("", key("down"));
     const buf = new Buffer(120, 28);
@@ -626,14 +620,14 @@ describe("PanelController portfolio UI", () => {
       join(cwdDir, `2026-06-13T08-00-00-000Z_${activeId}.jsonl`),
       [
         JSON.stringify({ type: "session", version: 3, id: activeId, timestamp: "2026-06-13T08:00:00.000Z", cwd: process.cwd() }),
-        JSON.stringify({ type: "message", id: "m1", timestamp: "2026-06-13T08:03:00.000Z", message: { role: "user", content: "新的 JSONL 会话" } }),
+        JSON.stringify({ type: "message", id: "m1", parentId: null, timestamp: "2026-06-13T08:03:00.000Z", message: { role: "user", content: "新的 JSONL 会话" } }),
       ].join("\n"),
       "utf-8",
     );
     const future = new Date("2026-06-14T00:00:00.000Z");
     utimesSync(legacyPath, future, future);
 
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("resume");
     const buf = new Buffer(120, 28);
     panel.render(buf);
@@ -668,7 +662,7 @@ describe("PanelController portfolio UI", () => {
     );
     saveArtifact("sess-artifact-1", "<html><body>artifact</body></html>", { title: "Analysis artifact", messageCount: 3 });
 
-    const panel = new PanelController();
+    const panel = new PanelController(undefined, dataOptions);
     panel.open("artifact");
     const buf = new Buffer(120, 28);
     panel.render(buf);
@@ -681,18 +675,18 @@ describe("PanelController portfolio UI", () => {
     expect(plain).not.toContain("esc close");
 
     const open = panel.handleKey("", key("return"));
-    expect(open).toEqual({ restoreArtifact: "sess-artifact-1", close: true });
+    expect(open).toEqual({ restoreArtifact: expect.stringMatching(/^sess-artifact-1@[a-f0-9]{64}$/), close: true });
 
     const ignored = panel.handleKey("g", key("g", "g"));
     expect(ignored).toEqual({});
     panel.close();
   });
   it("uses the same panel frame size for config, resume, and portfolio", () => {
-    const configPanel = new PanelController();
+    const configPanel = new PanelController(undefined, dataOptions);
     configPanel.open("config");
-    const resumePanel = new PanelController();
+    const resumePanel = new PanelController(undefined, dataOptions);
     resumePanel.open("resume");
-    const portfolioPanel = new PanelController();
+    const portfolioPanel = new PanelController(undefined, dataOptions);
     portfolioPanel.open("portfolio");
 
     const configBuf = new Buffer(120, 28);
@@ -707,7 +701,7 @@ describe("PanelController portfolio UI", () => {
     const portfolioLines = portfolioBuf.toPlain();
     const configTop = configLines.find((line) => line.includes("Settings"));
     const resumeTop = resumeLines.find((line) => line.includes("Resume a previous session"));
-    const portfolioTop = portfolioLines.find((line) => line.includes("Local portfolios"));
+    const portfolioTop = portfolioLines.find((line) => line.includes("Portfolios"));
     expect(configTop).toBeDefined();
     expect(resumeTop).toBeDefined();
     expect(portfolioTop).toBeDefined();

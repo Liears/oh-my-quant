@@ -106,10 +106,11 @@ export function nextInputAction(buf: string): { action: InputAction | null; rest
   }
 
   const single: Record<string, string> = { "\r": "return", "\n": "return", "\x7f": "backspace", "\b": "backspace", "\t": "tab" };
-  const control: Record<string, string> = { "\x03": "c", "\x04": "d", "\x10": "p" };
   const ch = Array.from(buf)[0];
   if (single[ch]) return { action: key(single[ch]), rest: buf.slice(ch.length) };
-  if (control[ch]) return { action: key(control[ch], { ctrl: true }), rest: buf.slice(ch.length) };
+  // Decode terminal control letters independently of configurable application bindings.
+  const code = ch.charCodeAt(0);
+  if (code >= 1 && code <= 26) return { action: key(String.fromCharCode(code + 96), { ctrl: true }), rest: buf.slice(ch.length) };
   if (ch >= " " && ch !== "\x7f") return { action: key("", { char: ch }), rest: buf.slice(ch.length) };
   return { action: { type: "discard" }, rest: buf.slice(ch.length) };
 }
@@ -171,7 +172,7 @@ export function buildSuggestions(value: string, watchlist: CodeEntry[], skills: 
   const lower = value.toLowerCase();
   const catalogMatches = COMMAND_CATALOG.filter((c) => c.name.toLowerCase().startsWith(lower));
   // When partial-matching /skill, show skill suggestions
-  if (catalogMatches.length === 1 && catalogMatches[0].name === "/skill") {
+  if (catalogMatches.length === 1 && catalogMatches[0].name === "/skill" && skills.length) {
     return skills.map(skillSuggestion);
   }
   return catalogMatches.map((c) => ({ label: `${c.name}  ${c.desc}`, fill: c.name }));

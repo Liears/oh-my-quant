@@ -219,6 +219,14 @@ as brand colors.
 
 Market movement colors are data visualization concerns and not brand identity.
 
+## Market and status semantics
+
+The shared brand gold is `#D4AF37`, focus gold `#E2BE4D`, text `#F5F5F5`, muted text `#A6A6A6`, and hairline `#242424`.
+
+`/config → Market Colors` selects one explicit convention for the workspace, including mixed-market portfolios: `red-up` (default, red up / green down) or `green-up` (green up / red down). Overview, tables, candles and newly generated HTML use the same convention; report versions retain the convention captured when generated.
+
+Movement and outcome use separate tokens. Positive/negative command status, scores and risk amounts do not change when the market convention changes. Rounded zero, flat candles and unavailable values use neutral gray; gains/losses retain signs, and reports include a legend. Brand gold does not imply a positive financial result.
+
 ## Layout Principles
 
 Left aligned.

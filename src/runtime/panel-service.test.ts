@@ -26,12 +26,16 @@ describe("runtime panel service", () => {
       activePortfolio: "Alpha",
       source: "akshare",
       showPortfolioPanel: false,
+      marketColorScheme: "red-up",
+      hudMode: "full",
     });
 
     expect(buildLocalStorageState({ preferences: {} }, { symbols: [], groups: [] })).toEqual({
-      activePortfolio: "holdings.json",
+      activePortfolio: "No portfolios",
       source: "llmquant-data",
       showPortfolioPanel: true,
+      marketColorScheme: "red-up",
+      hudMode: "full",
     });
   });
 

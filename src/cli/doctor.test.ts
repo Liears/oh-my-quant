@@ -1,7 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { buildDoctorErrorResult, collectDoctor, describeEndpointMode, formatDoctorText, resolveDoctorRequestModel, runDoctor } from "./doctor.ts";
+import { buildDoctorErrorResult, collectDoctor as collectDoctorRuntime, describeEndpointMode, formatDoctorText, resolveDoctorRequestModel, runDoctor } from "./doctor.ts";
 import { DEFAULT_SETTINGS } from "../types/config.ts";
 import { existsSync, readFileSync } from "node:fs";
+
+// These tests cover orchestration and formatting; dependency states have their own matrix.
+const checkDependency = async () => ({ status: "ready" as const, python: "fixture", akshare: "fixture" });
+const collectDoctor: typeof collectDoctorRuntime = (settings, env, options = {}) =>
+  collectDoctorRuntime(settings, env, { checkDependency, ...options });
 
 describe("doctor", () => {
   it("classifies /v1 endpoints as OpenAI-compatible before vendor labels", () => {
@@ -17,7 +22,7 @@ describe("doctor", () => {
     expect(doctor.phases.map((phase) => phase.status)).toEqual(["fail", "pass", "fail"]);
     expect(doctor.auth.WHYJ_QUANT_API_KEY).toEqual({ available: false, source: "missing", value: "-" });
     expect(doctor.hints).toEqual([
-      expect.stringContaining("WHYJ_QUANT_API_KEY"),
+      expect.stringContaining("/config → Model"),
       expect.stringContaining("WHYJ_QUANT_LLMQUANT_API_KEY"),
     ]);
 
@@ -60,7 +65,7 @@ describe("doctor", () => {
     expect(doctor.overall).toBe("unconfigured");
   });
 
-  it("prefers env source over config source and suppresses resolved hints", async () => {
+  it("gives saved model credentials priority consistently with the agent", async () => {
     const doctor = await collectDoctor({
       ...DEFAULT_SETTINGS,
       env: {
@@ -78,8 +83,8 @@ describe("doctor", () => {
 
     expect(doctor.auth.WHYJ_QUANT_API_KEY).toEqual(expect.objectContaining({
       available: true,
-      source: "env",
-      value: expect.stringContaining("from...-env"),
+      source: "config",
+      value: expect.stringContaining("from...nfig"),
     }));
     expect(doctor.auth.WHYJ_QUANT_LLMQUANT_API_KEY).toEqual(expect.objectContaining({
       available: true,
@@ -309,6 +314,7 @@ describe("doctor", () => {
         WHYJ_QUANT_LLMQUANT_API_KEY: "llmq-secret-5678",
       },
     }, {}, {
+      checkDependency,
       writeLog: false,
       phases: ["tools"],
       seedState: base,
@@ -324,7 +330,7 @@ describe("doctor", () => {
     ]);
   });
 
-  it("falls back to a full rerun when the seeded doctor snapshot no longer matches current config", async () => {
+  it("drops stale results without expanding the requested probe scope", async () => {
     const states: string[][] = [];
     for await (const state of runDoctor({
       ...DEFAULT_SETTINGS,
@@ -334,6 +340,7 @@ describe("doctor", () => {
         WHYJ_QUANT_LLMQUANT_API_KEY: "llmq-secret-5678",
       },
     }, {}, {
+      checkDependency,
       writeLog: false,
       phases: ["tools"],
       seedState: {
@@ -369,12 +376,8 @@ describe("doctor", () => {
     }
 
     expect(states).toEqual([
-      ["checking", "pending", "pending"],
-      ["pass", "pending", "pending"],
-      ["pass", "checking", "pending"],
-      ["pass", "pass", "pending"],
-      ["pass", "pass", "checking"],
-      ["pass", "pass", "pass"],
+      ["pending", "checking", "pending"],
+      ["pending", "pass", "pending"],
     ]);
   });
 });

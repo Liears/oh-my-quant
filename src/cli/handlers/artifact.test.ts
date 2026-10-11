@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { artifactHandler } from "./artifact.ts";
 import { generateCurrentSessionArtifact, restoreArtifactReport } from "../../runtime/artifact-reports.ts";
-import { loadArtifact, loadArtifactMeta, saveArtifact } from "../../storage/index.ts";
+import { artifactPath, loadArtifact, loadArtifactMeta, saveArtifact } from "../../storage/index.ts";
 
 const OHQ = join(process.cwd(), ".ohquant-test-artifact-command");
 
@@ -57,6 +57,21 @@ afterEach(() => {
 });
 
 describe("artifactHandler", () => {
+  it("distinguishes versions of the same report in text and JSON listings", async () => {
+    writeSessionFile("versioned-report");
+    const first = saveArtifact("versioned-report", "original", { title: "Same title" });
+    const second = saveArtifact("versioned-report", "changed", { title: "Same title" });
+    const result = await artifactHandler({}, [], {});
+    expect(result.success).toBe(true);
+    for (const meta of [first, second]) {
+      expect(result.message).toContain(meta.revision!.slice(0, 8));
+    }
+    expect(result.data).toEqual({ reports: [second, first].map(meta => ({
+      ref: `versioned-report@${meta.revision}`, title: "Same title", createdAt: meta.createdAt,
+      sourceSessionId: "versioned-report", messageCount: 0, bytes: meta === first ? 8 : 7,
+    })) });
+  });
+
   it("opens the artifact selector without exposing generation options", async () => {
     const result = await artifactHandler({}, [], { openArtifact: () => {} });
     expect(result).toEqual({ success: true, message: "", effects: [{ type: "openArtifact" }] });
@@ -94,7 +109,7 @@ describe("artifactHandler", () => {
     expect(appendContextNote).toHaveBeenCalledTimes(1);
     expect(appendContextNote.mock.calls[0]![0]).toBe("artifact_export");
     expect(appendContextNote.mock.calls[0]![1]).toContain(`session_id: ${sessionId}`);
-    expect(appendContextNote.mock.calls[0]![1]).toContain(`path: .ohquant/artifacts/${sessionId}.html`);
+    expect(appendContextNote.mock.calls[0]![1]).toContain(`path: ${artifactPath(sessionId)}`);
   });
 
   it("restores the selected artifact session by default", async () => {
@@ -126,12 +141,12 @@ describe("artifactHandler", () => {
     expect(appendContextNote).toHaveBeenCalledTimes(1);
     expect(appendContextNote.mock.calls[0]![0]).toBe("artifact_restore");
     expect(appendContextNote.mock.calls[0]![1]).toContain("Artifact session restored.");
-    expect(appendContextNote.mock.calls[0]![1]).toContain(`path: .ohquant/artifacts/${sessionId}.html`);
-    expect(result.message).toContain("trajectory rebuilt");
-    expect(loadArtifactMeta(sessionId)?.title).toBe("研究对象 (000001.SZ)");
+    expect(appendContextNote.mock.calls[0]![1]).toContain(`path: ${artifactPath(sessionId)}`);
+    expect(result.message).toContain("saved version");
+    expect(loadArtifactMeta(sessionId)?.title).toBe("Saved Report");
   });
 
-  it("resumes the metadata source session and refreshes the saved trajectory", async () => {
+  it("resumes the metadata source session without overwriting the saved trajectory", async () => {
     const artifactId = "report-alias";
     const sourceSessionId = "source-session";
     saveArtifact(artifactId, "<html><body>stale trajectory</body></html>", {
@@ -155,13 +170,13 @@ describe("artifactHandler", () => {
 
     expect(result.success).toBe(true);
     expect(resumeSession).toHaveBeenCalledWith(sourceSessionId);
-    expect(loadArtifact(artifactId)).toContain("Report body");
-    expect(loadArtifact(artifactId)).not.toContain("stale trajectory");
+    expect(loadArtifact(artifactId)).not.toContain("Report body");
+    expect(loadArtifact(artifactId)).toContain("stale trajectory");
     expect(openFile).toHaveBeenCalledTimes(1);
-    expect(loadArtifactMeta(artifactId)?.title).toBe("研究对象 (000001.SZ)");
+    expect(loadArtifactMeta(artifactId)?.title).toBe("Aliased Report");
   });
 
-  it("rebuilds a stored trajectory in one-shot mode without an agent session", async () => {
+  it("opens a stored version in one-shot mode without an agent session", async () => {
     const artifactId = "one-shot-report";
     const sourceSessionId = "one-shot-source";
     writeSessionFile(sourceSessionId);
@@ -175,13 +190,13 @@ describe("artifactHandler", () => {
     const result = await restoreArtifactReport(artifactId, { openFile });
 
     expect(result.success).toBe(true);
-    expect(result.message).toContain("trajectory rebuilt");
-    expect(loadArtifact(artifactId)).toContain("Report body");
-    expect(loadArtifact(artifactId)).not.toContain("stale trajectory");
+    expect(result.message).toContain("saved version");
+    expect(loadArtifact(artifactId)).not.toContain("Report body");
+    expect(loadArtifact(artifactId)).toContain("stale trajectory");
     expect(openFile).toHaveBeenCalledTimes(1);
   });
 
-  it("deletes an orphaned report without opening it", async () => {
+  it("retains an unavailable report without opening it or changing sessions", async () => {
     const artifactId = "orphan-report";
     saveArtifact(artifactId, "<html><body>orphan</body></html>", { sourceSessionId: "missing-session" });
     const openFile = mock(() => {});
@@ -193,10 +208,10 @@ describe("artifactHandler", () => {
       } as any,
     });
 
-    expect(result.success).toBe(true);
-    expect(result.message).toContain("Removed stale artifact");
+    expect(result.success).toBe(false);
+    expect(result.message).toContain("retained for recovery");
     expect(openFile).not.toHaveBeenCalled();
-    expect(loadArtifact(artifactId)).toBeNull();
-    expect(loadArtifactMeta(artifactId)).toBeNull();
+    expect(loadArtifact(artifactId)).toContain("orphan");
+    expect(loadArtifactMeta(artifactId)).not.toBeNull();
   });
 });

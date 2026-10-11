@@ -211,48 +211,55 @@ function turnStyle(turns: number | null, contextPct: number | null) {
 }
 
 type StatusSegment = { text: string; style: Parameters<Buffer["text"]>[3] };
+type StatusGroup = StatusSegment[];
 
-function buildStatusSegments(st: AppState): StatusSegment[] {
+function buildStatusGroups(st: AppState): StatusGroup[] {
   const contextPct = st.hud?.contextUsage?.percent ?? null;
   const rawTurns = st.hud?.turnCount;
   const turns = typeof rawTurns === "number" && Number.isFinite(rawTurns) && rawTurns > 0 ? rawTurns : null;
-  const segments: StatusSegment[] = [
-    { text: `◆ ${st.model}`, style: S.gold },
+  const groups: StatusGroup[] = [[{ text: `◆ ${st.model}`, style: S.gold }]];
+  if (st.hudMode !== "off") groups.push([
     { text: "·", style: S.dim },
     { text: "Ctx ", style: S.dim },
     { text: progressBar(contextPct), style: contextStyle(contextPct, turns) },
     { text: ` ${formatContextUsage(st.hud?.contextUsage ?? null)}`, style: contextStyle(contextPct, turns) },
+  ]);
+  if (st.hudMode !== "off" && st.hudMode !== "context") groups.push([
     { text: "·", style: S.dim },
     { text: "TTFT ", style: S.dim },
     { text: formatLatency(st.hud?.ttftMs ?? null), style: ttftStyle(st.hud?.ttftMs ?? null, turns, contextPct) },
+  ]);
+  if (st.hudMode !== "off" && st.hudMode !== "context") groups.push([
     { text: "·", style: S.dim },
     { text: "TPOT ", style: S.dim },
     { text: formatLatency(st.hud?.tpotMs ?? null, true), style: tpotStyle(st.hud?.tpotMs ?? null, turns, contextPct) },
+  ]);
+  if (st.hudMode !== "off") groups.push([
     { text: "·", style: S.dim },
     { text: "T ", style: S.dim },
     { text: turns === null ? "-" : `${turns}`, style: turnStyle(turns, contextPct) },
-  ];
+  ]);
   if (st.source) {
-    segments.push({ text: "·", style: S.dim }, { text: st.source, style: S.dim });
+    groups.push([{ text: "·", style: S.dim }, { text: st.source, style: S.dim }]);
   }
   if (st.activePortfolio) {
-    segments.push({ text: "·", style: S.dim }, { text: st.activePortfolio, style: S.dim });
+    groups.push([{ text: "·", style: S.dim }, { text: st.activePortfolio, style: S.dim }]);
   }
-  return segments;
-}
-
-function drawStatusSegments(buf: Buffer, row: number, width: number, segments: StatusSegment[]): void {
-  let x = 0;
-  for (const segment of segments) {
-    if (x >= width) break;
-    const remaining = width - x;
-    const text = strWidth(segment.text) > remaining ? truncate(segment.text, remaining) : segment.text;
-    x = buf.text(x, row, text, segment.style, remaining, width);
-  }
+  return groups;
 }
 
 export function drawStatus(buf: Buffer, row: number, width: number, st: AppState): void {
-  drawStatusSegments(buf, row, width, buildStatusSegments(st));
+  width = Math.min(width, buf.w);
+  if (width <= 0) return;
+  const [model, ...groups] = buildStatusGroups(st);
+  const modelLimit = Math.min(width, Math.max(12, Math.floor(width * 0.45)));
+  const modelText = truncate(model![0]!.text, modelLimit);
+  let x = 0;
+  x = buf.text(x, row, modelText, model![0]!.style, width, width);
+  for (const group of groups) {
+    if (group.reduce((sum, segment) => sum + strWidth(segment.text), 0) > width - x) continue;
+    for (const segment of group) x = buf.text(x, row, segment.text, segment.style, width - x, width);
+  }
 }
 
 export { HEADER_H, COMPOSER_H, STATUS_H };

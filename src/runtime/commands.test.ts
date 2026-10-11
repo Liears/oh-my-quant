@@ -52,6 +52,7 @@ function commandContext() {
 
 describe("runtime command helpers", () => {
   it("classifies skill invocations separately from local skill commands", () => {
+    expect(getRuntimeCommandInvocation(parsed("skill", ["install", "owner/repo"]))).toMatchObject({ isSkillInvoke: false, localOnly: false });
     expect(getRuntimeCommandInvocation(parsed("skill", ["list"]))).toEqual({
       isSkillInvoke: false,
       isCompactCommand: false,

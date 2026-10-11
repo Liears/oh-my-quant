@@ -1,4 +1,4 @@
-import type { Bar, FundNavDaily } from "../../types/data.ts";
+import type { Bar, FundNavDaily, PriceAdjustment } from "../../types/data.ts";
 import type { AkshareBarSource, AksharePublicFundEndpoint, AksharePublicIndexEndpoint } from "./akshare-endpoints.ts";
 
 export type AkshareIndexConstituentEndpoint =
@@ -82,12 +82,14 @@ export type { AkshareBarSource } from "./akshare-endpoints.ts";
 export type AkshareBarInstrument = "stock" | "fund" | "index" | "ambiguous";
 
 export interface AkshareBarsOptions {
+  signal?: AbortSignal;
   /** Ordered upstreams used by AKShare for ordinary A-share daily bars. */
   sourcePriority?: string | readonly string[];
 }
 
 export interface AkshareBarsResult {
   bars: Bar[];
+  adjustment?: PriceAdjustment;
   endpoint: string | null;
   attempts: AkshareAttempt[];
 }

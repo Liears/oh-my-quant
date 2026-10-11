@@ -19,31 +19,14 @@
 
 用户入口统一称为 `Settings`，命令仍为 `/config`。面板按 `Agent Runtime`、`Research Data`、`Workspace Experience` 分组，字段名称与 JSON 映射以 [WhyJ Quant 配置参考](./configuration.md) 为准。不要在 README、Doctor 或 TUI 中为同一字段使用另一套别名。
 
-推荐字段：
+模型连接统一使用 `provider`、实际 `model`、`providers[id]` 与 `thinkingLevel`。`/config → Model` 和 Doctor 的 `Model connection` 共用搜索、Pi Provider setup、手动 key、协议和能力编辑器，详细说明只在配置参考维护。
 
-```json
-{
-  "env": {
-    "WHYJ_QUANT_API_KEY": "sk-...",
-    "WHYJ_QUANT_BASE_URL": "https://api.deepseek.com/anthropic",
-    "WHYJ_QUANT_AUTH_TOKEN": "sk-..."
-  }
-}
-```
-
-规则：
-
-- 不要推荐项目根目录的 `.env` 文件。
-- `/config` 应写入 `.ohquant/settings.json`。
-- `doctor` 应报告配置路径、认证来源和脱敏值，而不输出完整密钥。
-- UI 中显示的模型标签和值在展示前必须剥离终端控制码。
-- 统一命名使用 `WHYJ_QUANT_*` 前缀。`WHYJ_QUANT_API_KEY` 是模型凭证槽位，`WHYJ_QUANT_BASE_URL` 是端点槽位。
-- `WHYJ_QUANT_AUTH_TOKEN` 仅作为兼容旧配置的模型凭证 fallback；新的配置入口仍应写入并引导用户使用 `WHYJ_QUANT_API_KEY`。
-- 如果 `WHYJ_QUANT_BASE_URL` 指向 Anthropic 兼容端点，如 `/anthropic`，运行时必须自动选择 Anthropic Messages provider，而不是强制使用 OpenAI-compatible 路径。
-- 如果 `WHYJ_QUANT_BASE_URL` 的尾段是 OpenAI-compatible 形态，如 `/v1`，运行时必须保持 `openai-completions` 路径，即使同一厂商也同时提供 `/anthropic` 端点。
-- 如果配置了 `/anthropic`，doctor 和提示应指出工具重放是 Anthropic 形态的，因此 `tool_use` 之后必须紧跟 `tool_result` 块。
-- 仅在显示边界剥离终端控制码。配置值、模型 ID 和 provider URL 应按原样读取和存储，除非代码显式用于渲染。
-- 不要将仅用于显示的控制码剥离器当作配置解析器重用。如果值可以合法包含括号或后缀，应保留它并单独为 UI 副本格式化。
+- 模型编辑为草稿；`Save` 保存模型字段，`Save & Verify` 保存并只检测模型。不会顺带保存 Doctor 中尚未确认的数据源草稿。
+- Doctor 的 `Market Data` 打开共享数据草稿编辑器，`Check data` 成功后才能 `Save verified`；外层 `Run diagnostics` 只检查已保存设置。
+- 密钥只显示存在状态或脱敏值。端点、协议和模型以实际解析结果显示，保存失败保留编辑内容。
+- 模型实际 ID 不受旧角色别名改写；拒绝控制字符，保留 `[1m]` 后缀。
+- 原生 provider 使用 Pi 的默认协议，自定义连接显式选协议。URL 推断仅适用于没有 `provider` 的旧配置。
+- 保存的模型 key 优先于 Pi 对应环境凭证。不同 provider 的 key、env、端点隔离，模型能力覆盖只作用于具体 ID。
 
 ## UX 交互
 
@@ -108,37 +91,9 @@ Agent 仍在启动中。您的消息已保留在 composer 中；请稍后重新�
 - Anthropic 兼容端点上的 `404 status code (no body)` -> 检查 base URL、模型名称和 provider 路由；该端点可能不提供该模型。
 - `400` 且 `tool_use` id 缺少 `tool_result` 块 -> 检查 Anthropic 重放顺序；不要在块之间插入无关的 assistant 文本。
 
-快速 provider 检查清单：
+快速 provider 检查：先打开 `/config → Model` 确认 provider、实际 ID、凭证来源和协议，再执行 `Save & Verify`。目录外 ID 或兼容端点需要与服务商提供的协议一致。上下文窗口描述模型实际容量，compact 触发阈值是独立设置。
 
-1. 确认配置来源是 `.ohquant/settings.json`，而非项目根目录的 `.env`。
-2. 确认 `WHYJ_QUANT_BASE_URL` 和模型标签指向同一 provider 族。
-3. 如果存在 `WHYJ_DEFAULT_*_MODEL` 映射，确认顶层 `model` 是角色别名或精确等于其中一个映射值。
-4. 确认 Doctor provider probe 使用解析后的原始模型 ID，与 Agent 请求一致；终端清理后的显示标签不能用于网络请求。
-5. 确认 `WHYJ_QUANT_CONTEXT_WINDOW` 是当前模型真实支持的正整数 token 数，而不是期望值或 compact 阈值。
-6. 确认 `WHYJ_QUANT_COMPACT_TRIGGER_TOKENS` 是独立的正整数，并且不高于 context window。
-7. 确认 URL 尾段与协议匹配：`/anthropic` -> Anthropic Messages，`/v1` -> OpenAI-compatible。
-8. 确认工具重放形状与 provider 匹配：OpenAI-compatible 的 `assistant.tool_calls` vs Anthropic 的 `tool_use` 后跟 `user.tool_result`。
-9. 如果模型仍然失败，在暴露原始 provider 文本前在错误副本中呈现不匹配信息。
-
-已验证的真实 provider smoke：
-
-- DeepSeek `/anthropic`
-- GLM `/anthropic`
-- GLM `/v1`
-- MiniMax `/anthropic`
-- MiniMax `/v1`
-
-执行方式：
-
-- `bun run test:providers`
-- 默认 case 读取 `.ohquant/settings.json`
-- 可选补充：
-  - `WHYJ_SMOKE_GLM_AUTH_TOKEN`
-  - `WHYJ_SMOKE_GLM_ANTHROPIC_MODEL`
-  - `WHYJ_SMOKE_GLM_OPENAI_MODEL`
-  - `WHYJ_SMOKE_MINIMAX_AUTH_TOKEN`
-  - `WHYJ_SMOKE_MINIMAX_ANTHROPIC_MODEL`
-  - `WHYJ_SMOKE_MINIMAX_OPENAI_MODEL`
+确定性验证使用真实 Pi 请求构造器和本地 HTTP fixture，不代表真实供应商账户验收。`bun run test:providers` 读取当前设置并发送真实请求；可选 `WHYJ_SMOKE_GLM_AUTH_TOKEN` / `WHYJ_SMOKE_MINIMAX_AUTH_TOKEN` 启用旧 vendor smoke 矩阵。成功要求 assistant 非 error/aborted 且包含文本；旧版只检查 Promise 完成的结果不能作为连通性证据。
 
 ## 操作引导
 
@@ -151,7 +106,7 @@ Slash 命令应有从命令到下一步操作的清晰路径。
 - `/help`：仅命令目录和快捷键。
 - `/config`：按 Agent、Provider、Research、Data keys、Workspace 和 Path 输出当前规范化设置；TUI 中打开只保留设置项、当前值和顶部概览的 Settings 面板。
 - `/portfolio`：在 TUI 中打开本地组合面板；在 TUI 外，列出可用组合。
-- `/portfolio use <name|file|index>`：切换活跃的本地组合。
+- `/portfolio create/add/remove/rename/delete`：编辑自定义组合；`/portfolio import` 仅用于显式遗留迁移。
 - `/resume`：在 TUI 中打开恢复面板；在 TUI 外，列出已保存的 sessions。
 - `/resume <sessionId>`：恢复已知 session，对缺失 ID 给予友好处理。
 - `/compact [focus]`：仅在有用时压缩 session；no-op 为 info。
@@ -164,13 +119,13 @@ Slash 命令应有从命令到下一步操作的清晰路径。
 面板空状态引导：
 
 - Resume 面板："暂无已保存的 session。先开始一段对话，然后再回到 /resume。"
-- Portfolio 面板："暂无本地组合。" 外加 `.ohquant/portfolio/` 设置引导。
+- Portfolio 面板：始终提供 `+ Create portfolio`，Enter 创建后直接添加标的。
 - Benchmark dashboard：告诉用户如何创建第一个 benchmark 结果。
 - 数据搜索：建议完整代码或更具体的名称。
 
 补充实现约束：
 
-- `/doctor`、`whyj doctor` 和 `whyj --json doctor` 必须共享同一套 `runDoctor()` 状态机，避免 TUI、文本 CLI 与 JSON CLI 的 ready 判定、来源显示或脱敏格式不一致。
+- 普通 `/doctor`、`whyj doctor` 和 `whyj --json doctor` 共享 `runDoctor()` 三阶段状态机。独立的 `/doctor --tool …` 和 Endpoint check 面板共用 `probeToolEndpoint()`，返回所选端点的响应检查结果，协议见 Slash 参考。
 - `doctor` 文本输出应包含阶段名、状态、摘要和下一步 action；如果使用表格输出，必须包含列头，便于在 TUI 对话区和纯文本 shell 输出中快速扫描。
 
 ## 安装
@@ -193,8 +148,8 @@ bun run src/index.ts
 
 1. 启动 `whyj`。
 2. 运行 `/doctor`。
-3. 在首次设置向导中配置 `WHYJ_QUANT_API_KEY`、`WHYJ_QUANT_BASE_URL` 和首选数据源 key。
-4. 使用 `[Save & Verify]` 保存并运行真实探测。
+3. 在 Model connection 中选择 provider、模型并填写凭证，使用 `[Save & Verify]` 保存并检测模型。
+4. 在 Market Data 中选择市场/源和样本、填写凭证，使用 `[Check data]` 验证草稿，成功后 `[Save verified]` 保存。
 5. 提出自然语言问题或运行 `/help`。
 
 Skill 安装引导：
@@ -271,9 +226,9 @@ Doctor 同时承担两个产品角色：
 1. **首次配置入口**：当模型凭证和数据源凭证全部缺失时，`/doctor` 进入首次设置向导，帮助用户完成最小可用配置。
 2. **后续诊断工具**：配置存在后，`/doctor` 运行真实 provider、工具链和数据源探测，定位当前环境为什么不能工作。
 
-这两个角色共享同一套检查逻辑，但写入行为必须被限制在显式的配置动作里。普通诊断运行只读配置；wizard 或 `[Configure]` 进入编辑状态后，只有用户执行 `[Save & Verify]` 才写入 `.ohquant/settings.json` 并重新检测。
+这两个角色共享同一套检查逻辑，但写入行为必须被限制在显式的配置动作里。普通诊断运行只读配置；wizard 或 `[Configure]` 进入编辑状态后，模型编辑器的 `[Save]` 或 `[Save & Verify]` 保存模型配置；数据编辑器 `[Save verified]` 仅保存已经检查成功的草稿；外层 `[Run diagnostics]` 检查已保存设置。
 
-### 当前落地状态（2026-07-04）
+### 当前落地状态（2026-09-14）
 
 下面这份文档以**当前实现**为主；只有在明确标注时，才表达后续可演进方向。当前代码已经落地的是：
 
@@ -283,9 +238,10 @@ Doctor 同时承担两个产品角色：
 - CLI 文本模式渐进输出；`overall === "unconfigured"` 时直接输出首次配置 scaffold；`--json` 只输出最终结果
 - TUI `/doctor` 入口：命令执行后立即打开 doctor 面板，并随着 `runDoctor()` 逐阶段刷新状态
 - 如果 `/doctor` 在面板打开后遇到运行时异常，TUI / slash 命令链路会把 loading 面板替换成结构化 fail-state，而不是停在永久 loading
-- TUI first-setup 闭环：`overall === "unconfigured"` 时进入 doctor draft，`[Save & Verify]` 一次性写入并重跑 `/doctor`，ESC 丢弃 draft
+- TUI first-setup 闭环：`overall === "unconfigured"` 时进入配置入口，模型与数据分别使用共享编辑器；数据检查通过再保存，`Run diagnostics` 独立重跑已保存配置，Esc 丢弃当前未保存草稿
 - TUI 诊断动作：`[Retry All]`、`[Retry Model]`、`[Retry Tools]`、`[Retry Data]` 和 `[Configure]`
-- Tools 阶段已校验 built-in registry、TypeBox schema compile、source adapter export，以及 `akshare` 场景下的 Python / package 可用性
+- Tools 阶段校验 built-in registry、TypeBox schema compile、source adapter export，以及全部已注册 AKShare 路由的 Python / package 依赖，不因首选日线源是其他 provider 而跳过
+- `capabilities` 字段逐工具显示依赖与样本范围；TUI 按 `v` 查看，详情按 `p` 检查选定端点；端点结果不把未测工具标为 ready
 - `warnings` 已在 CLI 文本和 TUI doctor 面板中显示
 
 当前还保留的实现取舍是：
@@ -306,7 +262,7 @@ interface DoctorPhase {
   label: string;        // "Model · DeepSeek V4 Pro"
   detail: string;       // "sk-...abcd · Anthropic Messages"
   error?: string;       // "Connection refused: 127.0.0.1:11434"
-  action?: string;      // "Set WHYJ_QUANT_API_KEY in settings"
+  action?: string;      // "Open /config → Model and check provider credentials"
   warnings?: string[];  // non-blocking findings shown when expanded
   durationMs?: number;
 }
@@ -315,7 +271,9 @@ interface DoctorState {
   mode: DoctorMode;
   phases: [DoctorPhase, DoctorPhase, DoctorPhase];
   overall: DoctorOverall;
+  requestedPhases?: Array<"model" | "tools" | "data">;
   config: {
+    provider?: string;
     settingsPath: string;
     model: string;
     baseUrl: string;
@@ -331,16 +289,11 @@ interface DoctorState {
 
 #### 1. Model — 验证 AI 模型连通性
 
-**检测内容：**
-- 读取 `WHYJ_QUANT_API_KEY` 和 `WHYJ_QUANT_BASE_URL`
-- **发送真实 API 请求**验证连通性；每个 provider 使用自己的最小探针，例如 list models、最短 completion 或协议握手
-- 验证 endpoint 协议匹配（`/anthropic` vs `/v1`）
-- 失败时展示脱敏 key 指纹和 endpoint mode
+使用与 Agent 相同的 `resolveConfiguredModel`、`resolveConfiguredAuth` 和 Pi kernel，发送最短文本请求。原生 provider 使用默认端点，包括由 SDK 决定端点的环境凭证 provider；不要求重复填写 URL。成功必须有非错误文本响应；空响应、401、超时与无凭证分别提示失败。
 
-**失败恢复：**
-- 缺失 key：展示 `WHYJ_QUANT_API_KEY` 配置路径
-- 连接失败：展示网络/代理提示 + 重试引导
-- 协议不匹配：展示 URL 尾段与 provider 的对应关系
+默认单阶段超时 30 秒，模型请求收到取消信号。`/doctor --phase model` 与模型编辑器 `Save & Verify` 只运行此阶段；即使没有 seed 或设置已变化，也不会擅自运行 Tools/Data。未检测阶段保留 pending，`requestedPhases` 标明本次范围；匹配设置的已有阶段结果可保留展示。
+
+失败后回到同一个 `Model connection` 编辑器修改，再重试。模型设置已保存但验证失败时保留该设置，明确报告失败，不自动改回别的模型。
 
 #### 2. Tools — 验证内置工具链就绪
 
@@ -349,9 +302,9 @@ interface DoctorState {
 - Tool definitions 是否加载并可编译（TypeBox schemas）
 - 数据源 adapter export 是否可解析（akshare、tushare、llmquant-data、financial-datasets）
 - **Python 环境检测**（首次运行关键）：
-  - `python3 --version` 是否存在
-  - 关键 Python 包是否安装（akshare 等）
-  - 未安装时提供 `pip install` 命令
+  - 复用行情 adapter 的 `.venv` / `py -3` / `python3` / `python` 发现顺序
+  - 异步导入 AKShare 并报告 Python/package 版本，支持超时和取消，不阻塞终端线程
+  - 缺解释器与缺 package 分开显示，检查不自动安装依赖
 
 **失败恢复：**
 - Tool registry/schema 加载失败：展示失败的工具名和测试/重试引导
@@ -361,17 +314,25 @@ interface DoctorState {
 
 #### 3. Data — 验证数据源可用
 
+Tools 通过只表示 schema/adapter/解释器就绪，端点权限仍未验证。工具列表的 required 参数、provider、端点、权限说明和副作用来自实际 registry；索引报价区分 Sina 与 AKShare 两条路由，搜索固定为 Tushare A 股 `stock_basic`。
+
 **检测内容：**
-- 读取数据源 key（`WHYJ_QUANT_TUSHARE_TOKEN` / `WHYJ_QUANT_LLMQUANT_API_KEY` / `WHYJ_QUANT_FINANCIAL_DATASETS_KEY`）
-- 只针对当前选择的数据源发送最小真实数据请求（如一条 quote、snapshot 或 `equity_historical_prices` limit=1）验证 key 有效
-- 报告数据源类型、adapter、认证来源和可用状态
+- `runtime/data-readiness.ts` 复用实际 source adapter，固定配置/凭证快照；保存的 key 和端点优先于进程环境
+- 默认检查兼容市场的 AAPL、00700.HK、000001.SZ 或 270042.OF，窗口为最近 30 天；`config.dataRequest` 和文本 `data sample` 显示实际范围，runtime API 也支持显式请求
+- 只请求所选 provider，不读取缓存、不跨源回退、不在空窗口后无日期重试；有效、规范化、窗口内日线至少一行才通过
+- AKShare 先检查同一 Python/package，再请求实际行情；导入包成功或 HTTP 200 空载荷不等于 Data pass
+- data phase 的 `data` 保存 source/market/symbol/window、有效行数、as-of、观测时刻、依赖版本和状态，排除凭证、响应体与原始异常
 
 **失败恢复：**
 - 缺失 key：展示对应 env var 和注册链接
-- Key 无效（401/403）：展示脱敏 key 指纹，引导更新
+- 401 标记 `auth-failed`；402/403 标记 `permission-denied`，分别引导检查凭证和数据订阅/权限
 - 数据为空但认证成功：提示检查 symbol/市场覆盖，而不是把它归类为认证失败
 
+`ready` 只证明该日线/单位 NAV 样本可用，不证明财报/新闻等工具权限或全市场覆盖。所有真实样本仍单独验收。DoctorOptions.signal 向 probe/Python/HTTP 传递取消，后续 phase 停止；取消/超时不接受迟到结果。数据面板已接通市场选择、草稿验证后保存和异步重绘。AppRuntime 为每轮 Doctor 持有取消控制器，TUI 关闭/替换/进入配置时取消，重跑也取消旧轮；CLI handler 传递信号并过滤旧结果。真实回环 HTTP 与面板测试证明此链路，不扩展为全部工具权限可用。
+
 ### TUI 呈现：Doctor 面板
+
+`v → 搜索工具 → Enter → p` 打开独立 Endpoint check，核对 provider/endpoint 与 JSON 参数后执行。它使用当前配置快照直接调用 source，区分缺依赖、缺凭证、401/权限错误、空行、超时和取消。AKShare 基金参数复用工具 schema；不执行量化计算、不写 cache 或 settings。结果是所选请求的非空响应证据，不能证明最新时点或其他端点权限；关闭后不作为长期状态保存。修改参数/连接、Esc 或替换父面板取消并隔离旧结果。
 
 当前实现里，Doctor 在 TUI 中渲染为**临时 overlay/modal**，不是内联消息，不是普通 assistant 文本。
 
@@ -415,7 +376,7 @@ interface DoctorState {
 - `[Retry All]` 重新运行全部三个阶段
 - `[Retry Model]` / `[Retry Tools]` / `[Retry Data]` 局部重跑单个阶段
 - `[Configure]` 在 doctor 面板内直接编辑配置（不跳转 `/config`）
-- ESC 或点击外部关闭；如果有未保存 draft，丢弃 draft 并保持现有配置不变
+- Esc 关闭 Doctor 并取消检查；数据子编辑器内 Esc 先取消在途检查，再按 Esc 返回并丢弃草稿。父面板关闭、替换和 TUI 停止也取消；已显式保存的设置保留
 
 ### CLI 呈现：渐进文本输出
 
@@ -433,57 +394,21 @@ $ whyj doctor
 
 `--json` 保持机器稳定，只输出最终 `DoctorState`，不输出渐进事件流。普通文本 CLI 可以逐阶段打印进度；如果最终结果是 `first_setup/unconfigured`，则直接输出可复制的 `settings.json` scaffold。JSON 使用者只看到一次完整 envelope，避免 parser 处理 NDJSON 或中间状态。新增字段必须 additive；已有 `ready`、`auth`、`config`、`hints` 语义在迁移期保留或提供兼容映射。
 
+现有 `ready: true`、envelope 的 `ok: true` 与退出码 `0` 表示报告生成完成；诊断失败通过 `overall`、`phases[].status/error` 表达。自动化判定模型连通性必须检查 model phase 为 `pass` 且未跳过网络请求，不能只看进程退出码。`provider-smoke.ts` 则按真实响应成功与否设置退出码。
+
 ### 首次设置引导（unconfigured）
 
-当模型凭证和已选择数据源所需凭证全部缺失时（`overall === "unconfigured"`），在 `/doctor` 内进入**首次设置向导**，不跳转到 `/config`。
+模型与所选数据源凭证都缺失时进入 Doctor 首次设置。外层面板提供：
 
-**TUI wizard 流程：**
-
-```
-┌ Doctor · First Setup ────────────────────────────┐
-│                                                   │
-│  Let's configure your quant terminal.             │
-│                                                   │
-│  1. API Key                                       │
-│     [________________________________________]    │
-│     Your AI model provider key (sk-...)           │
-│                                                   │
-│  2. Base URL                                      │
-│     [https://api.deepseek.com/anthropic______]    │
-│     ▼ DeepSeek  ·  GLM  ·  MiniMax  ·  Custom     │
-│                                                   │
-│  3. Data Source                                   │
-│     ○ llmquant-data  ○ tushare  ○ financial       │
-│     [your-data-key___________________________]    │
-│                                                   │
-│  [Save & Verify]                                  │
-└───────────────────────────────────────────────────┘
+```text
+Model connection   provider / model
+Market Data        llmquant-data
+Run diagnostics    Check saved model, tools and data
 ```
 
-- 三步输入：API Key（兼容 legacy token 已存在场景）→ Base URL（含快捷选项）→ Data Source + Key
-- 每步输入先保存在 wizard draft 中，不即时写入 `settings.json`
-- `[Save & Verify]` 一次性写入后自动重新运行三阶段检测
-- 所有 key 值在 UI 中脱敏显示
-- ESC 或关闭 wizard 会丢弃 draft，不产生半写入配置
+`Model connection` 与 `Market Data` 分别打开和 `/config` 相同的编辑器，独立保存。数据按市场 → 源/依赖 → 凭证/端点 → 标的/区间 → Check data → Save verified 进行，失败不写入，改变草稿或有效环境连接后须重新检查。Run diagnostics 独立运行三阶段；Esc 取消未保存草稿，已显式保存的设置保留。
 
-**CLI 输出：**
-
-```
-$ whyj doctor
-No credentials configured.
-
-Add this to .ohquant/settings.json:
-
-{
-  "env": {
-    "WHYJ_QUANT_API_KEY": "sk-your-key-here",
-    "WHYJ_QUANT_BASE_URL": "https://api.deepseek.com/anthropic",
-    "WHYJ_QUANT_LLMQUANT_API_KEY": "your-llmquant-key"
-  }
-}
-
-Then: whyj doctor
-```
+非 TUI 的首次设置输出包含 `/config → Model` 引导和 `provider`/`model`/`providers` JSON 示例；原生 provider 通常无需手填端点。CLI 不再推荐新用户填写角色别名和共享模型 key 槽位。
 
 ### 实现结构
 
@@ -519,7 +444,7 @@ src/
 1. **共享状态机与兼容 JSON**：已完成。`DoctorState`、`runDoctor()` async iterable、`collectDoctor()` 最终快照已落地，并保留了旧 `ready/auth/config/hints` 字段的兼容语义。
 2. **真实 provider probe 与日志**：已完成。Model/Data 阶段已升级为最小真实请求，包含超时、错误分类和脱敏日志。
 3. **TUI doctor 面板入口**：已完成。`/doctor` 在 TUI 中会立即打开 doctor 面板，并随着状态机逐阶段刷新。
-4. **首次设置 wizard**：已完成。已支持 provider 预设、draft 编辑、`[Save & Verify]` 一次性写入、ESC 丢弃 draft、诊断态 `[Configure]` 入口。
+4. **首次设置 wizard**：已完成。已支持同一个 provider/model 编辑器、Pi 凭证分步设置、draft 编辑、显式保存、ESC 丢弃未保存内容和诊断态 `[Configure]` 入口。
 5. **细粒度 retry**：已完成。doctor 面板支持 `Retry All`、`Retry Model`、`Retry Tools`、`Retry Data`。
 
 ### 交互状态完整矩阵
@@ -605,7 +530,7 @@ unconfigured ──→ wizard ──→ running ──→ all_pass
 
 - **定时健康检查** — doctor 是手动触发的诊断工具，不是后台 daemon
 - **历史 doctor 报告** — 不持久化可浏览的历史报告，每次运行是独立检测；诊断日志只用于排障
-- **自动修复** — 诊断模式只报告问题并提供 action，不自动修改配置；只有用户显式执行 `[Save & Verify]` 才写入配置
+- **自动修复** — 诊断模式只报告问题并提供 action，不自动修改配置；只有用户显式执行模型 `[Save]` / `[Save & Verify]` 或数据 `[Save verified]` 才写入配置
 - **Multi-provider 并发检测** — 一次只检测当前配置的 provider，不并发测多个
 - **性能 benchmark** — doctor 检测连通性和配置，不测量延迟/吞吐
 
@@ -617,28 +542,33 @@ unconfigured ──→ wizard ──→ running ──→ all_pass
 |------|------|
 | 全凭证就绪 + API 通 | `overall === "all_pass"`，三阶段 `pass` |
 | 零凭证 (unconfigured) | `overall === "unconfigured"`，wizard 触发 |
-| Model key 缺失 | Model `fail`，error 包含 "WHYJ_QUANT_API_KEY" |
+| Model key 缺失 | Model `fail`，action 包含 `/config → Model` |
 | Model API 超时 | 30s 内 Model 转为 `fail`，error 包含 "timed out" |
 | Tool registry/schema 加载失败 | Tools `fail`，detail 列出失败的工具名或 schema 错误 |
-| Data key 401 | Data `fail`，error 包含 "401" 和脱敏 key 指纹 |
+| Data key 401 | Data `fail`，`data.status` 为 `auth-failed`，Credentials 单独显示脱敏指纹 |
 | Python 缺失 | Tools `fail`，error 包含平台相关安装命令 |
 | 凭证从 env 读取 (非 config) | auth source 标注为 "env" |
 | `--json` 输出格式 | JSON 包含 `phases` 数组，每项有 `status` `label` `detail`，并保持旧字段或兼容映射 |
 | retry 后全通过 | 初始 `partial_fail` → retry → `all_pass` |
-| wizard draft 关闭 | 未执行 `[Save & Verify]` 时不写入 `settings.json` |
+| 数据草稿关闭 | 未通过当前草稿检查并执行 `[Save verified]` 时不写入 `settings.json` |
 | 诊断日志脱敏 | 日志不包含完整 API key、Authorization header 或未脱敏请求体 |
 
 当前已经补上的测试集中在：
 
-- `src/cli/doctor.test.ts`：零凭证、env 优先级、legacy token fallback、resolved model id、partial rerun seed 失效回退、provider 分类、warning 渲染、日志脱敏
+- `src/cli/doctor.test.ts`：零凭证、模型保存 key 优先级、legacy token fallback、resolved model id、partial rerun seed 失效时不扩展检测范围、provider 分类、warning 渲染、日志脱敏
+- `src/cli/doctor-data.test.ts` / `src/runtime/data-readiness.test.ts`：HTTP 200 空数据反例、真实 adapter、本地 HTTP 的 401/402/403、依赖失败、窗口/身份、禁止回退、超时/取消、配置快照和数据样本变化后的 seed 失效
 - `src/index.test.ts`：`whyj doctor` 文本进度输出、unconfigured scaffold 与 `--json` 稳定输出
 - `src/cli/registry.test.ts` / `src/cli/handlers/system.test.ts` / `src/runtime/commands.test.ts`：`/doctor` 命令、TUI 实时回调链路与 runtime side effects
-- `src/tui/test/panel.test.ts`：doctor 面板渲染、wizard draft 不落盘、`[Save & Verify]` 后重跑 `/doctor`、`Retry Tools/Data`、`[Configure]`、`esc` 关闭
+- `src/tui/test/panel.test.ts`：doctor 面板渲染、数据检查前不落盘、独立保存模型与数据、`Run diagnostics`、`Retry Tools/Data`、`Configure`、Esc 关闭
 
 ### 诊断日志路径
 
-详细错误信息去哪里看：`.ohquant/logs/doctor/` 目录下按时间戳命名的日志文件。TUI 失败展开只显示摘要，完整 stack trace 和已脱敏的原始响应体写入日志文件；不得写入完整 API key、Authorization header 或未脱敏请求体。面板底部添加一行：
+诊断记录位于 `.ohquant/logs/doctor/` 下按时间戳命名的文件。Data 记录安全的错误类别和样本元数据，不保存原始响应体、stack 或 key；TUI 展示摘要与下一步动作。面板底部显示：
 
 ```
   Logs  ·  .ohquant/logs/doctor/2026-07-01T15-04-05.log
 ```
+
+数据交互专项：`src/runtime/data-settings.test.ts` 校验草稿/环境绑定、取消和迟到隔离；`src/tui/test/data-settings-panel.test.ts` 使用真实回环 HTTP，验证失败/成功/保存冲突和 60/80/120 列焦点；`src/app-doctor.test.ts` 验证 AppRuntime → handler → adapter 的取消与 TUI 关闭/替换。
+
+工具专项：`runtime/tool-readiness.test.ts`、`cli/doctor-tools.test.ts` 校验真实 registry 投影与依赖；`tools/tool-cancellation.test.ts` 覆盖全部 88 data 工具的请求前取消、并发合并取消及真实 HTTP 搜索；`runtime/tool-probe.test.ts` 和 `tui/test/tool-capabilities-panel.test.ts` 覆盖具名端点、schema、权限/空响应、编辑证据失效、父面板取消及多尺寸入口。

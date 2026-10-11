@@ -38,7 +38,7 @@ export function parseAkshareBarsResultJson(parsed: unknown): AkshareBarsResult {
     low: Number(r.low || 0),
     close: Number(r.close || 0),
     volume: Number(r.volume || 0),
-    amount: Number(r.amount || 0),
+    amount: r.amount == null || r.amount === "" ? null : Number(r.amount),
   }));
   return {
     bars,
