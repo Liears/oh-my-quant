@@ -31,6 +31,11 @@ function validSize(value: unknown): value is TerminalSize {
   return Number.isInteger(size.cols) && Number.isInteger(size.rows)
     && size.cols >= 20 && size.cols <= 500 && size.rows >= 5 && size.rows <= 250;
 }
+function saveWindowState(): void {
+  if (!window || window.isDestroyed()) return;
+  const bounds = window.getNormalBounds();
+  try { writeFileSync(join(stateDir, "window.json"), JSON.stringify({ width: bounds.width, height: bounds.height, maximized: window.isMaximized() })); } catch { /* Window state is optional. */ }
+}
 function stopTree(): void {
   const child = terminal;
   terminal = undefined;
@@ -71,7 +76,7 @@ function startTerminal(size: TerminalSize): void {
   child.onExit(({ exitCode }) => {
     if (terminal === child) terminal = undefined;
     if (closeTimer) clearTimeout(closeTimer);
-    if (closing || exitCode === 0) { window?.destroy(); return; }
+    if (closing || exitCode === 0) { saveWindowState(); window?.destroy(); return; }
     if (window && !window.isDestroyed()) window.webContents.send("terminal:exit", exitCode);
   });
 }
@@ -110,8 +115,7 @@ else {
     window.webContents.on("render-process-gone", () => { stopTree(); });
     window.on("close", event => {
       if (closing) return;
-      const bounds = window!.getNormalBounds();
-      try { writeFileSync(join(stateDir, "window.json"), JSON.stringify({ width: bounds.width, height: bounds.height, maximized: window!.isMaximized() })); } catch { /* Window state is optional. */ }
+      saveWindowState();
       if (!terminal) return;
       event.preventDefault();
       closing = true;
