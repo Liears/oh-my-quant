@@ -1,4 +1,4 @@
-Windows 桌面版正式提供一键安装包。下载 **WhyJ-Quant-Setup-1.3.0-win-x64.exe**，双击安装后从桌面或开始菜单启动。
+Windows 桌面版提供一键安装包。下载 **WhyJ-Quant-Setup-1.3.1-win-x64.exe**，双击安装后从桌面或开始菜单启动。本次修复了小窗口及调整字号后终端底部状态栏可能被裁切的问题。
 
 - Electron 内直接使用原 CLI 界面，命令、设置、组合、历史会话与报告保持一致。
 - 内置 Bun、Python 3.13.12、AKShare 1.18.63、AKQuant 和 Git，无需另装开发环境。

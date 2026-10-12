@@ -4,7 +4,7 @@
 
 ## 安装与使用
 
-从 GitHub Release 下载 `WhyJ-Quant-Setup-1.3.0-win-x64.exe`，双击即可安装到当前用户目录，并创建桌面和开始菜单快捷方式。支持 Windows 10 1809 及更新版本、Windows 11，x64。安装和启动无需管理员权限，也无需预装 Node、Bun、Python 或 Git。
+从 GitHub Release 下载 `WhyJ-Quant-Setup-1.3.1-win-x64.exe`，双击即可安装到当前用户目录，并创建桌面和开始菜单快捷方式。支持 Windows 10 1809 及更新版本、Windows 11，x64。安装和启动无需管理员权限，也无需预装 Node、Bun、Python 或 Git。
 
 安装包包含 Electron、独立 CLI、Python 3.13.12、AKShare 1.18.63、AKQuant、精选技能的 Python 依赖和 MinGit。行情与模型服务需要网络；AI 分析首次使用时按 `Ctrl+P` 或输入 `/config` 配置自己的模型连接。模型、数据源的凭证和权限要求与 CLI 相同。首次启动会在后台下载固定版本的精选技能，失败会提供重试命令，主界面仍可使用。
 

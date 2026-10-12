@@ -10,10 +10,10 @@ button { background: transparent; color: #A6A6A6; border: 1px solid transparent;
 button:hover { color: #F0D77A; background: #171717; }
 button:focus-visible { outline: 1px solid #D4AF37; outline-offset: 1px; }
 .divider { height: 16px; width: 1px; background: #242424; margin: 0 8px; }
-main { flex: 1; min-height: 0; padding: 10px 12px 4px; overflow: hidden; }
+main { flex: 1; min-height: 0; overflow: hidden; }
 footer { flex: 0 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 18px; color: #777; border-top: 1px solid #1A1A1A; font-size: 10px; user-select: none; }
 footer b { color: #A6A6A6; font-weight: 500; }
-.xterm { height: 100%; }
+.xterm { height: 100%; padding: 10px 12px 4px; }
 .xterm-viewport::-webkit-scrollbar { width: 6px; }
 .xterm-viewport::-webkit-scrollbar-thumb { background: #333; }
 #error { position: absolute; inset: 30% 20%; background: #111; border: 1px solid #D4AF37; padding: 28px; height: fit-content; box-shadow: 0 12px 60px #000a; }

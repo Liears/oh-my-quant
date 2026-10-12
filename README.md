@@ -6,9 +6,9 @@
 
 ![WhyJ Quant terminal homepage](./docs/assets/terminal.png)
 
-## Windows Desktop 1.3.0
+## Windows Desktop 1.3.1
 
-`app` 分支提供与 CLI 共用界面的 Electron 桌面版。下载 [Windows 一键安装包](https://github.com/yangjingo/oh-my-quant/releases/tag/v1.3.0)，安装后从桌面启动；内置 Bun、Python/AKShare、AKQuant 和 Git，无需另装开发环境。首次 AI 分析按 `Ctrl+P` 配置自己的模型连接。
+`app` 分支提供与 CLI 共用界面的 Electron 桌面版。下载 [Windows 一键安装包](https://github.com/yangjingo/oh-my-quant/releases/tag/v1.3.1)，安装后从桌面启动；内置 Bun、Python/AKShare、AKQuant 和 Git，无需另装开发环境。首次 AI 分析按 `Ctrl+P` 配置自己的模型连接。
 
 支持中文输入、多行安全粘贴、复制、字号调整和窗口状态保存。安装、数据目录、构建及验收说明见 [桌面版文档](./docs/desktop.md)。
 

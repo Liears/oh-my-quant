@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const version = JSON.parse(readFileSync(join(desktop, "package.json"), "utf8")).version;
 const home = process.env.WHYJ_SMOKE_HOME || mkdtempSync(join(tmpdir(), "whyj-desktop-smoke-"));
 const evidence = resolve(desktop, "../output/playwright/desktop");
 mkdirSync(evidence, { recursive: true });
@@ -34,9 +35,9 @@ try {
   let page = await application.firstWindow();
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
-  await waitFor(page, "WhyJ Quant v1.3.0");
+  await waitFor(page, `WhyJ Quant v${version}`);
   assert.equal(await page.locator("#error").isVisible(), false);
-  assert.equal(await page.locator("#status").textContent(), "Desktop 1.3.0");
+  assert.equal(await page.locator("#status").textContent(), `Desktop ${version}`);
   record("fresh profile starts the bundled CLI with no Node/Bun/Python/Git on PATH");
   await page.screenshot({ path: join(evidence, "startup.png") });
   const preferences = await application.evaluate(({ BrowserWindow }) => {
@@ -83,6 +84,11 @@ try {
   assert.equal(await page.locator("#font-reset").textContent(), "15px");
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(820, 600));
   await waitFor(page, "Composer");
+  await page.waitForFunction(() => {
+    const terminal = document.querySelector(".xterm-screen").getBoundingClientRect();
+    const footer = document.querySelector("footer").getBoundingClientRect();
+    return terminal.bottom <= footer.top && terminal.right <= window.innerWidth;
+  });
   await page.screenshot({ path: join(evidence, "compact.png") });
   record("font adjustment and responsive ConPTY resize");
   // Validate the actual runtime beside the installed resources.
@@ -90,7 +96,7 @@ try {
   const python = execFileSync(join(runtime, "python/python.exe"), ["-c", "import json,akshare,akquant,yfinance,pandas_market_calendars; print(json.dumps({'akshare':akshare.__version__}))"], { env, windowsHide: true, timeout: 60000, encoding: "utf8" });
   assert.equal(JSON.parse(python).akshare, "1.18.63");
   assert.match(execFileSync(join(runtime, "git/cmd/git.exe"), ["--version"], { env, windowsHide: true, encoding: "utf8" }), /git version/);
-  assert.match(execFileSync(join(runtime, "whyj.exe"), ["--version"], { env, windowsHide: true, timeout: 30000, encoding: "utf8" }), /v1.3.0/);
+  assert.ok(execFileSync(join(runtime, "whyj.exe"), ["--version"], { env, windowsHide: true, timeout: 30000, encoding: "utf8" }).includes(`v${version}`));
   record("packaged Python data libraries, Git and CLI version");
   await page.keyboard.type("/exit");
   await Promise.all([application.waitForEvent("close", { timeout: 15000 }), page.keyboard.press("Enter")]);
@@ -98,7 +104,7 @@ try {
   record("CLI exit closes the desktop process");
   application = await launch();
   page = await application.firstWindow();
-  await waitFor(page, "WhyJ Quant v1.3.0");
+  await waitFor(page, `WhyJ Quant v${version}`);
   assert.equal(await page.locator("#font-reset").textContent(), "15px");
   assert.equal(JSON.parse(readFileSync(settingsPath, "utf8")).preferences.marketColorScheme, "green-up");
   record("desktop preferences survive restart");
@@ -116,7 +122,7 @@ try {
   assert.equal(remaining, "", "The isolated test runner must have no orphaned WhyJ CLI processes");
   record("no CLI process survives desktop shutdown");
   assert.deepEqual(errors, []);
-  writeFileSync(join(evidence, "result.json"), JSON.stringify({ version: "1.3.0", executable: executable || "development", home, checks, at: new Date().toISOString() }, null, 2));
+  writeFileSync(join(evidence, "result.json"), JSON.stringify({ version, executable: executable || "development", home, checks, at: new Date().toISOString() }, null, 2));
   console.log(`Evidence: ${evidence}`);
 } catch (error) {
   if (application) {
