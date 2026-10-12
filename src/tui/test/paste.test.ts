@@ -2,6 +2,26 @@ import { expect, test } from "bun:test";
 import { nextInputAction } from "../src/input.ts";
 import { QuantTui } from "../src/tui.ts";
 import { createInitialAppState } from "../../app-runtime.ts";
+import { Buffer } from "../src/buffer.ts";
+import { drawComposer } from "../src/chrome.ts";
+
+test("the composer displays every pasted line before submission", () => {
+  const buf = new Buffer(40, 10);
+  drawComposer(buf, { x: 0, y: 1, w: 40, h: 6 }, createInitialAppState("test"), "中文桌面输入验证\n/exit");
+  const rows = buf.toPlain();
+  expect(rows[2]).toContain("中文桌面输入验证");
+  expect(rows[3]).toContain("/exit▏");
+  expect(rows[7]).toBe(" ".repeat(40));
+});
+
+test("long CJK input keeps its end visible without crossing composer borders", () => {
+  const buf = new Buffer(24, 10);
+  drawComposer(buf, { x: 0, y: 1, w: 24, h: 5 }, createInitialAppState("test"), "中".repeat(80) + "\nlast line");
+  const rows = buf.toPlain();
+  expect(rows.slice(2, 5).join("\n")).toContain("last line▏");
+  expect(rows[5]).toMatch(/^╰─+╯$/);
+  expect(rows.slice(6).every(line => line === " ".repeat(24))).toBe(true);
+});
 
 test("bracketed paste waits across chunks and keeps multiline commands inert", () => {
   const partial = "\x1b[200~中文\r\n/exit\r";
