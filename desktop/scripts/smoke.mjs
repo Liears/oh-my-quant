@@ -24,8 +24,10 @@ const launch = () => electron.launch({
 let application;
 const checks = [];
 const record = (name) => { checks.push(name); console.log(`PASS ${name}`); };
-async function waitFor(page, text) {
-  await page.waitForFunction(text => document.querySelector(".xterm-accessibility-tree")?.textContent?.includes(text), text, { timeout: 45_000 });
+async function waitFor(page, text, present = true) {
+  await page.waitForFunction(({ text, present }) =>
+    !!document.querySelector(".xterm-accessibility-tree")?.textContent?.includes(text) === present,
+    { text, present }, { timeout: 45_000 });
 }
 try {
   application = await launch();
@@ -49,6 +51,7 @@ try {
   await waitFor(page, "Commands");
   await page.screenshot({ path: join(evidence, "help.png") });
   await page.keyboard.press("Escape");
+  await waitFor(page, "[Commands] / Hotkeys", false);
   await page.keyboard.press("Control+p");
   await waitFor(page, "Settings");
   await page.screenshot({ path: join(evidence, "settings.png") });
@@ -59,12 +62,14 @@ try {
   await waitFor(page, "Green ↑ Red ↓");
   assert.equal(JSON.parse(readFileSync(settingsPath, "utf8")).preferences.marketColorScheme, "green-up");
   await page.keyboard.press("Escape");
+  await waitFor(page, "╭─ Settings", false);
   record("original help/settings, public AKShare first-run default and settings persistence");
-  for (const [command, title] of [["/portfolio", "Portfolios"], ["/resume", "Resume a previous session"], ["/artifact", "Artifacts"]]) {
+  for (const [command, title] of [["/portfolio", "╭─ Portfolios"], ["/resume", "Resume a previous session"], ["/artifact", "╭─ Artifacts"]]) {
     await page.keyboard.type(command);
     await page.keyboard.press("Enter");
     await waitFor(page, title);
     await page.keyboard.press("Escape");
+    await waitFor(page, title, false);
   }
   record("portfolio, saved-session and research-report panels");
   await application.evaluate(async ({ clipboard }) => { await clipboard.writeText("中文桌面输入验证\n/exit"); });
