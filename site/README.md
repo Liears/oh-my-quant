@@ -23,15 +23,35 @@ bun run --cwd site preview
 
 | 文件 | 修改时机 |
 |---|---|
-| `public/index.html` | 文案、导航、功能介绍、演示内容与外链 |
+| `templates/home.html` | 首页结构、功能介绍、演示内容与外链 |
+| `templates/header.html` | 首页与 Blog 共用的 Feature 目录、导航和语言入口 |
+| `templates/layout.html` | 共用页面外壳、元信息、字体和页脚 |
+| `templates/blog.html` | Blog 目录；尚未发布文章时显示待发布状态 |
+| `content/messages.json` | 中英文文案；每个键必须同时提供 `zh` 和 `en` |
 | `public/styles.css` | 布局、响应式与设计 token；修改色彩前先更新或核对 `../DESIGN.md` |
 | `public/app.js` | 标签切换、演示偏好、导航与复制命令 |
 | `public/fonts/` | 自托管 Geist / Geist Mono 及 SIL OFL 许可；页面不请求第三方字体 |
-| `scripts/build.mjs` | 只将审阅过的 public 资产复制到干净的 `dist/` |
+| `scripts/render.mjs` | 路由、静态语言渲染和浏览器交互文案；缺失翻译会使构建失败 |
+| `scripts/build.mjs` | 生成四个语言页面，将审阅过的 public 资产复制到干净的 `dist/` |
 | `scripts/serve.mjs` | 仅本机开发/预览服务器，不作为生产服务 |
 | `vercel.json` | 构建路径、安全响应头与字体缓存 |
 
 字体来自 Google Fonts 的 Geist v5 / Geist Mono v6，使用固定资源版本。品牌文字采用 DESIGN 规定的 Geist，不使用旧图片 Logo 的衬线字体。
+
+## 中英文与 Blog
+
+| 页面 | 中文 | English |
+|---|---|---|
+| 首页 | `/` | `/en/` |
+| Blog | `/blog/` | `/en/blog/` |
+
+页面在构建时生成完整的语言内容，直接访问或禁用 JavaScript 仍能阅读。语言按钮切换同一页面的另一种语言，并保留章节锚点；站内导航保持当前语言。`html lang`、页面标题、description、hreflang、无障碍标签和交互提示同步翻译。URL 决定语言，不依赖浏览器存储；演示偏好在两种语言之间共用。
+
+模板通过 `{{message.key}}` 引用 `content/messages.json` 中的文案，内容按纯文本转义，HTML 结构放在模板中。`runtime.*` 用于设置状态、移动导航按钮和复制反馈，构建时生成 `/messages.js`。不要直接编辑 `dist/`；开发服务器和正式构建使用同一个渲染函数。
+
+Blog 当前没有已发布文章，不生成虚构文章或占位文章链接。发布第一篇文章时：在 `templates/` 增加正文模板，在 `content/messages.json` 添加两种语言的文案，在 `scripts/render.mjs` 的路由表和模板加载列表登记文章，再把 `templates/blog.html` 的待发布状态替换为文章目录。目录和正文都应提供对应语言链接；未完成的译文不要冒充已发布版本。
+
+Feature 目录指向首页已有的自然语言研究、因子与回测、报告、工作流和设置章节。目录使用原生 `details/summary`，支持 Enter、Space、Tab；Escape 关闭并返回焦点，点击外部或选择链接也会关闭。手机端入口位于折叠菜单中。
 
 ## 内容与交互约定
 
@@ -39,7 +59,7 @@ bun run --cwd site preview
 
 红绿仅用于涨跌和风险，`Market Colors` 翻转涨跌色，风险保持独立语义；平盘保持中性。默认黑金配色与颜色值对应 DESIGN。网页支持系统减少动态效果偏好。
 
-发布前检查：桌面与手机无横向溢出；导航与全部标签可用；键盘方向键切换标签；复制结果明确；偏好刷新保留；配色不改变风险语义；安装命令与外链仍和产品一致。研究示例不是产品性能或真实模型运行证明。
+发布前检查：两种语言的首页和 Blog 均可直接访问；语言切换保留页面和锚点；桌面与手机无横向溢出；Feature 目录与全部标签可用；键盘方向键切换标签；复制结果明确；偏好刷新及切换语言后保留；配色不改变风险语义；安装命令与外链仍和产品一致。研究示例不是产品性能或真实模型运行证明。
 
 ## Vercel
 

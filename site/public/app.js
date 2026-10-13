@@ -1,4 +1,7 @@
+import { messages } from "/messages.js";
+
 const root = document.documentElement;
+const text = messages[root.lang === "en" ? "en" : "zh"];
 const storageKey = "whyj-quant-site-preferences-v1";
 const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 const defaults = () => ({
@@ -33,12 +36,13 @@ function applyPreferences(save = false) {
   root.dataset.market = preferences.market;
   root.classList.toggle("no-overview", !preferences.overview);
   root.classList.toggle("no-motion", preferences.motion);
+  if (!colorSelect) return;
   document.querySelector("#overview-panel").hidden = !preferences.overview;
   colorSelect.value = preferences.market;
   overviewToggle.setAttribute("aria-checked", String(preferences.overview));
   motionToggle.setAttribute("aria-checked", String(preferences.motion));
   document.querySelector("#market-legend").textContent =
-    `${preferences.market === "red-up" ? "红涨 / 绿跌" : "绿涨 / 红跌"} · 合成数据`;
+    preferences.market === "red-up" ? text.redLegend : text.greenLegend;
   if (save) {
     try {
       localStorage.setItem(storageKey, JSON.stringify(preferences));
@@ -49,24 +53,24 @@ function applyPreferences(save = false) {
   }
   settingsStatus.textContent = storageAvailable
     ? save
-      ? "已更新演示 · 仅保存在此浏览器"
-      : "演示设置 · 仅保存在此浏览器"
-    : "演示设置 · 本次页面有效，浏览器存储不可用";
+      ? text.settingsSaved
+      : text.settingsDefault
+    : text.settingsUnavailable;
 }
 applyPreferences();
-colorSelect.addEventListener("change", () => {
+colorSelect?.addEventListener("change", () => {
   preferences.market = colorSelect.value;
   applyPreferences(true);
 });
-overviewToggle.addEventListener("click", () => {
+overviewToggle?.addEventListener("click", () => {
   preferences.overview = !preferences.overview;
   applyPreferences(true);
 });
-motionToggle.addEventListener("click", () => {
+motionToggle?.addEventListener("click", () => {
   preferences.motion = !preferences.motion;
   applyPreferences(true);
 });
-document.querySelector("#reset-settings").addEventListener("click", () => {
+document.querySelector("#reset-settings")?.addEventListener("click", () => {
   preferences = defaults();
   applyPreferences(true);
 });
@@ -103,35 +107,62 @@ for (const list of document.querySelectorAll('[role="tablist"]')) {
 
 const menuButton = document.querySelector("#menu-button");
 const mobileNav = document.querySelector("#mobile-nav");
+const featureMenus = [...document.querySelectorAll(".feature-menu")];
 function closeMenu(returnFocus = false) {
   mobileNav.hidden = true;
+  for (const menu of featureMenus) menu.open = false;
   menuButton.setAttribute("aria-expanded", "false");
-  menuButton.setAttribute("aria-label", "打开导航菜单");
+  menuButton.setAttribute("aria-label", text.menuOpen);
   if (returnFocus) menuButton.focus();
 }
 menuButton.addEventListener("click", () => {
   const open = menuButton.getAttribute("aria-expanded") !== "true";
   mobileNav.hidden = !open;
   menuButton.setAttribute("aria-expanded", String(open));
-  menuButton.setAttribute("aria-label", open ? "关闭导航菜单" : "打开导航菜单");
+  menuButton.setAttribute("aria-label", open ? text.menuClose : text.menuOpen);
+  if (!open) closeMenu();
 });
 for (const link of mobileNav.querySelectorAll("a"))
   link.addEventListener("click", () => closeMenu());
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !mobileNav.hidden) closeMenu(true);
+  if (event.key !== "Escape") return;
+  const feature = featureMenus.find((menu) => menu.open);
+  if (feature) {
+    feature.open = false;
+    feature.querySelector("summary").focus();
+  } else if (!mobileNav.hidden) closeMenu(true);
 });
-window.matchMedia("(min-width: 761px)").addEventListener("change", (event) => {
-  if (event.matches) closeMenu();
+window.matchMedia("(min-width: 761px)").addEventListener("change", () => closeMenu());
+for (const menu of featureMenus) {
+  menu.addEventListener("focusout", (event) => {
+    if (!menu.contains(event.relatedTarget)) menu.open = false;
+  });
+  for (const link of menu.querySelectorAll("a"))
+    link.addEventListener("click", () => { menu.open = false; });
+}
+document.addEventListener("click", (event) => {
+  for (const menu of featureMenus)
+    if (!menu.contains(event.target)) menu.open = false;
+  if (!event.target.closest(".site-header") && !mobileNav.hidden) closeMenu();
 });
+
+// Each language has a real URL; retain the current section when switching.
+const languageLink = document.querySelector("[data-language-link]");
+const alternatePath = languageLink.getAttribute("href");
+function updateLanguageLink() {
+  languageLink.href = `${alternatePath}${window.location.hash}`;
+}
+updateLanguageLink();
+window.addEventListener("hashchange", updateLanguageLink);
 
 for (const button of document.querySelectorAll("[data-copy]")) {
   button.addEventListener("click", async () => {
     const status = document.querySelector("#copy-status");
     try {
       await navigator.clipboard.writeText(button.dataset.copy);
-      status.textContent = `已复制：${button.dataset.copy}`;
+      status.textContent = `${text.copied}${button.dataset.copy}`;
     } catch {
-      status.textContent = `无法自动复制，请手动选择命令：${button.dataset.copy}`;
+      status.textContent = `${text.copyFailed}${button.dataset.copy}`;
       const range = document.createRange();
       range.selectNodeContents(button.parentElement.querySelector("code"));
       const selection = window.getSelection();

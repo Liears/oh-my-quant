@@ -1,0 +1,734 @@
+{
+  "hero.first": {
+    "zh": "让研究，",
+    "en": "Research first,"
+  },
+  "hero.second": {
+    "zh": "先于判断",
+    "en": "then conviction"
+  },
+  "hero.period": {
+    "zh": "。",
+    "en": "."
+  },
+  "hero.question": {
+    "zh": "把问题带进终端，",
+    "en": "Bring your questions to the terminal."
+  },
+  "hero.evidence": {
+    "zh": "把依据留在每一次判断里。",
+    "en": "Keep evidence behind every decision."
+  },
+  "hero.descriptionFirst": {
+    "zh": "用自然语言串起行情、因子、回测与报告。",
+    "en": "Connect market data, factors, backtests and reports through natural language."
+  },
+  "hero.descriptionSecond": {
+    "zh": "WhyJ Quant，让你的研究形成完整的工作流。",
+    "en": "WhyJ Quant brings your research into one continuous workflow."
+  },
+  "hero.install": {
+    "zh": "安装 WhyJ Quant",
+    "en": "Install WhyJ Quant"
+  },
+  "hero.explore": {
+    "zh": "探索工作台",
+    "en": "Explore the workspace"
+  },
+  "demo.scenarios": {
+    "zh": "研究场景",
+    "en": "Research scenarios"
+  },
+  "demo.research": {
+    "zh": "市场研究",
+    "en": "Market research"
+  },
+  "demo.compare": {
+    "zh": "组合比较",
+    "en": "Portfolio comparison"
+  },
+  "demo.report": {
+    "zh": "研究报告",
+    "en": "Research reports"
+  },
+  "demo.interactive": {
+    "zh": "交互示意",
+    "en": "Interactive demo"
+  },
+  "demo.synthetic": {
+    "zh": "合成数据",
+    "en": "Synthetic data"
+  },
+  "demo.question": {
+    "zh": "比较样本 A 与基准的走势，看看风险来自哪里。",
+    "en": "Compare Sample A with the benchmark and explore the sources of risk."
+  },
+  "demo.priceWindow": {
+    "zh": "价格窗口 · 数据日期 · 覆盖检查",
+    "en": "Price window · Dates · Coverage"
+  },
+  "demo.done": {
+    "zh": "完成",
+    "en": "Done"
+  },
+  "demo.factors": {
+    "zh": "动量 · 波动率 · RSI",
+    "en": "Momentum · Volatility · RSI"
+  },
+  "demo.risk": {
+    "zh": "最大回撤 · 风险分布",
+    "en": "Max drawdown · Risk distribution"
+  },
+  "demo.answerHeading": {
+    "zh": "先理解波动，再讨论收益。",
+    "en": "Understand volatility before discussing returns."
+  },
+  "demo.answerFirst": {
+    "zh": "这个示例中，样本的涨幅更高，回撤也更深。",
+    "en": "In this example, the sample has both a higher return and a deeper drawdown."
+  },
+  "demo.answerSecond": {
+    "zh": "把收益、风险和数据区间放在一起，判断才有上下文。",
+    "en": "Consider returns, risk and the data window together to put the result in context."
+  },
+  "demo.return": {
+    "zh": "区间收益",
+    "en": "Period return"
+  },
+  "demo.drawdown": {
+    "zh": "最大回撤",
+    "en": "Max drawdown"
+  },
+  "demo.coverage": {
+    "zh": "数据覆盖",
+    "en": "Data coverage"
+  },
+  "demo.compareQuestion": {
+    "zh": "把两组观察标的放在相同区间里比较。",
+    "en": "Compare two watchlists over the same date window."
+  },
+  "demo.commonDates": {
+    "zh": "共同日期",
+    "en": "Common dates"
+  },
+  "demo.align": {
+    "zh": "先对齐日期、权重与计价币种",
+    "en": "Align dates, weights and currency first"
+  },
+  "demo.watchlists": {
+    "zh": "模拟观察组",
+    "en": "Model watchlist"
+  },
+  "demo.groupA": {
+    "zh": "观察组 A",
+    "en": "Watchlist A"
+  },
+  "demo.groupB": {
+    "zh": "观察组 B",
+    "en": "Watchlist B"
+  },
+  "demo.benchmark": {
+    "zh": "基准",
+    "en": "Benchmark"
+  },
+  "demo.compareHeading": {
+    "zh": "看见不同选择的代价。",
+    "en": "See the trade-offs behind each choice."
+  },
+  "demo.compareFirst": {
+    "zh": "比较共同窗口内的表现，保留权重和缺失原因。",
+    "en": "Compare a shared time window, keeping weights and data gaps visible."
+  },
+  "demo.compareSecond": {
+    "zh": "观察组模拟收益与真实账户业绩分别理解。",
+    "en": "Interpret simulated watchlist returns separately from actual account performance."
+  },
+  "demo.reportQuestion": {
+    "zh": "留下这次研究的报告，下次从这里继续。",
+    "en": "Save a report of this research so we can continue from here next time."
+  },
+  "demo.reportHeading": {
+    "zh": "每个结论，都有来路。",
+    "en": "Every conclusion has a source."
+  },
+  "demo.reportWindow": {
+    "zh": "研究区间与数据覆盖",
+    "en": "Research window and data coverage"
+  },
+  "demo.reportFactors": {
+    "zh": "因子、回测与风险指标",
+    "en": "Factors, backtests and risk metrics"
+  },
+  "demo.reportTrace": {
+    "zh": "调用轨迹与来源会话",
+    "en": "Tool trace and source session"
+  },
+  "demo.archive": {
+    "zh": "版本归档 ↗",
+    "en": "Version archive ↗"
+  },
+  "demo.reportHint": {
+    "zh": "在终端开启 Auto Artifacts 后生成；通过 /artifact 浏览已有报告。",
+    "en": "Enable Auto Artifacts in the terminal to generate reports. Browse saved reports with /artifact."
+  },
+  "demo.overviewLabel": {
+    "zh": "示例行情面板",
+    "en": "Sample market overview"
+  },
+  "demo.watchlist": {
+    "zh": "示例观察组",
+    "en": "Sample watchlist"
+  },
+  "demo.sampleA": {
+    "zh": "样本 A",
+    "en": "Sample A"
+  },
+  "demo.sampleB": {
+    "zh": "样本 B",
+    "en": "Sample B"
+  },
+  "demo.chartLabel": {
+    "zh": "样本 A 合成价格曲线，不代表真实行情",
+    "en": "Synthetic price chart for Sample A; not real market data"
+  },
+  "demo.start": {
+    "zh": "起点",
+    "en": "Start"
+  },
+  "demo.tradingDays": {
+    "zh": "120 个交易日 · 示例",
+    "en": "120 trading days · Demo"
+  },
+  "demo.end": {
+    "zh": "终点",
+    "en": "End"
+  },
+  "demo.researchSample": {
+    "zh": "研究样本",
+    "en": "Research sample"
+  },
+  "demo.comparisonSample": {
+    "zh": "比较样本",
+    "en": "Reference sample"
+  },
+  "runtime.redLegend": {
+    "zh": "红涨 / 绿跌 · 合成数据",
+    "en": "Red up / Green down · Synthetic data"
+  },
+  "demo.composer": {
+    "zh": "下一个值得研究的问题是什么？",
+    "en": "What is the next question worth researching?"
+  },
+  "demo.terminal": {
+    "zh": "为你熟悉的终端而造。",
+    "en": "Built for the terminal you know."
+  },
+  "demo.trySettings": {
+    "zh": "试试工作区设置",
+    "en": "Try workspace settings"
+  },
+  "principle.language": {
+    "zh": "自然语言驱动研究",
+    "en": "Research in natural language"
+  },
+  "principle.providers": {
+    "zh": "连接自己的模型与数据源",
+    "en": "Bring your models and data sources"
+  },
+  "principle.local": {
+    "zh": "本地保存研究过程",
+    "en": "Keep your research locally"
+  },
+  "principle.license": {
+    "zh": "MIT 开源 ↗",
+    "en": "Open source · MIT ↗"
+  },
+  "features.kicker": {
+    "zh": "从数据，到有依据的判断",
+    "en": "From data to informed decisions"
+  },
+  "features.titleFirst": {
+    "zh": "研究需要的工具，",
+    "en": "Your research tools,"
+  },
+  "features.titleSecond": {
+    "zh": "在同一个上下文里。",
+    "en": "in one shared context."
+  },
+  "features.introFirst": {
+    "zh": "少一点在工具之间切换，",
+    "en": "Less switching between tools."
+  },
+  "features.introSecond": {
+    "zh": "多一点对问题本身的思考。",
+    "en": "More time thinking about the question."
+  },
+  "features.researchTitle": {
+    "zh": "用问题开启研究",
+    "en": "Start with a question"
+  },
+  "features.researchBody": {
+    "zh": "用自然语言描述目标。Agent 调用数据和量化工具，把分析过程与结果留在同一段对话里。",
+    "en": "Describe your goal in natural language. The agent calls data and quantitative tools, keeping the analysis and results in the same conversation."
+  },
+  "features.backtestTitle": {
+    "zh": "把感觉放进回测",
+    "en": "Put an idea to the test"
+  },
+  "features.backtestBody": {
+    "zh": "从动量、波动率到双均线策略，用因子、回测与风险指标检验想法，并查看数据覆盖。",
+    "en": "From momentum and volatility to moving-average strategies, test ideas with factors, backtests and risk metrics. Check the data coverage along the way."
+  },
+  "features.reportsTitle": {
+    "zh": "让结论保留出处",
+    "en": "Keep conclusions traceable"
+  },
+  "features.reportsBody": {
+    "zh": "在设置中开启报告生成，用 Dashboard 看结果，用 Trajectory 回看工具调用和研究过程。",
+    "en": "Enable report generation in settings. Use Dashboard to review results and Trajectory to revisit tool calls and the research process."
+  },
+  "workflow.kicker": {
+    "zh": "每一步，都接得上",
+    "en": "Each step connects to the next"
+  },
+  "workflow.titleFirst": {
+    "zh": "从一个问题出发，",
+    "en": "Start with a question."
+  },
+  "workflow.titleSecond": {
+    "zh": "下次接着研究。",
+    "en": "Pick up where you left off."
+  },
+  "workflow.docs": {
+    "zh": "查看命令文档",
+    "en": "Command reference"
+  },
+  "workflow.connect": {
+    "zh": "连接",
+    "en": "Connect"
+  },
+  "workflow.connectFirst": {
+    "zh": "选好模型与数据源，",
+    "en": "Choose your model and data sources."
+  },
+  "workflow.connectSecond": {
+    "zh": "检查研究环境。",
+    "en": "Check the research environment."
+  },
+  "workflow.observe": {
+    "zh": "观察",
+    "en": "Observe"
+  },
+  "workflow.observeFirst": {
+    "zh": "建立自己的观察组，",
+    "en": "Build your watchlists."
+  },
+  "workflow.observeSecond": {
+    "zh": "把标的与问题放在一起。",
+    "en": "Keep instruments and questions together."
+  },
+  "workflow.verify": {
+    "zh": "验证",
+    "en": "Verify"
+  },
+  "workflow.verifyFirst": {
+    "zh": "自然语言发起分析，",
+    "en": "Ask for analysis in natural language."
+  },
+  "workflow.verifySecond": {
+    "zh": "对照回测、风险与依据。",
+    "en": "Review backtests, risk and evidence."
+  },
+  "workflow.prompt": {
+    "zh": "Q › 分析这个想法",
+    "en": "Q › Analyze this idea"
+  },
+  "workflow.continue": {
+    "zh": "继续",
+    "en": "Continue"
+  },
+  "workflow.continueFirst": {
+    "zh": "回看报告与会话，",
+    "en": "Revisit reports and sessions."
+  },
+  "workflow.continueSecond": {
+    "zh": "继续尚未结束的问题。",
+    "en": "Continue exploring open questions."
+  },
+  "settings.kicker": {
+    "zh": "按你的方式工作",
+    "en": "Work your way"
+  },
+  "settings.modelTitle": {
+    "zh": "你的模型。",
+    "en": "Your models."
+  },
+  "settings.dataTitle": {
+    "zh": "你的数据。",
+    "en": "Your data."
+  },
+  "settings.workspaceTitle": {
+    "zh": "你的研究工作台。",
+    "en": "Your workspace."
+  },
+  "settings.intro": {
+    "zh": "在终端的 /config 中连接模型、管理数据源，调整工作区。让工具适应自己的研究习惯。",
+    "en": "Connect models, manage data sources and adjust your workspace with /config in the terminal. Make the tools fit the way you research."
+  },
+  "settings.guide": {
+    "zh": "阅读配置指南",
+    "en": "Configuration guide"
+  },
+  "settings.demoNotice": {
+    "zh": "下方是网页交互演示。涨跌配色和 Overview 开关会同步到上方工作台，不连接模型、不读取本机配置。",
+    "en": "This is an interactive website demo. Market colors and the Overview toggle update the workspace above. It does not connect to models or read your local configuration."
+  },
+  "settings.groups": {
+    "zh": "设置分组",
+    "en": "Settings categories"
+  },
+  "settings.models": {
+    "zh": "模型连接",
+    "en": "Models"
+  },
+  "settings.data": {
+    "zh": "研究数据",
+    "en": "Data"
+  },
+  "settings.workspace": {
+    "zh": "工作区",
+    "en": "Workspace"
+  },
+  "settings.colorsHelp": {
+    "zh": "全工作区统一的涨跌约定",
+    "en": "One market color convention across the workspace"
+  },
+  "settings.colorsLabel": {
+    "zh": "涨跌颜色约定",
+    "en": "Market color convention"
+  },
+  "settings.redUp": {
+    "zh": "红涨 / 绿跌",
+    "en": "Red up / Green down"
+  },
+  "settings.greenUp": {
+    "zh": "绿涨 / 红跌",
+    "en": "Green up / Red down"
+  },
+  "settings.overviewHelp": {
+    "zh": "显示侧边行情与观察组",
+    "en": "Show market data and watchlists in the sidebar"
+  },
+  "settings.overviewLabel": {
+    "zh": "显示 Overview 行情面板",
+    "en": "Show the Overview market panel"
+  },
+  "settings.motion": {
+    "zh": "减少动态效果",
+    "en": "Reduce motion"
+  },
+  "settings.motionHelp": {
+    "zh": "只调整本网页的动效",
+    "en": "Adjust animations on this website only"
+  },
+  "settings.motionLabel": {
+    "zh": "减少网页动态效果",
+    "en": "Reduce website animations"
+  },
+  "settings.colorNotice": {
+    "zh": "涨跌配色只影响行情。回撤风险与操作状态保持各自语义。",
+    "en": "Market colors apply to price movements. Drawdown risk and action status keep their own meanings."
+  },
+  "settings.modelHelp": {
+    "zh": "在终端选择 Provider 与实际模型 ID",
+    "en": "Choose a provider and model ID in the terminal"
+  },
+  "settings.connectValue": {
+    "zh": "自主连接 ↗",
+    "en": "Your connection ↗"
+  },
+  "settings.thinkingHelp": {
+    "zh": "选择模型支持的推理级别",
+    "en": "Choose a reasoning level supported by your model"
+  },
+  "settings.thinkingValue": {
+    "zh": "按模型能力",
+    "en": "Model dependent"
+  },
+  "settings.verifyHelp": {
+    "zh": "保存连接并发送小型验证请求",
+    "en": "Save the connection and send a small verification request"
+  },
+  "settings.verifyValue": {
+    "zh": "显式验证",
+    "en": "Verify explicitly"
+  },
+  "settings.credentialsNotice": {
+    "zh": "请在安装后的终端填写凭证；本网页不收集 API key。",
+    "en": "Enter credentials in the installed terminal. This website does not collect API keys."
+  },
+  "settings.dataHelp": {
+    "zh": "选择市场、数据源与样本区间",
+    "en": "Choose a market, data source and sample window"
+  },
+  "settings.checkHelp": {
+    "zh": "检查当前连接的样本响应",
+    "en": "Check a sample response from your connection"
+  },
+  "settings.checkValue": {
+    "zh": "先验证",
+    "en": "Verify first"
+  },
+  "settings.saveHelp": {
+    "zh": "保存通过验证的数据连接",
+    "en": "Save a verified data connection"
+  },
+  "settings.saveValue": {
+    "zh": "再保存",
+    "en": "Then save"
+  },
+  "settings.dataNotice": {
+    "zh": "数据源能力与权限不同；样本检查通过不代表所有市场和端点都可用。",
+    "en": "Capabilities and permissions vary by provider. A successful sample check does not guarantee access to every market or endpoint."
+  },
+  "runtime.settingsDefault": {
+    "zh": "演示设置 · 仅保存在此浏览器",
+    "en": "Demo settings · Saved in this browser only"
+  },
+  "settings.reset": {
+    "zh": "恢复默认",
+    "en": "Reset defaults"
+  },
+  "install.titleFirst": {
+    "zh": "下一个研究问题，",
+    "en": "Your next question"
+  },
+  "install.titleSecond": {
+    "zh": "从这里开始。",
+    "en": "starts here."
+  },
+  "install.intro": {
+    "zh": "在你的终端里，安装 WhyJ Quant。",
+    "en": "Install WhyJ Quant in your terminal."
+  },
+  "install.terminal": {
+    "zh": "终端安装",
+    "en": "Terminal install"
+  },
+  "install.requirement": {
+    "zh": "需要 Node.js / npm 或 Bun",
+    "en": "Requires Node.js / npm or Bun"
+  },
+  "install.methods": {
+    "zh": "安装方式",
+    "en": "Installation methods"
+  },
+  "install.copyNpm": {
+    "zh": "复制 npm 安装命令",
+    "en": "Copy npm install command"
+  },
+  "install.copyBun": {
+    "zh": "复制 Bun 安装命令",
+    "en": "Copy Bun install command"
+  },
+  "install.then": {
+    "zh": "然后运行",
+    "en": "Then run"
+  },
+  "install.copyLaunch": {
+    "zh": "复制启动命令",
+    "en": "Copy launch command"
+  },
+  "install.nextFirst": {
+    "zh": "首次启动输入",
+    "en": "On first launch, enter "
+  },
+  "install.nextSecond": {
+    "zh": "，连接模型和数据源。",
+    "en": " to connect your model and data sources."
+  },
+  "install.docs": {
+    "zh": "完整安装与环境配置",
+    "en": "Installation and environment setup"
+  },
+  "faq.title": {
+    "zh": "开始之前。",
+    "en": "Before you begin."
+  },
+  "faq.tradingQuestion": {
+    "zh": "这是一个在线交易平台吗？",
+    "en": "Is this an online trading platform?"
+  },
+  "faq.tradingAnswer": {
+    "zh": "WhyJ Quant 是安装在本机的量化研究终端。这是它的产品介绍与交互演示页面；网页不连接证券账户，也不执行交易。",
+    "en": "WhyJ Quant is a quantitative research terminal installed on your computer. This website introduces the product and demonstrates its interface. It does not connect to brokerage accounts or execute trades."
+  },
+  "faq.providersQuestion": {
+    "zh": "需要自己配置模型和数据源吗？",
+    "en": "Do I configure my own model and data sources?"
+  },
+  "faq.providersAnswer": {
+    "zh": "需要。在 /config 中选择模型连接与适合研究市场的数据源。部分数据源需要 API key，AKShare 路径需要本机 Python 环境和相应依赖。模型和数据服务费用由各提供方收取。",
+    "en": "Yes. Use /config to select a model connection and data sources for your markets. Some sources require an API key. AKShare requires a local Python environment and its dependencies. Model and data providers charge for their own services."
+  },
+  "faq.storageQuestion": {
+    "zh": "研究数据保存在哪里？",
+    "en": "Where is my research stored?"
+  },
+  "faq.storageAnswer": {
+    "zh": "配置、研究会话与报告保存在本地工作区。分析时会向你选择的模型和数据提供方发送必要请求；本地存储不等于所有计算都离线。官网仅在浏览器保存演示偏好。",
+    "en": "Configuration, research sessions and reports are stored in your local workspace. Analysis sends necessary requests to your chosen model and data providers; local storage does not mean all computation is offline. This website only saves demo preferences in your browser."
+  },
+  "faq.contributeQuestion": {
+    "zh": "如何反馈或参与开发？",
+    "en": "How can I give feedback or contribute?"
+  },
+  "faq.contributeFirst": {
+    "zh": "项目采用 MIT 许可证。你可以在",
+    "en": "The project is MIT licensed. Visit "
+  },
+  "faq.contributeSecond": {
+    "zh": "阅读代码、提出问题或提交改进。界面能力以所安装版本和配置为准。",
+    "en": " to read the code, report issues or contribute improvements. Available features depend on your installed version and configuration."
+  },
+  "footer.notice": {
+    "zh": "网页演示不构成投资建议。示例数字为合成数据。",
+    "en": "This demo is not investment advice. All sample figures are synthetic."
+  },
+  "hero.subtitle": {
+    "zh": "Research before conviction.",
+    "en": "A terminal for thoughtful research."
+  },
+  "home.title": {
+    "zh": "WhyJ Quant — 让研究，先于判断。",
+    "en": "WhyJ Quant — Research before conviction."
+  },
+  "home.description": {
+    "zh": "WhyJ Quant，一个为认真研究而造的开源量化终端。用自然语言连接行情、因子、回测与研究报告，让研究先于判断。",
+    "en": "An open-source quantitative research terminal. Connect market data, factors, backtests and reports through natural language. Research before conviction."
+  },
+  "blog.title": {
+    "zh": "Blog — WhyJ Quant",
+    "en": "Blog — WhyJ Quant"
+  },
+  "blog.description": {
+    "zh": "WhyJ Quant 的产品进展、研究实践与技术文章。",
+    "en": "Product updates, research practice and engineering notes from WhyJ Quant."
+  },
+  "nav.skip": {
+    "zh": "跳转到正文",
+    "en": "Skip to content"
+  },
+  "nav.home": {
+    "zh": "WhyJ Quant 首页",
+    "en": "WhyJ Quant home"
+  },
+  "nav.main": {
+    "zh": "主导航",
+    "en": "Main navigation"
+  },
+  "nav.mobile": {
+    "zh": "移动端导航",
+    "en": "Mobile navigation"
+  },
+  "nav.features": {
+    "zh": "Feature · 功能",
+    "en": "Features"
+  },
+  "nav.allFeatures": {
+    "zh": "全部功能",
+    "en": "All features"
+  },
+  "nav.research": {
+    "zh": "自然语言研究",
+    "en": "Natural-language research"
+  },
+  "nav.backtest": {
+    "zh": "因子与回测",
+    "en": "Factors and backtesting"
+  },
+  "nav.reports": {
+    "zh": "研究报告",
+    "en": "Research reports"
+  },
+  "nav.workflow": {
+    "zh": "工作流",
+    "en": "Workflow"
+  },
+  "nav.settings": {
+    "zh": "工作区设置",
+    "en": "Workspace settings"
+  },
+  "nav.docs": {
+    "zh": "文档",
+    "en": "Docs"
+  },
+  "nav.github": {
+    "zh": "在 GitHub 查看源码",
+    "en": "View source on GitHub"
+  },
+  "nav.start": {
+    "zh": "开始使用",
+    "en": "Get started"
+  },
+  "nav.language": {
+    "zh": "切换到英文",
+    "en": "Switch to Chinese"
+  },
+  "nav.languageName": {
+    "zh": "EN",
+    "en": "中文"
+  },
+  "runtime.menuOpen": {
+    "zh": "打开导航菜单",
+    "en": "Open navigation menu"
+  },
+  "runtime.menuClose": {
+    "zh": "关闭导航菜单",
+    "en": "Close navigation menu"
+  },
+  "runtime.greenLegend": {
+    "zh": "绿涨 / 红跌 · 合成数据",
+    "en": "Green up / Red down · Synthetic data"
+  },
+  "runtime.settingsSaved": {
+    "zh": "已更新演示 · 仅保存在此浏览器",
+    "en": "Demo updated · Saved in this browser only"
+  },
+  "runtime.settingsUnavailable": {
+    "zh": "演示设置 · 本次页面有效，浏览器存储不可用",
+    "en": "Demo settings · This page only; browser storage is unavailable"
+  },
+  "runtime.copied": {
+    "zh": "已复制：",
+    "en": "Copied: "
+  },
+  "runtime.copyFailed": {
+    "zh": "无法自动复制，请手动选择命令：",
+    "en": "Could not copy. Select the command manually: "
+  },
+  "blog.heading": {
+    "zh": "把研究中的思考，写下来。",
+    "en": "Notes from the work."
+  },
+  "blog.intro": {
+    "zh": "记录产品进展、研究实践，以及构建 WhyJ Quant 过程中的技术思考。",
+    "en": "Product updates, research practice and lessons from building WhyJ Quant."
+  },
+  "blog.emptyTitle": {
+    "zh": "第一篇文章，正在路上。",
+    "en": "The first post is on its way."
+  },
+  "blog.emptyBody": {
+    "zh": "未来的文章会陆续发布在这里。在此之前，可以先探索工作台，或到 GitHub 查看项目进展。",
+    "en": "New articles will appear here. In the meantime, explore the workspace or follow the project on GitHub."
+  },
+  "blog.explore": {
+    "zh": "探索功能",
+    "en": "Explore the features"
+  },
+  "blog.follow": {
+    "zh": "查看项目进展",
+    "en": "Follow the project"
+  }
+}

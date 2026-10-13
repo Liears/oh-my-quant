@@ -4,6 +4,7 @@
   "installCommand": "node --version",
   "buildCommand": "node scripts/build.mjs",
   "outputDirectory": "dist",
+  "trailingSlash": true,
   "headers": [
     {
       "source": "/(.*)",
