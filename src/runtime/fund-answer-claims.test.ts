@@ -1,6 +1,15 @@
 import { expect, it } from "bun:test";
 import { knownFundAnswerViolations } from "./fund-answer-claims.ts";
 
+it("treats Chinese TWR drawdown qualifiers as part of the drawdown metric", () => {
+  const evidence = { principalReturn: 0.25, timeWeightedReturn: 0.5, maximumDrawdownTwr: 0 };
+  for (const qualifier of ["(TWR口径)", "（TWR 口径）"]) {
+    expect(knownFundAnswerViolations(`时间加权收益率 +50.00%\n最大回撤 ${qualifier} 0.00%`, evidence)).toEqual([]);
+    expect(knownFundAnswerViolations(`最大回撤 ${qualifier} 5.00%`, evidence))
+      .toEqual(["wrong-verified-twr-drawdown"]);
+  }
+});
+
 it("rejects the four definite contradictions found in the retained real fund answer", () => {
   const answer = [
     "本金收益率也与基金本身表现无关。",

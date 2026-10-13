@@ -11,10 +11,27 @@ export interface RenderLine {
   segments?: { text: string; style?: Style }[];
 }
 
+const messageLayouts = new WeakMap<UIMessage, {
+  inputs: Array<string | number | undefined>;
+  lines: RenderLine[];
+}>();
+
 export function buildConversationLines(msgs: UIMessage[], width: number): RenderLine[] {
   const lines: RenderLine[] = [];
   for (const msg of msgs) {
-    lines.push(...renderMsg(msg, width));
+    const inputs = [width, msg.role, msg.text, msg.tool?.name, msg.tool?.label, msg.tool?.args,
+      msg.tool?.status, msg.tool?.result, msg.skill?.name, msg.skill?.label, msg.skill?.status];
+    let cached = messageLayouts.get(msg);
+    if (!cached || !cached.inputs.every((value, index) => value === inputs[index])) {
+      cached = { inputs, lines: renderMsg(msg, width) };
+      messageLayouts.set(msg, cached);
+    }
+    // Return independent rows so selection/render consumers cannot modify the cached layout.
+    for (const line of cached.lines) {
+      lines.push(line.segments
+        ? { ...line, segments: line.segments.map(segment => ({ ...segment })) }
+        : { ...line });
+    }
     lines.push({ text: "" });
   }
   return lines;

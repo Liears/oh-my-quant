@@ -1,11 +1,12 @@
 /** Narrow regression check for the fixed factor/risk evaluation, not a semantic judge. */
 export function knownFactorAnswerViolations(text: string): string[] {
   const topic = /均值回(?:归|复)|mean[-\s]?reversion/iu;
-  const rejected = /(?:未|尚未|没有|尚无|缺少|无法|不能|不应|不可|不足以|不代表|不构成|不证明|不检验).{0,40}(?:均值回(?:归|复)|mean[-\s]?reversion)/iu;
+  const rejected = /(?:未|尚未|没有|尚无|缺少|无法|不能|不应|不可|不足以|不代表|不构成|不证明|不检验|不预测).{0,40}(?:均值回(?:归|复)|mean[-\s]?reversion)/iu;
   const untested = /(?:均值回(?:归|复)|mean[-\s]?reversion).{0,35}(?:未|未经|尚未|没有|尚无|待|需要|尚待|需)(?:被|经|进一步)?(?:检验|验证|证明|确认|测试)/iu;
   const pending = /(?:需|需要|待|尚待|应).{0,20}(?:检验|验证|测试).{0,20}(?:均值回(?:归|复)|mean[-\s]?reversion)/iu;
   const englishRejected = /(?:not|no|cannot|never|without).{0,35}mean[-\s]?reversion|mean[-\s]?reversion.{0,35}(?:not tested|untested|unverified|not established|requires? testing)/iu;
-  return text.split(/(?:[。！？；\n]|但(?:是)?|然而|\bbut\b)/iu).some(clause => topic.test(clause) && !rejected.test(clause)
+  // A comma separates an independent assertion, but can also join a negated list of topics.
+  return text.split(/(?:[。！？；\n]|但(?:是)?|然而|\bbut\b|[，,](?=[^，,。！？；\n]*(?:均值回(?:归|复)|mean[-\s]?reversion))(?=[^，,。！？；\n]*(?:确认|证明|断言|(?:是|属).{0,20}(?:信号|特征)|\b(?:confirms?|proves?|establish(?:es|ed)?|signals?)\b)))/iu).some(clause => topic.test(clause) && !rejected.test(clause)
     && !untested.test(clause) && !pending.test(clause) && !englishRejected.test(clause))
     ? ["unsupported-mean-reversion-claim"] : [];
 }
