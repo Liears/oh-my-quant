@@ -1,6 +1,7 @@
 import {
   fetchBars as fetchSourceBars,
   fetchLiveBars as fetchSourceLiveBars,
+  fetchResearchBars as fetchSourceResearchBars,
   searchSymbols as searchSourceSymbols,
   type DataSource,
   type LiveFetchResult,
@@ -54,6 +55,15 @@ export async function fetchLiveBars(
 
 export async function searchSymbols(keyword: string, market?: Market): Promise<SymbolInfo[]> {
   return searchSourceSymbols(keyword, market, createStorageSourceProviderOptions());
+}
+
+/** Research callers receive atomic provenance; no cache fetch time is relabeled as live evidence. */
+export async function fetchResearchBars(
+  symbol: string, market: Market, start?: string, end?: string, source?: DataSource,
+  options: SourceProviderOptions = {},
+) {
+  return fetchSourceResearchBars(symbol, market, start, end,
+    source ?? loadSettings().preferences.source, { ...createStorageSourceProviderOptions(), ...options });
 }
 
 function withStorageDeps<T extends Pick<SourceFetchOptions, "deps" | "providers">>(options: T): T & { deps: SourceRuntimeDeps } {

@@ -3,6 +3,7 @@ import { fetchFromFinancialDatasets } from "./financial-datasets.ts";
 import { fetchFromLlmQuant } from "./llmquant.ts";
 import { fetchFromTushare, searchTushareSymbols } from "./tushare.ts";
 import type { Bar, Market, SymbolInfo } from "../../types/data.ts";
+import type { DailyBarDataset } from "../../types/research-data.ts";
 import type {
   BarProviderAdapter,
   DataSource,
@@ -11,6 +12,35 @@ import type {
   PullBarsResult,
   SourceProviderOptions,
 } from "./source-contracts.ts";
+
+/** Direct research pull, without cache fallback or inferred finality/adjustment claims. */
+export async function fetchResearchBars(
+  symbol: string, market: Market, start?: string, end?: string,
+  selected: DataSource = fallbackSourceForMarket(market),
+  options: SourceProviderOptions = {}, now: () => Date = () => new Date(),
+): Promise<{ dataset: DailyBarDataset | null; attempts: ProviderAttempt[] }> {
+  const request = { symbol: normalizeSymbol(symbol, market), market, start, end };
+  const adapters = createProviderAdapters(options);
+  const attempts: ProviderAttempt[] = [];
+  for (const source of providerOrderFor(market, selected, options.fallbackOrder)) {
+    try {
+      const adapter = adapters[source];
+      const snapshot = adapter.fetchDataset ? await adapter.fetchDataset(request) : null;
+      const bars = normalizeBarSeries(snapshot ? snapshot.bars : await adapter.fetchBars(request), start, end);
+      attempts.push({ source, status: bars.length ? "success" : "empty" });
+      if (bars.length) return { dataset: {
+        symbol: request.symbol, market, source, fetchedAt: now().toISOString(),
+        marketAt: snapshot?.marketAt ?? null,
+        adjustment: snapshot?.adjustment ?? { basis: "unknown", source: "", verifiedAt: "" },
+        finality: snapshot?.finality ?? {},
+        units: snapshot?.units ?? { volume: "unknown", amount: "unknown" }, bars,
+      }, attempts };
+    } catch (error) {
+      attempts.push({ source, status: "error", error: providerErrorMessage(error) });
+    }
+  }
+  return { dataset: null, attempts };
+}
 
 /** Provider fallback chain for live/cache pulls. */
 export async function pullBarsFromProviders(

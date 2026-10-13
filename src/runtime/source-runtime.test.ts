@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { saveSettings } from "../storage/index.ts";
 import { DEFAULT_SETTINGS } from "../types/config.ts";
-import { createStorageSourceProviderOptions } from "./source-runtime.ts";
+import { createStorageSourceProviderOptions, fetchResearchBars } from "./source-runtime.ts";
 
 const OHQ = join(process.cwd(), ".ohquant-test-source-runtime");
 
@@ -19,6 +19,24 @@ afterEach(() => {
 });
 
 describe("storage source runtime", () => {
+  it("binds selected source to research pulls and preserves unknown legacy evidence", async () => {
+    saveSettings({ ...DEFAULT_SETTINGS, preferences: { ...DEFAULT_SETTINGS.preferences, source: "tushare" } });
+    const seen: string[] = [];
+    const r = await fetchResearchBars("600000", "A", undefined, undefined, undefined, {
+      adapters: {
+        tushare: { fetchBars: async (request) => {
+          seen.push(request.symbol);
+          return [{ date: "2026-10-12", open: 10, high: 11, low: 9, close: 10, volume: 100, amount: 1000 }];
+        } },
+        akshare: { fetchBars: async () => { throw new Error("wrong source selected"); } },
+      },
+    });
+    expect(seen).toEqual(["600000.SH"]);
+    expect(r.dataset?.source).toBe("tushare");
+    expect(r.dataset?.adjustment.basis).toBe("unknown");
+    expect(r.dataset?.marketAt).toBeNull();
+  });
+
   it("passes settings-backed provider credentials into source adapters", () => {
     saveSettings({
       ...DEFAULT_SETTINGS,
