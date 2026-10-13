@@ -40,6 +40,8 @@ bun run --cwd site preview
 
 字体来自 Google Fonts 的 Geist v5 / Geist Mono v6，使用固定资源版本。品牌文字采用 DESIGN 规定的 Geist，不使用旧图片 Logo 的衬线字体。
 
+本轮排版、留白和交互调整依据用户指定的 taste-skill；设计判断与保留项见 [设计复核](./DESIGN-REVIEW.md)。
+
 ## 中英文与 Blog
 
 | 页面 | 中文 | English |

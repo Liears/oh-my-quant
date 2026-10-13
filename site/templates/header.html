@@ -1,7 +1,7 @@
     <a class="skip-link" href="#main">{{nav.skip}}</a>
     <header class="site-header">
       <div class="nav-shell">
-        <a class="brand" href="{{route.home}}" aria-label="{{nav.home}}">
+        <a class="brand" href="{{route.home}}" title="{{nav.home}}">
           <span class="brand-mark" aria-hidden="true">Q<span>_</span></span>
           <span>WhyJ Quant</span>
         </a>
@@ -24,7 +24,7 @@
           <a class="github-link" href="https://github.com/yangjingo/oh-my-quant" target="_blank" rel="noopener" aria-label="{{nav.github}}">
             <svg class="icon"><use href="#icon-github" /></svg><span>GitHub</span>
           </a>
-          <a class="language-link" data-language-link href="{{route.alternate}}" lang="{{locale.otherLang}}" hreflang="{{locale.otherLang}}" aria-label="{{nav.language}}">{{nav.languageName}}</a>
+          <a class="language-link" data-language-link href="{{route.alternate}}" lang="{{locale.otherLang}}" hreflang="{{locale.otherLang}}" aria-label="{{nav.languageName}}: {{nav.language}}">{{nav.languageName}}</a>
           <a class="button button-small nav-start" href="{{route.home}}#install">{{nav.start}} <svg class="icon"><use href="#icon-arrow" /></svg></a>
           <button class="menu-button" id="menu-button" aria-label="{{runtime.menuOpen}}" aria-expanded="false" aria-controls="mobile-nav"><span></span><span></span></button>
         </div>

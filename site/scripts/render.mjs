@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 
+const siteOrigin = "https://oh-my-quant.vercel.app";
+
 export const routes = [
   { path: "/", locale: "zh", page: "home" },
   { path: "/en/", locale: "en", page: "home" },
@@ -42,8 +44,9 @@ export function renderPage(content, route) {
     "route.home": routes.find((entry) => entry.locale === locale && entry.page === "home").path,
     "route.blog": routes.find((entry) => entry.locale === locale && entry.page === "blog").path,
     "route.alternate": routes.find((entry) => entry.locale === otherLocale && entry.page === page).path,
-    "route.zh": routes.find((entry) => entry.locale === "zh" && entry.page === page).path,
-    "route.en": routes.find((entry) => entry.locale === "en" && entry.page === page).path,
+    "route.zh": new URL(routes.find((entry) => entry.locale === "zh" && entry.page === page).path, siteOrigin).href,
+    "route.en": new URL(routes.find((entry) => entry.locale === "en" && entry.page === page).path, siteOrigin).href,
+    "page.canonical": new URL(route.path, siteOrigin).href,
     "page.title": values[`${page}.title`],
     "page.description": values[`${page}.description`],
     "page.blogCurrent": page === "blog" ? "page" : "false",

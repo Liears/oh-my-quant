@@ -1,28 +1,18 @@
     <main id="main">
       <section class="hero container" aria-labelledby="hero-title">
-        <div class="eyebrow">
-          <span class="gold-line"></span> OPEN SOURCE · AI RESEARCH TERMINAL
-        </div>
-        <div class="hero-grid">
-          <div>
-            <h1 id="hero-title">
-              {{hero.first}}<br />{{hero.second}}<span class="gold">{{hero.period}}</span>
-            </h1>
-            <p class="hero-english">{{hero.subtitle}}</p>
-          </div>
-          <div class="hero-intro">
-            <p>{{hero.question}}<br />{{hero.evidence}}</p>
-            <p class="hero-description">
-              {{hero.descriptionFirst}}<br />{{hero.descriptionSecond}}
-            </p>
-            <div class="hero-actions">
-              <a href="#install" class="button"
-                >{{hero.install}}
-                <svg class="icon"><use href="#icon-arrow" /></svg></a
-              ><a href="#workspace" class="text-link"
-                >{{hero.explore}} <span aria-hidden="true">↓</span></a
-              >
-            </div>
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="gold-line" aria-hidden="true"></span>{{hero.eyebrow}}</p>
+          <h1 id="hero-title">
+            {{hero.first}}<br />{{hero.second}}<span class="gold">{{hero.period}}</span>
+          </h1>
+          <p class="hero-description">{{hero.description}}</p>
+          <div class="hero-actions">
+            <a href="#install" class="button"
+              >{{nav.start}}
+              <svg class="icon"><use href="#icon-arrow" /></svg></a
+            ><a href="#workspace" class="text-link"
+              >{{hero.explore}} <span aria-hidden="true">↓</span></a
+            >
           </div>
         </div>
         <div class="product-preview" id="workspace">
@@ -273,53 +263,34 @@
             ></a>
           </div>
         </div>
-        <div class="principle-strip">
-          <span>{{principle.language}}</span><i></i><span>{{principle.providers}}</span
-          ><i></i><span>{{principle.local}}</span><i></i
-          ><a
-            href="https://github.com/yangjingo/oh-my-quant/blob/main/LICENSE"
-            target="_blank"
-            rel="noopener"
-            >{{principle.license}}</a
-          >
-        </div>
       </section>
       <section
         class="features container section"
         id="features"
         aria-labelledby="features-title"
       >
-        <div class="section-kicker">
-          <span>01 / CAPABILITIES</span><span>{{features.kicker}}</span>
-        </div>
-        <div class="section-heading">
+        <div class="features-heading">
           <h2 id="features-title">{{features.titleFirst}}<br />{{features.titleSecond}}</h2>
           <p>{{features.introFirst}}<br />{{features.introSecond}}</p>
         </div>
-        <div class="feature-grid">
+        <div class="feature-list">
           <article id="feature-research">
-            <span class="feature-number">[ 01 ]</span>
             <h3>{{features.researchTitle}}</h3>
             <p>
               {{features.researchBody}}
             </p>
-            <span class="feature-tag">NATURAL LANGUAGE → RESEARCH</span>
           </article>
           <article id="feature-backtest">
-            <span class="feature-number">[ 02 ]</span>
             <h3>{{features.backtestTitle}}</h3>
             <p>
               {{features.backtestBody}}
             </p>
-            <span class="feature-tag">FACTOR / BACKTEST / RISK</span>
           </article>
           <article id="feature-reports">
-            <span class="feature-number">[ 03 ]</span>
             <h3>{{features.reportsTitle}}</h3>
             <p>
               {{features.reportsBody}}
             </p>
-            <span class="feature-tag">DASHBOARD + TRAJECTORY</span>
           </article>
         </div>
       </section>
@@ -329,9 +300,6 @@
         aria-labelledby="workflow-title"
       >
         <div class="container">
-          <div class="section-kicker">
-            <span>02 / WORKFLOW</span><span>{{workflow.kicker}}</span>
-          </div>
           <div class="section-heading">
             <h2 id="workflow-title">{{workflow.titleFirst}}<br />{{workflow.titleSecond}}</h2>
             <a
@@ -375,9 +343,6 @@
         id="settings"
         aria-labelledby="settings-title"
       >
-        <div class="section-kicker">
-          <span>03 / YOUR WORKSPACE</span><span>{{settings.kicker}}</span>
-        </div>
         <div class="settings-grid">
           <div class="settings-copy">
             <h2 id="settings-title">
@@ -574,9 +539,6 @@
       >
         <div class="container install-grid">
           <div>
-            <div class="eyebrow">
-              <span class="gold-line"></span> START WITH A QUESTION
-            </div>
             <h2 id="install-title">{{install.titleFirst}}<br />{{install.titleSecond}}</h2>
             <p>{{install.intro}}</p>
             <div class="platforms">
@@ -676,7 +638,6 @@
         class="faq-section container section"
         aria-labelledby="faq-title"
       >
-        <div class="section-kicker"><span>04 / GOOD TO KNOW</span></div>
         <div class="faq-grid">
           <h2 id="faq-title">{{faq.title}}</h2>
           <div>

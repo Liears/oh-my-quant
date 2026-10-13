@@ -2,20 +2,13 @@
 
 **Research before conviction.**
 
-An open-source AI research terminal. Bring your own models and data sources to explore markets, test ideas, and keep a record of the evidence.
+An open-source AI research terminal for exploring markets, testing ideas, and keeping the evidence. Bring your own models and data sources.
 
-[Website](https://oh-my-quant.vercel.app/en/) · [Quick start](#quick-start) · [Docs](#documentation) · [Blog](https://oh-my-quant.vercel.app/en/blog/) · [中文](https://oh-my-quant.vercel.app)
+[Website](https://oh-my-quant.vercel.app/en/) / [中文](https://oh-my-quant.vercel.app) / [Documentation](#documentation) / [Blog](https://oh-my-quant.vercel.app/en/blog/)
 
 [![WhyJ Quant website demo: research tools, sample analysis, and a market overview](./docs/assets/website-workspace.png)](https://oh-my-quant.vercel.app/en/)
 
 *Interactive website demo with synthetic data. The CLI runs in your own terminal.*
-
-## Features
-
-- **Research in context.** Ask questions in natural language; connect market data and quantitative tools in one conversation.
-- **Test the idea.** Explore factors, backtests, and risk metrics with explicit date windows and data coverage.
-- **Keep the evidence.** Review Dashboard reports and tool-call trajectories, then resume the source research.
-- **Make it yours.** Choose models, data providers, skills, market colors, and workspace preferences.
 
 ## Quick start
 
@@ -51,6 +44,13 @@ The checkout and npm release may differ. Check `whyj --version` and the [changel
 
 </details>
 
+## Features
+
+- **Research in context.** Connect market data and quantitative tools in one conversation.
+- **Test an idea.** Explore factors, backtests, and risk with explicit dates and data coverage.
+- **Keep the evidence.** Review reports and tool calls, then resume the source research.
+- **Work your way.** Choose models, data providers, skills, and workspace preferences.
+
 ## Commands
 
 | Command | Purpose |
@@ -66,14 +66,11 @@ Use `/help` in the terminal or `whyj --help` in your shell. The [command referen
 
 ## Documentation
 
-| Start here | Explore further |
-| --- | --- |
-| [Configuration](./docs/configuration.md) | [Module architecture](./docs/module-architecture.md) |
-| [Data providers](./docs/source-data-providers.md) | [Agent loop and harness](./docs/pi-agent-loop-harness.md) |
-| [Reports and artifacts](./docs/artifacts-design.md) | [Design system](./DESIGN.md) |
-| [Tools and skills](./docs/trader-skills.md) | [Investment reading notes](./notes/README.md) |
+- **Use the terminal:** [Configuration](./docs/configuration.md), [data providers](./docs/source-data-providers.md), [reports](./docs/artifacts-design.md), [tools and skills](./docs/trader-skills.md).
+- **Understand the system:** [Architecture](./docs/module-architecture.md), [agent loop](./docs/pi-agent-loop-harness.md), [design](./DESIGN.md).
+- **Read further:** [Investment notes](./notes/README.md), [changelog](./CHANGELOG.md).
 
-The website is available in [English](https://oh-my-quant.vercel.app/en/) and [中文](https://oh-my-quant.vercel.app). Most technical references are currently in Chinese. Future articles will appear on the [Blog](https://oh-my-quant.vercel.app/en/blog/).
+Most technical references are in Chinese. The [website](https://oh-my-quant.vercel.app/en/) supports English and Chinese; articles will appear on the [Blog](https://oh-my-quant.vercel.app/en/blog/).
 
 ## Development
 

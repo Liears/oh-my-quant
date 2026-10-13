@@ -92,6 +92,10 @@ h1,
 h2,
 h3 {
   font-weight: 600;
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
 }
 a,
 button,
@@ -205,7 +209,7 @@ kbd {
   gap: 30px;
   margin-left: 24px;
   align-items: center;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
 }
 .desktop-nav > a[aria-current="page"] {
@@ -221,6 +225,12 @@ kbd {
   cursor: pointer;
   list-style: none;
   white-space: nowrap;
+  min-height: 44px;
+}
+.desktop-nav > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 .feature-menu summary::-webkit-details-marker {
   display: none;
@@ -241,7 +251,7 @@ kbd {
 }
 .feature-dropdown {
   position: absolute;
-  top: calc(100% + 20px);
+  top: calc(100% + 10px);
   left: -20px;
   width: 290px;
   padding: 8px;
@@ -277,8 +287,8 @@ kbd {
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  min-width: 38px;
-  min-height: 38px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 4px 7px;
   border: 1px solid var(--hairline);
   border-radius: 6px;
@@ -306,8 +316,13 @@ kbd {
   gap: 8px;
   align-items: center;
   font-size: 13px;
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
 }
 .button {
+  min-height: 44px;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -326,7 +341,22 @@ kbd {
 }
 .button:hover {
   background: var(--focus);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+}
+.button:active {
+  transform: scale(0.98);
+}
+.copy-button,
+.menu-button,
+.language-link,
+.tab-list button {
+  transition: color 0.18s, background-color 0.18s, border-color 0.18s, transform 0.18s;
+}
+.copy-button:active,
+.menu-button:active,
+.language-link:active,
+.tab-list button:active {
+  transform: scale(0.98);
 }
 .button-small {
   font-size: 13px;
@@ -335,8 +365,8 @@ kbd {
 }
 .menu-button {
   display: none;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   background: transparent;
   border: 1px solid var(--hairline);
   border-radius: 8px;
@@ -377,15 +407,14 @@ kbd {
   color: var(--gold);
 }
 .hero {
-  padding-top: 72px;
+  padding-top: 64px;
 }
 .eyebrow {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 1.5px;
+  font-size: 12px;
+  letter-spacing: 0.5px;
   color: var(--muted);
 }
 .gold-line {
@@ -394,12 +423,9 @@ kbd {
   height: 2px;
   background: var(--gold);
 }
-.hero-grid {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 70px;
-  margin: 32px 0 56px;
-  align-items: center;
+.hero-copy {
+  max-width: 760px;
+  margin-bottom: 48px;
 }
 h1 {
   font-size: 56px;
@@ -407,33 +433,22 @@ h1 {
   letter-spacing: -1.2px;
   font-weight: 700;
 }
-.hero-english {
-  font-size: 16px;
-  color: var(--muted);
-  margin-top: 22px;
-  letter-spacing: 0.1px;
-}
-.hero-intro > p:first-child {
-  font-size: 24px;
-  line-height: 1.55;
-  letter-spacing: -0.5px;
+.hero-copy h1 {
+  margin-top: 24px;
 }
 .hero-description {
+  max-width: 52ch;
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1.9;
-  margin-top: 14px;
+  font-size: 18px;
+  line-height: 1.7;
+  margin-top: 24px;
 }
-html[lang="en"] .hero-description br,
 html[lang="en"] .answer p br {
   display: none;
 }
-html[lang="en"] .hero-actions {
-  flex-wrap: wrap;
-  gap: 18px;
-}
 .hero-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 24px;
   align-items: center;
   margin-top: 26px;
@@ -442,7 +457,8 @@ html[lang="en"] .hero-actions {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  font-size: 13px;
+  font-size: 14px;
+  min-height: 44px;
   white-space: nowrap;
 }
 .product-preview {
@@ -459,6 +475,7 @@ html[lang="en"] .hero-actions {
   gap: 26px;
 }
 .tab-list button {
+  min-height: 44px;
   position: relative;
   border: 0;
   padding: 15px 0;
@@ -492,6 +509,7 @@ html[lang="en"] .hero-actions {
   color: var(--gold);
 }
 .terminal-window {
+  font-variant-numeric: tabular-nums;
   background: var(--terminal);
   border: 1px solid var(--hairline);
   border-top: 0;
@@ -767,21 +785,6 @@ html[lang="en"] .hero-actions {
   width: 14px;
   height: 14px;
 }
-.principle-strip {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 36px 0 44px;
-  color: var(--muted);
-  font-size: 12px;
-  border-bottom: 1px solid var(--hairline);
-  margin-top: 20px;
-}
-.principle-strip i {
-  width: 3px;
-  height: 3px;
-  background: var(--gold);
-}
 .comparison-table {
   font-size: 12px;
   margin: 28px 0;
@@ -850,66 +853,51 @@ html[lang="en"] .hero-actions {
 .section {
   padding-block: 80px;
 }
-.section-kicker {
-  display: flex;
-  justify-content: space-between;
-  font: 10px var(--mono);
-  letter-spacing: 1.2px;
-  color: var(--muted);
-}
-.section-kicker > span:last-child:not(:first-child) {
-  font-family: var(--sans);
-  letter-spacing: 0.5px;
-}
 .section-heading {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-top: 28px;
   gap: 40px;
 }
-.section-heading h2,
 h2 {
   font-size: 40px;
-  line-height: 1.35;
+  line-height: 1.3;
   letter-spacing: -0.8px;
 }
-.section-heading > p {
-  font-size: 14px;
-  color: var(--muted);
-  line-height: 1.9;
-}
-.feature-grid {
+.features {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  margin-top: 55px;
-  gap: 32px;
-}
-.feature-grid article {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 80px;
+  margin-top: 64px;
   border-top: 1px solid var(--hairline);
-  padding-top: 25px;
 }
-.feature-number {
-  font: 11px var(--mono);
-  color: var(--gold);
-}
-.feature-grid h3 {
-  font-size: 21px;
-  margin-top: 30px;
-}
-.feature-grid p {
-  font-size: 14px;
-  line-height: 1.9;
+.features-heading p {
+  font-size: 16px;
   color: var(--muted);
-  margin-top: 14px;
-  max-width: 310px;
+  line-height: 1.8;
+  margin-top: 24px;
 }
-.feature-tag {
-  display: block;
-  font: 9px var(--mono);
+.feature-list article {
+  padding-block: 28px;
+  border-top: 1px solid var(--hairline);
+}
+.feature-list article:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.feature-list article:last-child {
+  padding-bottom: 0;
+}
+.feature-list h3 {
+  font-size: 22px;
+  line-height: 1.4;
+}
+.feature-list p {
+  font-size: 16px;
+  line-height: 1.8;
   color: var(--muted);
-  letter-spacing: 0.6px;
-  margin-top: 34px;
+  margin-top: 12px;
+  max-width: 60ch;
 }
 .workflow-section {
   background: var(--surface);
@@ -944,14 +932,14 @@ h2 {
   margin-top: 22px;
 }
 .workflow-steps p {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.85;
   color: var(--muted);
   margin-top: 12px;
 }
 .workflow-steps code {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 27px;
   color: var(--ink);
 }
@@ -961,8 +949,7 @@ h2 {
 .settings-grid {
   display: grid;
   grid-template-columns: 1fr 1.05fr;
-  gap: 100px;
-  margin-top: 40px;
+  gap: 64px;
   align-items: center;
 }
 .settings-copy h2 {
@@ -970,7 +957,7 @@ h2 {
   line-height: 1.5;
 }
 .settings-copy > p {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--muted);
   margin-top: 24px;
   max-width: 365px;
@@ -980,7 +967,7 @@ h2 {
   margin-top: 24px;
 }
 .settings-copy > p.settings-note {
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.8;
   border-left: 1px solid var(--hairline);
   padding-left: 14px;
@@ -1035,10 +1022,11 @@ h2 {
 }
 .setting-row p {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 6px;
 }
 .setting-row select {
+  min-height: 44px;
   color: var(--ink);
   font-size: 11px;
   background: var(--elevated);
@@ -1048,23 +1036,33 @@ h2 {
   max-width: 140px;
 }
 .switch {
-  width: 34px;
-  height: 20px;
+  position: relative;
+  width: 44px;
+  height: 44px;
   border: 0;
-  background: var(--hairline);
-  padding: 3px;
-  border-radius: 20px;
+  background: transparent;
+  padding: 0;
   flex-shrink: 0;
 }
+.switch::before {
+  content: "";
+  position: absolute;
+  inset: 12px 5px;
+  border-radius: 20px;
+  background: var(--hairline);
+  transition: background-color 0.2s;
+}
 .switch > span {
-  display: block;
+  position: absolute;
+  top: 15px;
+  left: 8px;
   width: 14px;
   height: 14px;
   border-radius: 50%;
   background: var(--muted);
   transition: transform 0.2s;
 }
-.switch[aria-checked="true"] {
+.switch[aria-checked="true"]::before {
   background: var(--gold);
 }
 .switch[aria-checked="true"] > span {
@@ -1076,7 +1074,7 @@ h2 {
   gap: 10px;
   align-items: flex-start;
   margin-block: 17px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   line-height: 1.8;
 }
@@ -1093,14 +1091,15 @@ h2 {
   padding: 14px 24px;
   border-top: 1px solid var(--hairline);
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 .settings-footer button {
+  min-height: 44px;
   padding: 6px 0;
   border: 0;
   background: none;
   color: var(--ink);
-  font-size: 10px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .settings-footer button:hover {
@@ -1113,15 +1112,12 @@ h2 {
 .install-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 100px;
+  gap: 64px;
   align-items: center;
-}
-.install-grid h2 {
-  margin-top: 25px;
 }
 .install-grid > div > p {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
   margin-top: 20px;
 }
 .platforms {
@@ -1153,7 +1149,7 @@ h2 {
 .install-requirement {
   margin-left: auto;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 .install-tabs {
   gap: 22px;
@@ -1179,8 +1175,9 @@ h2 {
   border: 0;
   background: none;
   color: var(--muted);
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
   border-radius: 5px;
 }
 .copy-button:hover {
@@ -1204,7 +1201,7 @@ h2 {
   font-size: 13px;
 }
 .install-box > p.install-next {
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 18px;
   line-height: 1.8;
   color: var(--muted);
@@ -1219,7 +1216,7 @@ h2 {
   border-top: 1px solid var(--hairline);
   padding-top: 17px;
   margin-top: 20px;
-  font-size: 11px;
+  font-size: 13px;
 }
 .install-docs:hover {
   color: var(--gold);
@@ -1234,7 +1231,6 @@ h2 {
   display: grid;
   grid-template-columns: 1fr 1.4fr;
   gap: 90px;
-  margin-top: 30px;
 }
 .faq-grid h2 {
   font-size: 32px;
@@ -1248,7 +1244,7 @@ h2 {
   align-items: center;
   cursor: pointer;
   list-style: none;
-  font-size: 14px;
+  font-size: 16px;
   padding: 22px 0;
   gap: 24px;
 }
@@ -1264,7 +1260,7 @@ h2 {
   color: var(--gold);
 }
 .faq-grid details p {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
   line-height: 1.9;
   padding: 0 35px 22px 0;
@@ -1301,8 +1297,9 @@ h2 {
   padding-top: 42px;
   margin-top: 72px;
 }
-.blog-index {
-  font: 12px var(--mono);
+.blog-empty .blog-status {
+  margin: 0;
+  font: 13px/1.6 var(--sans);
   color: var(--gold);
   padding-top: 8px;
 }
@@ -1355,7 +1352,9 @@ h2 {
 .no-overview .overview-panel {
   display: none;
 }
-.no-motion * {
+.no-motion *,
+.no-motion *::before,
+.no-motion *::after {
   animation: none !important;
   transition: none !important;
 }
@@ -1387,24 +1386,6 @@ h2 {
     transition: none !important;
   }
 }
-@media (min-width: 1100px) {
-  .hero-grid {
-    animation: appear 0.7s both;
-  }
-  .product-preview {
-    animation: appear 0.8s 0.1s both;
-  }
-}
-@keyframes appear {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 @media (max-width: 1050px) {
   .desktop-nav {
     margin-left: 12px;
@@ -1416,8 +1397,8 @@ h2 {
   .github-link span {
     display: none;
   }
-  .hero-grid {
-    gap: 45px;
+  .features {
+    gap: 48px;
   }
   .workspace-body {
     grid-template-columns: minmax(0, 1fr) 260px;
@@ -1504,32 +1485,21 @@ h2 {
     padding-top: 44px;
   }
   .eyebrow {
-    font-size: 9px;
-    letter-spacing: 1px;
+    font-size: 11px;
   }
-  .hero-grid {
-    grid-template-columns: 1fr;
-    gap: 25px;
-    margin: 25px 0 36px;
+  .hero-copy {
+    margin-bottom: 36px;
   }
   h1 {
     font-size: 48px;
     line-height: 1.2;
   }
-  .hero-english {
-    margin-top: 14px;
-    font-size: 13px;
-  }
-  .hero-intro > p:first-child {
-    font-size: 20px;
-    line-height: 1.65;
-  }
-  .hero-intro > p:first-child br {
-    display: none;
+  .hero-copy h1 {
+    margin-top: 20px;
   }
   .hero-description {
-    font-size: 13px;
-    margin-top: 10px;
+    font-size: 16px;
+    margin-top: 20px;
   }
   .hero-actions {
     margin-top: 22px;
@@ -1541,7 +1511,7 @@ h2 {
     gap: 14px;
   }
   .text-link {
-    font-size: 12px;
+    font-size: 13px;
   }
   .preview-toolbar {
     align-items: flex-start;
@@ -1660,59 +1630,30 @@ h2 {
   .preview-footnote {
     font-size: 10px;
   }
-  .principle-strip {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 18px;
-    font-size: 11px;
-    padding: 27px 0 34px;
-  }
-  .principle-strip i {
-    display: none;
-  }
   .section {
     padding-block: 56px;
   }
-  .section-kicker {
-    font-size: 9px;
-    letter-spacing: 0.7px;
-  }
-  .section-kicker > span:last-child:not(:first-child) {
-    display: none;
-  }
   .section-heading {
     display: block;
-    margin-top: 22px;
   }
-  .section-heading h2,
   h2 {
     font-size: 30px;
     line-height: 1.4;
   }
-  .section-heading > p {
-    margin-top: 18px;
-    font-size: 13px;
-  }
-  .feature-grid {
+  .features {
     grid-template-columns: 1fr;
     gap: 32px;
-    margin-top: 35px;
+    margin-top: 40px;
   }
-  .feature-grid article {
-    padding-top: 20px;
+  .features-heading p {
+    font-size: 15px;
+    margin-top: 18px;
   }
-  .feature-grid h3 {
-    margin-top: 17px;
+  .feature-list h3 {
     font-size: 20px;
   }
-  .feature-grid p {
-    max-width: 100%;
-    font-size: 13px;
-    margin-top: 10px;
-  }
-  .feature-tag {
-    margin-top: 20px;
-    font-size: 9px;
+  .feature-list p {
+    font-size: 15px;
   }
   .workflow-steps {
     grid-template-columns: 1fr 1fr;
@@ -1724,10 +1665,10 @@ h2 {
     margin-top: 14px;
   }
   .workflow-steps p {
-    font-size: 12px;
+    font-size: 14px;
   }
   .workflow-steps code {
-    font-size: 9px;
+    font-size: 11px;
     margin-top: 20px;
   }
   .workflow-steps li:nth-child(2):after {
@@ -1740,14 +1681,13 @@ h2 {
   .install-grid {
     grid-template-columns: 1fr;
     gap: 30px;
-    margin-top: 28px;
   }
   .settings-copy h2 {
     font-size: 30px;
     line-height: 1.4;
   }
   .settings-copy > p {
-    font-size: 13px;
+    font-size: 15px;
     max-width: 100%;
     margin-top: 18px;
   }
@@ -1770,20 +1710,19 @@ h2 {
   }
   .settings-footer {
     padding: 12px 20px;
-    font-size: 9px;
+    font-size: 11px;
   }
   .install-grid {
     margin-top: 0;
   }
   .install-grid h2 {
     font-size: 30px;
-    margin-top: 22px;
   }
   .install-box {
     padding: 20px;
   }
   .install-requirement {
-    font-size: 8px;
+    font-size: 10px;
   }
   .install-command {
     font-size: 12px;
@@ -1793,23 +1732,22 @@ h2 {
     overflow-wrap: anywhere;
   }
   .install-grid > div > p {
-    font-size: 13px;
+    font-size: 15px;
     margin-top: 15px;
   }
   .faq-grid {
     grid-template-columns: 1fr;
     gap: 18px;
-    margin-top: 20px;
   }
   .faq-grid h2 {
     font-size: 28px;
   }
   .faq-grid summary {
-    font-size: 13px;
+    font-size: 15px;
     padding: 20px 0;
   }
   .faq-grid details p {
-    font-size: 12px;
+    font-size: 14px;
     padding-right: 12px;
   }
   .footer-top {
@@ -1867,9 +1805,6 @@ h2 {
   html[lang="en"] .setting-row select {
     max-width: 127px;
     font-size: 10px;
-  }
-  html[lang="en"] .settings-help {
-    font-size: 9px;
   }
   html[lang="en"] .comparison-table {
     font-size: 10px;

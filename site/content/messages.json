@@ -11,26 +11,6 @@
     "zh": "。",
     "en": "."
   },
-  "hero.question": {
-    "zh": "把问题带进终端，",
-    "en": "Bring your questions to the terminal."
-  },
-  "hero.evidence": {
-    "zh": "把依据留在每一次判断里。",
-    "en": "Keep evidence behind every decision."
-  },
-  "hero.descriptionFirst": {
-    "zh": "用自然语言串起行情、因子、回测与报告。",
-    "en": "Connect market data, factors, backtests and reports through natural language."
-  },
-  "hero.descriptionSecond": {
-    "zh": "WhyJ Quant，让你的研究形成完整的工作流。",
-    "en": "WhyJ Quant brings your research into one continuous workflow."
-  },
-  "hero.install": {
-    "zh": "安装 WhyJ Quant",
-    "en": "Install WhyJ Quant"
-  },
   "hero.explore": {
     "zh": "探索工作台",
     "en": "Explore the workspace"
@@ -227,26 +207,6 @@
     "zh": "试试工作区设置",
     "en": "Try workspace settings"
   },
-  "principle.language": {
-    "zh": "自然语言驱动研究",
-    "en": "Research in natural language"
-  },
-  "principle.providers": {
-    "zh": "连接自己的模型与数据源",
-    "en": "Bring your models and data sources"
-  },
-  "principle.local": {
-    "zh": "本地保存研究过程",
-    "en": "Keep your research locally"
-  },
-  "principle.license": {
-    "zh": "MIT 开源 ↗",
-    "en": "Open source · MIT ↗"
-  },
-  "features.kicker": {
-    "zh": "从数据，到有依据的判断",
-    "en": "From data to informed decisions"
-  },
   "features.titleFirst": {
     "zh": "研究需要的工具，",
     "en": "Your research tools,"
@@ -286,10 +246,6 @@
   "features.reportsBody": {
     "zh": "在设置中开启报告生成，用 Dashboard 看结果，用 Trajectory 回看工具调用和研究过程。",
     "en": "Enable report generation in settings. Use Dashboard to review results and Trajectory to revisit tool calls and the research process."
-  },
-  "workflow.kicker": {
-    "zh": "每一步，都接得上",
-    "en": "Each step connects to the next"
   },
   "workflow.titleFirst": {
     "zh": "从一个问题出发，",
@@ -354,10 +310,6 @@
   "workflow.continueSecond": {
     "zh": "继续尚未结束的问题。",
     "en": "Continue exploring open questions."
-  },
-  "settings.kicker": {
-    "zh": "按你的方式工作",
-    "en": "Work your way"
   },
   "settings.modelTitle": {
     "zh": "你的模型。",
@@ -595,21 +547,17 @@
     "zh": "网页演示不构成投资建议。示例数字为合成数据。",
     "en": "This demo is not investment advice. All sample figures are synthetic."
   },
-  "hero.subtitle": {
-    "zh": "Research before conviction.",
-    "en": "A terminal for thoughtful research."
-  },
   "home.title": {
-    "zh": "WhyJ Quant — 让研究，先于判断。",
-    "en": "WhyJ Quant — Research before conviction."
+    "zh": "WhyJ Quant | 让研究，先于判断。",
+    "en": "WhyJ Quant | Research before conviction."
   },
   "home.description": {
     "zh": "WhyJ Quant，一个为认真研究而造的开源量化终端。用自然语言连接行情、因子、回测与研究报告，让研究先于判断。",
     "en": "An open-source quantitative research terminal. Connect market data, factors, backtests and reports through natural language. Research before conviction."
   },
   "blog.title": {
-    "zh": "Blog — WhyJ Quant",
-    "en": "Blog — WhyJ Quant"
+    "zh": "Blog | WhyJ Quant",
+    "en": "Blog | WhyJ Quant"
   },
   "blog.description": {
     "zh": "WhyJ Quant 的产品进展、研究实践与技术文章。",
@@ -730,5 +678,17 @@
   "blog.follow": {
     "zh": "查看项目进展",
     "en": "Follow the project"
+  },
+  "hero.eyebrow": {
+    "zh": "开源 AI 研究终端",
+    "en": "Open-source AI research terminal"
+  },
+  "hero.description": {
+    "zh": "用自然语言连接行情、因子、回测与报告，把依据留在每一次判断里。",
+    "en": "Connect market data, factors, backtests and reports in one conversation. Keep the evidence behind every decision."
+  },
+  "blog.status": {
+    "zh": "即将发布",
+    "en": "Coming soon"
   }
 }
