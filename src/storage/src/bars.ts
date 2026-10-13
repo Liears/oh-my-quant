@@ -1,6 +1,5 @@
 /**
- * Daily bars storage — Parquet files under .ohquant/data/{source}/{symbol}/
- * Falls back to JSON when Parquet is unavailable.
+ * Daily bars storage — JSON files under .ohquant/data/{source}/{symbol}/.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -36,14 +35,9 @@ export async function saveBars(symbol: string, source: string, bars: Bar[]): Pro
     emitFileEvent({ operation: "MKDIR", path: dir, detail: "bars cache" });
   }
 
-  const existing = await loadBars(symbol, source);
-  const dateSet = new Set(existing.map((b) => b.date));
-  for (const bar of bars) {
-    if (!dateSet.has(bar.date)) {
-      existing.push(bar);
-      dateSet.add(bar.date);
-    }
-  }
+  const byDate = new Map((await loadBars(symbol, source)).map((bar) => [bar.date, bar]));
+  for (const bar of bars) byDate.set(bar.date, bar);
+  const existing = [...byDate.values()];
   // Sort by date
   existing.sort((a, b) => a.date.localeCompare(b.date));
 

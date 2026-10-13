@@ -62,3 +62,4 @@ export type {
   SourceRuntimeDeps,
 } from "./src/sources.ts";
 export { fetchFromTushare, fetchTushareSnapshot, searchTushareSymbols } from "./src/tushare.ts";
+export { fetchResearchBars } from "./src/source-providers.ts";

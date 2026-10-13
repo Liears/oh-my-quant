@@ -1,4 +1,5 @@
 import type { Bar, Market } from "../../types/data.ts";
+import type { DailyBarDataset } from "../../types/research-data.ts";
 import type { FinancialDatasetsOptions } from "./financial-datasets.ts";
 import type { LlmQuantOptions } from "./llmquant.ts";
 import type { TushareOptions } from "./tushare.ts";
@@ -20,6 +21,8 @@ export interface SourceBarsRequest {
 /** Replaceable boundary between source orchestration and a concrete data client. */
 export interface BarProviderAdapter {
   fetchBars(request: SourceBarsRequest): Promise<Bar[]>;
+  /** Optional atomic bars + provenance response. Legacy adapters leave evidence unknown. */
+  fetchDataset?(request: SourceBarsRequest): Promise<Pick<DailyBarDataset, "bars" | "marketAt" | "adjustment" | "finality" | "units">>;
 }
 
 export interface ProviderAttempt {
