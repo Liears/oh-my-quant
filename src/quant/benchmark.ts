@@ -159,8 +159,8 @@ export function evaluate(
 
 function computeCAGR(returns: number[]): number {
   if (returns.length === 0) return 0;
-  const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-  return (1 + mean) ** TRADING_DAYS - 1;
+  const growth = returns.reduce((a, r) => a * (1 + r), 1);
+  return growth ** (TRADING_DAYS / returns.length) - 1;
 }
 
 function computeSharpe(returns: number[]): number {
