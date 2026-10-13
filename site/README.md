@@ -1,5 +1,7 @@
 # WhyJ Quant 产品官网
 
+[正式官网](https://oh-my-quant.vercel.app) · [English](https://oh-my-quant.vercel.app/en/) · [Blog](https://oh-my-quant.vercel.app/blog/)
+
 官网与 CLI 在同一仓库维护，`site/` 是独立的静态部署单元。视觉真源是根目录 [DESIGN.md](../DESIGN.md)，产品文案以 [README](../README.md)、[配置参考](../docs/configuration.md) 和 [Quant UI/UX](../docs/quant-uiux.md) 为依据。
 
 ## 为什么这样维护
@@ -74,4 +76,4 @@ vercel deploy --yes --target preview
 
 若通过 Vercel Git Integration 导入仓库，Root Directory 必须填写 `site`；PR 生成 Preview，合并 main 后可触发 Production。当前是否已连接 Git、是否已正式发布，以 [部署记录](./DEPLOYMENT.md) 为准。
 
-后续迭代先部署 Preview；正式发布时显式使用 `--prod`。项目使用独立的 Vercel 项目，不改动现有其他项目或绑定自定义域名。
+后续迭代先部署 Preview；正式发布时使用 `vercel promote <deployment-id> --yes` 提升已验证版本，或显式使用 `--prod` 创建新的 Production 部署。项目使用独立的 Vercel 项目，不改动现有其他项目或绑定自定义域名。

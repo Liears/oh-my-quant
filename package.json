@@ -15,7 +15,7 @@
     "ai",
     "agent"
   ],
-  "homepage": "https://github.com/yangjingo/oh-my-quant",
+  "homepage": "https://oh-my-quant.vercel.app",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yangjingo/oh-my-quant.git"

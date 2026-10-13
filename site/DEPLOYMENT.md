@@ -18,18 +18,20 @@
 |---|---|
 | Vercel Project | `yangjing-s-projects/oh-my-quant` |
 | 固定地址 | <https://oh-my-quant.vercel.app> |
+| 当前 Production | <https://oh-my-quant-fe0tqr4p0-yangjing-s-projects.vercel.app> |
 | 首次部署 | <https://oh-my-quant-1psxo238y-yangjing-s-projects.vercel.app> |
 | 初版 Preview | <https://oh-my-quant-nrhmr2uty-yangjing-s-projects.vercel.app> |
 | 中英文 / Blog / Feature Preview | <https://oh-my-quant-7ju1lhceo-yangjing-s-projects.vercel.app> |
 | 首次部署 ID | `dpl_E8EauEqejxNkTHyiZMhQhaRcyuSh` |
 | 初版 Preview ID | `dpl_73YG2NPS5WDHcoE67HrvrwgDcSXE` |
 | 中英文 Preview ID | `dpl_5JdPM8WRqaEjJNaeDosWSFrfxsct` |
+| 当前 Production ID | `dpl_ECpzN9wjDmhhr6TFnkMtf1sFswNL` |
 | 部署证据 | Vercel CLI 返回 `readyState: READY`；最新构建日志确认生成 4 个语言页面、复制 4 类 public 资产、下载 20 个源码文件并部署完成 |
 | 发布内容 | 仅从 `site/` 上传，未上传根目录业务代码、`.ohquant/` 或个人笔记 |
 
 新项目首次执行 `vercel deploy --yes` 时，Vercel 自动将其设为 Production，并绑定固定地址。随后显式执行 `--target preview`，生成相同网页资产的独立 Preview。部署结果由平台状态确认；浏览器验证在本地完成，不据此宣称已做线上端到端检查。
 
-中英文、Blog 和 Feature 目录更新使用 `--target preview` 发布；固定 Production 地址仍为首次部署的版本。
+2026-10-13 用户确认正式发布后，使用 `vercel promote dpl_5JdPM8WRqaEjJNaeDosWSFrfxsct --yes --scope yangjing-s-projects` 提升已验证的中英文 Preview。Vercel 生成 Production 部署 `dpl_ECpzN9wjDmhhr6TFnkMtf1sFswNL`。通过 `vercel inspect oh-my-quant.vercel.app` 确认固定域名已指向该部署，状态为 `production / Ready`；当前正式版包含中英文首页、Blog 与 Feature 目录。
 
 当前通过 CLI 在 `site/` 目录部署，因此项目 Root Directory 为 `.`。**尚未连接 Git 自动部署**。若以后导入整个 GitHub 仓库，需把 Root Directory 改为 `site`；不要保持 `.` 后直接构建整个仓库。
 

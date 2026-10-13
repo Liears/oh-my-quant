@@ -1,199 +1,98 @@
 # WhyJ Quant
 
-交互式量化分析终端 — AI Agent 驱动，slash commands 操作，本地数据存储。
+**Research before conviction.**
 
-[![npm](https://img.shields.io/npm/v/whyj-quant)](https://www.npmjs.com/package/whyj-quant)
+An open-source AI research terminal. Bring your own models and data sources to explore markets, test ideas, and keep a record of the evidence.
 
-![WhyJ Quant terminal homepage](./docs/assets/terminal.png)
+[Website](https://oh-my-quant.vercel.app/en/) · [Quick start](#quick-start) · [Docs](#documentation) · [Blog](https://oh-my-quant.vercel.app/en/blog/) · [中文](https://oh-my-quant.vercel.app)
 
-## What's New in 1.2.0
+[![WhyJ Quant website demo: research tools, sample analysis, and a market overview](./docs/assets/website-workspace.png)](https://oh-my-quant.vercel.app/en/)
 
-- Artifact 升级为华尔街终端风格的量化 Dashboard：K 线、NAV/收益曲线、风险收益指标、因子与数据覆盖度各司其职，并统一使用 WhyJ TUI 主题色。
-- Trajectory 按 Turn 完整复原用户输入、模型输入、Tool/Bash/Skill calls、Call ID、returns、thinking/compact 与最终 outputs；命令和关键结果会重点高亮。
-- `/artifact` 收敛为报告浏览与恢复入口；`Auto Artifacts` 只在 `/config` 开启，量化 turn 完成后自动生成并打开浏览器，失效报告会在展示前清理。
-- Overview 刷新链路可从失败和超时中恢复，开放式基金代码保留 `.OF` 语义；无有效行情时显示 `--`，不再伪造 `0.00`。
-- Slash command、Settings 与外部 Skills 配置统一为简洁的一层语义，Codex/Claude/Agents/pi 用户级 skills 合并到单一 `External Skills` 开关。
+*Interactive website demo with synthetic data. The CLI runs in your own terminal.*
 
-完整变更见 [CHANGELOG](./CHANGELOG.md)。
+## Features
 
-## Quick Start
+- **Research in context.** Ask questions in natural language; connect market data and quantitative tools in one conversation.
+- **Test the idea.** Explore factors, backtests, and risk metrics with explicit date windows and data coverage.
+- **Keep the evidence.** Review Dashboard reports and tool-call trajectories, then resume the source research.
+- **Make it yours.** Choose models, data providers, skills, market colors, and workspace preferences.
 
-全局安装：
+## Quick start
 
-```bash
-npm i -g whyj-quant
+Install the [published package](https://www.npmjs.com/package/whyj-quant), then launch the terminal:
+
+```sh
+npm install -g whyj-quant
 whyj
 ```
 
-本地开发：
+Open `/config` to connect your model and market-data providers. Use `/doctor` to check the setup, then ask a question:
 
-```bash
+```text
+Analyze the returns and risk of 000001.SZ from 2025-01-06 to 2025-06-30.
+Show the actual data source, coverage dates, assumptions, and missing inputs.
+```
+
+To save reports, enable **Auto Artifacts** in `/config` before submitting a research request. `/artifact` opens existing reports; `/resume` returns to a saved session.
+
+Provider credentials and optional Python dependencies depend on your data sources. Model and data services may charge for usage. See the [configuration guide](./docs/configuration.md) and [provider reference](./docs/source-data-providers.md).
+
+<details>
+<summary>Run from source</summary>
+
+With Bun installed, run from the repository root:
+
+```sh
 bun install
 bun run src/index.ts
 ```
 
-首次启动后先打开配置面板：
+The checkout and npm release may differ. Check `whyj --version` and the [changelog](./CHANGELOG.md) for the version you are using.
 
-```
-Q > /config
-```
-
-Settings 面板按语义分成三组：
-
-- `Agent Runtime`：Model、Thinking、Provider Key、Provider URL。
-- `Research Data`：Market Data、Data Token、Active Portfolio。
-- `Workspace Experience`：External Skills、Overview Dock、Auto Artifacts。
-
-面板只显示设置项与当前值；完整字段语义、默认值和迁移规则见 [WhyJ Quant 配置参考](./docs/configuration.md)。
-
-也可以直接写入默认配置文件 `.ohquant/settings.json`：
-
-```json
-{
-  "version": 3,
-  "env": {
-    "WHYJ_QUANT_API_KEY": "sk-...",
-    "WHYJ_QUANT_BASE_URL": "https://api.deepseek.com/anthropic",
-    "WHYJ_QUANT_AUTH_TOKEN": "sk-...",
-    "WHYJ_QUANT_CONTEXT_WINDOW": "1000000",
-    "WHYJ_QUANT_COMPACT_TRIGGER_TOKENS": "800000",
-    "WHYJ_QUANT_TUSHARE_TOKEN": "your_token",
-    "WHYJ_QUANT_FINANCIAL_DATASETS_KEY": "your_key",
-    "WHYJ_QUANT_LLMQUANT_API_KEY": "your_key"
-  },
-  "model": "sonnet",
-  "thinkingLevel": "high",
-  "showPortfolioPanel": true,
-  "artifactGeneration": { "auto": false },
-  "skillIntegrations": { "external": false }
-}
-```
-
-模型上下文相关变量：
-
-| 环境变量 | 作用 | 示例 |
-|----------|------|------|
-| `WHYJ_QUANT_CONTEXT_WINDOW` | 当前模型支持的上下文 token 总量；覆盖模型注册表/fallback 元数据，并用于底栏容量与占用百分比 | `"1000000"` |
-| `WHYJ_QUANT_COMPACT_TRIGGER_TOKENS` | 当前上下文估算达到该 token 数后，在下一次 prompt 发送前自动 compact | `"800000"` |
-
-两个值都应写成正整数字符串。compact 阈值独立于模型窗口；若配置值大于 context window，运行时会将其限制为 context window。未配置 compact 阈值时，默认使用 `contextWindow - 16384`。
-
-模型选择校验：如果 `env` 中配置了 `WHYJ_DEFAULT_SONNET_MODEL`、`WHYJ_DEFAULT_OPUS_MODEL` 或 `WHYJ_DEFAULT_HAIKU_MODEL`，顶层 `model` 必须是对应别名（`sonnet` / `opus` / `haiku`）或其中一个映射值。其他值会在 settings 加载/保存时强制回退到第一个已配置别名，优先级为 sonnet、opus、haiku。未配置任何角色映射时，仍允许直接模型 ID。
-
-`External Skills` 默认关闭，只加载项目量化 skills；开启后统一加载用户级 Codex、Claude、Agents 和 pi skills。
-
-配置完成后直接提问：
-
-```
-Q > 分析平安银行的动量因子和风险指标
-```
+</details>
 
 ## Commands
 
-Shell-level commands:
+| Command | Purpose |
+| --- | --- |
+| `/config` | Connect models and data; adjust the workspace |
+| `/doctor` | Check the research environment |
+| `/portfolio` | Manage observation groups |
+| `/skill` | Discover and inspect skills |
+| `/artifact` | Browse reports and restore their source research |
+| `/resume` | Continue a saved session |
 
-| 命令 | 说明 |
-|------|------|
-| `whyj` | 启动交互式 REPL |
-| `whyj --help` | 查看 CLI 入口帮助 |
-| `whyj --json doctor` | 检查 runtime、配置目录、auth 来源 |
-| `whyj -c "/help"` | 执行单条 slash command 后退出 |
-| `whyj --json -c "/portfolio"` | 执行单条 slash command 并输出 JSON envelope |
+Use `/help` in the terminal or `whyj --help` in your shell. The [command reference](./docs/slash-commands.md) covers the full interface and one-shot usage.
 
-Slash commands:
+## Documentation
 
-| 命令 | 一级描述 | 结果 |
-|---|---|---|
-| `/compact` | Compact current session context | 压缩当前 session，可附带关注点 |
-| `/resume` | Browse and restore saved sessions | 浏览并恢复历史 session |
-| `/portfolio` | Browse and select local portfolios | 浏览并选择本地 portfolio |
-| `/config` | Review and edit runtime settings | 查看或编辑 Settings |
-| `/doctor` | Configure and diagnose runtime | 首次配置或诊断 runtime readiness |
-| `/skill` | Discover, inspect, and run skills | 发现、查看和运行 skills |
-| `/help` | Browse commands and shortcuts | 查看命令与快捷键 |
-| `/clear` | Clear conversation and reset agent | 清空对话并重置 agent |
-| `/artifact` | Browse, restore, and open reports | 浏览报告，恢复来源 session 并在浏览器打开 |
-| `/exit` | Exit WhyJ Quant | 退出 WhyJ Quant |
+| Start here | Explore further |
+| --- | --- |
+| [Configuration](./docs/configuration.md) | [Module architecture](./docs/module-architecture.md) |
+| [Data providers](./docs/source-data-providers.md) | [Agent loop and harness](./docs/pi-agent-loop-harness.md) |
+| [Reports and artifacts](./docs/artifacts-design.md) | [Design system](./DESIGN.md) |
+| [Tools and skills](./docs/trader-skills.md) | [Investment reading notes](./notes/README.md) |
 
-无 `/` 前缀直接输入自然语言 → AI Agent 分析。因子、回测、风险与策略评分由 agent 调用内置 Quant tools（`Quant.Factor`、`Quant.Backtest`、`Quant.Risk`、`Quant.Benchmark`）完成；行情拉取与缓存由 agent 通过已配置的 `Source` 自动处理。
+The website is available in [English](https://oh-my-quant.vercel.app/en/) and [中文](https://oh-my-quant.vercel.app). Most technical references are currently in Chinese. Future articles will appear on the [Blog](https://oh-my-quant.vercel.app/en/blog/).
 
-报告自动生成默认关闭，只能在 `/config` 面板通过 `Auto Artifacts` 开启。开启后，量化研究类 turn 完成并写入完整调用轨迹时自动生成 Dashboard + Trajectory，同时打开浏览器预览；`/artifact` 本身只负责浏览、恢复和打开已有报告。
+## Development
 
-完整的 TUI/非 TUI 行为、参数与兼容边界见 [Slash Command 参考](./docs/slash-commands.md)。
-
-## Dev
-
-```bash
-bun install
-bun run src/index.ts
-bun run src/index.ts -- -c "/help"   # one-shot mode
-bun run src/index.ts -- --json doctor
+```sh
+bun run typecheck
+bun run check:architecture
+bun run test
+bun run build
 ```
 
-## JSON Policy
+The product website lives in [`site/`](./site/README.md) and has its own build:
 
-`--json` 输出稳定 envelope：
-
-```json
-{
-  "ok": true,
-  "command": "skill",
-  "message": "human-readable summary",
-  "data": {}
-}
+```sh
+bun run --cwd site dev
+bun run --cwd site build
 ```
 
-错误不会打印密钥：
+## License
 
-```json
-{
-  "ok": false,
-  "command": "skill",
-  "error": {
-    "code": "command_failed",
-    "message": "safe error message"
-  }
-}
-```
+[MIT](./LICENSE). Built for thoughtful research.
 
-`doctor` 报告凭证是否存在、来源类别和 redacted value fingerprint；不会打印完整 secret。`whyj --json doctor` 和 `/doctor` 使用同一套报告逻辑。
-
-## Docs
-
-### Architecture & System
-
-- [Agent System Spec](./docs/agent-system-spec.md) — full architecture, tool system, session management
-- [pi Agent Loop & Harness](./docs/pi-agent-loop-harness.md) — harness lifecycle, compaction, queue drains, branch navigation
-- [Agent Loop Context Assembly](./docs/agent-loop-context.md) — model-input vs UI-text assembly path
-- [Module Architecture](./docs/module-architecture.md) — repo-level module boundaries and dependency direction
-- [Storage Policy](./docs/ohquant-storage-policy.md) — local filesystem split: durable settings, cache, artifacts, forbidden state
-- [Configuration Reference](./docs/configuration.md) — Settings 面板、JSON 字段、默认值、凭证和兼容迁移
-
-### CLI & UX
-
-- [Slash Command Reference](./docs/slash-commands.md) — 一级目录、执行结果、参数和 TUI/非 TUI 行为
-- [CLI Design & Reference](./docs/interactive-cli-design.md) — slash commands, `src/cli/` module, implementation plan
-- [Doctor, Config, and UX Guidelines](./docs/doctor-design-and-hints.md) — doctor checks, config flow, UX interaction, errors, guidance
-
-### TUI
-
-- [TUI Layout Design](./docs/tui-layout-design.md) — five-region frame-buffer layout and interaction model
-- [TUI Table/Chart Render](./docs/tui-table-chart-render.md) — structured agent output rendering in the TUI
-- [Design System (NewForm)](./DESIGN.md)
-
-### Agent Tools & Skills
-
-- [Built-in Tool Registry](./docs/builtin-tool-registry.md) — unified registration path for built-in agent tools
-- [Quant Tools Design](./docs/quant-tools-design.md) — factor, backtest, risk, and benchmark as agent tools
-- [Skill 系统](./docs/trader-skills.md) — skill 架构、安装、发现、CLI handler、TUI 集成及完整技能目录
-
-### Data
-
-- [Source Providers](./docs/source-data-providers.md) — official interfaces, source priority, agent/runtime injection
-- [Source Module](./src/source/README.md) — provider adapters, fallback rules, module test layout
-
-### 参考
-
-- [量化资源索引](./docs/source-data-providers.md) — 数据源 provider、Python 库、API 参考（已合并至此）
-- [Skill 系统](./docs/trader-skills.md) — 外部 skill 生态、AI 交易平台、学习资源（已合并至此）
-- [Personal Notes](./notes/README.md) — 投资知识库：`notes.md`（原则/法则/框架）+ `funder.md`（16 位大师索引）+ `daily.md`（每日笔记）。其中 `notes.md` 和 `funder.md` 被 `/insight` 管道消费，自动生成为 Agent 思考时展示的投资格言
+Research software, not investment advice. Observation groups are not brokerage accounts. Settings, sessions, and reports are stored locally; analysis sends necessary requests to your chosen providers. Review reports before sharing them.
