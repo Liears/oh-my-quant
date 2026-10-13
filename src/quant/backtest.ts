@@ -71,8 +71,8 @@ export function vectorizedBacktest(
   for (let i = 1; i < n; i++) {
     const prevEq = equity[i - 1];
     const prevPos = position[i - 1];
-    const pxChg = prices[i] / prices[i - 1] - 1;
-    equity[i] = prevEq + prevPos * pxChg * prices[i] - cost[i];
+    const pxChg = prices[i] - prices[i - 1];
+    equity[i] = prevEq + prevPos * pxChg - cost[i];
   }
 
   // Daily returns
@@ -163,9 +163,7 @@ export function sortino(returns: number[], rf = RF_ANNUAL): number {
 export function calmar(returns: number[]): number {
   const dd = Math.abs(maxDrawdown(returns));
   if (dd === 0) return 0;
-  const mean = returns.filter((r) => !isNaN(r)).reduce((a, b) => a + b, 0) / (returns.length || 1);
-  const cagr = (1 + mean) ** TRADING_DAYS - 1;
-  return cagr / dd;
+  return compoundAnnualReturn(returns) / dd;
 }
 
 export function winRate(returns: number[]): number {
@@ -197,7 +195,7 @@ export function report(
 
   const result: BacktestReport = {
     totalReturn: valid.reduce((a, b) => a * (1 + b), 1) - 1,
-    cagr: (1 + mean) ** TRADING_DAYS - 1,
+    cagr: compoundAnnualReturn(valid),
     annualVol: std * Math.sqrt(TRADING_DAYS),
     sharpe: sharpe(returns),
     sortino: sortino(returns),
@@ -209,9 +207,7 @@ export function report(
   };
 
   if (benchmarkReturns && benchmarkReturns.length > 0) {
-    const bValid = benchmarkReturns.filter((r) => !isNaN(r));
-    const bMean = bValid.length > 0 ? bValid.reduce((a, b) => a + b, 0) / bValid.length : 0;
-    const bCagr = (1 + bMean) ** TRADING_DAYS - 1;
+    const bCagr = compoundAnnualReturn(benchmarkReturns);
     result.excessReturn = result.cagr - bCagr;
 
     // Tracking error: align lengths
@@ -230,6 +226,13 @@ export function report(
 }
 
 // --- Utilities ---
+
+function compoundAnnualReturn(returns: number[]): number {
+  const valid = returns.filter((r) => !isNaN(r));
+  if (valid.length === 0) return 0;
+  const growth = valid.reduce((a, r) => a * (1 + r), 1);
+  return growth ** (TRADING_DAYS / valid.length) - 1;
+}
 
 function rollingMean(values: number[], n: number): (number | null)[] {
   const result: (number | null)[] = new Array(values.length).fill(null);
