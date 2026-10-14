@@ -4,6 +4,10 @@ export type Market = "A" | "HK" | "US" | "Fund" | "Crypto";
 export type DataSource = "akshare" | "tushare" | "llmquant-data" | "financial-datasets";
 export type HudMode = "full" | "context" | "off";
 
+export const DEFAULT_TERMINAL_OPERATION_KEYBINDINGS = {
+  interruptResearch: ["ctrl+g"], retryFailedQuotes: ["ctrl+r"],
+};
+
 export function normalizeHudMode(value: unknown): HudMode {
   return value === "context" || value === "off" ? value : "full";
 }
@@ -63,6 +67,8 @@ export interface OhQuantSettings {
   permissions: { allow?: string[]; deny?: string[] };
   /** Explicitly disabled compiled extension IDs; absent means all catalog entries enabled. */
   disabledExtensions?: string[];
+  /** Terminal operation bindings; empty arrays disable an action. Changes apply at next launch. */
+  keybindings?: { interruptResearch?: string[]; retryFailedQuotes?: string[] };
   /** User business preferences */
   preferences: UserPreferences;
 }

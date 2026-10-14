@@ -64,12 +64,13 @@ export class DoctorPanel {
     frame.contentH = Math.max(1, frame.contentH - actions.length - controls.length);
     const rows: { text: string; style: Style }[] = [];
     const add = (text: string, style: Style = S.dim) => { for (const line of wrap(text, frame.inner.w)) rows.push({ text: line, style }); };
-    for (const phase of data.phases) {
+    const priority: Record<string, number> = { fail: 0, checking: 1, pending: 2, pass: 3 };
+    for (const phase of [...data.phases].sort((a, b) => (priority[a.status] ?? 4) - (priority[b.status] ?? 4))) {
       const prefix = phase.status === "pass" ? "✓" : phase.status === "fail" ? "✗" : phase.status === "checking" ? "⟳" : "○";
       add(`${prefix} ${phase.phase}`, phase.status === "fail" ? S.negative : phase.status === "pass" ? S.positive : S.creamB);
       if (phase.detail) add(phase.detail);
-      for (const warning of phase.warnings ?? []) add(`Warn · ${warning}`, S.gold);
       if (phase.action) add(`Fix · ${phase.action}`, S.gold);
+      for (const warning of phase.warnings ?? []) add(`Warn · ${warning}`, S.gold);
       add("");
     }
     add("Connection", S.creamB);

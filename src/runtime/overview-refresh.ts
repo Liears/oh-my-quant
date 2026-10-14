@@ -3,11 +3,12 @@ import { buildOverviewPanelSections, collectOverviewSymbols, MARKET_INDICES } fr
 import type { OverviewPortfolio } from "./overview.ts";
 import { fetchOverviewQuotes, fetchOverviewHoldings, OverviewRequestPool } from "./overview-data.ts";
 import type { OverviewQuoteFetcher, OverviewHoldingFetcher, OverviewRequestTiming } from "./overview-data.ts";
-import type { OverviewQuote } from "./overview-data.ts";
+import type { OverviewQuote, OverviewSymbolEntry } from "./overview-data.ts";
 import type { PanelSection } from "../tui/src/types.ts";
 import { marketRefreshLoadingPanel, marketUnavailablePanel } from "./panel-service.ts";
 import { perfLog } from "../perf.ts";
 import { OverviewBudget } from "./overview-budget.ts";
+import { DEFAULT_TERMINAL_OPERATION_KEYBINDINGS } from "../types/config.ts";
 
 type Outcome = "success" | "partial" | "unavailable" | "timeout" | "error" | "superseded" | "disposed";
 export interface OverviewRefreshMeasurement {
@@ -34,6 +35,7 @@ export interface OverviewRefreshOptions {
   poolFactory?: (signal: AbortSignal, budget: OverviewBudget) => OverviewRequestPool;
   timeoutMs?: number;
   intervalMs?: number;
+  retryKey?: () => string | undefined;
 }
 interface RefreshRun {
   generation: number;
@@ -42,7 +44,10 @@ interface RefreshRun {
   startedAt: number;
   requestedAt: number;
   superseded: boolean;
+  failedOnly: boolean;
 }
+
+function quoteKey(group: string, entry: OverviewSymbolEntry): string { return `${group}/${entry.instrument ?? "security"}/${entry.code}`; }
 
 /** Owns refresh lifecycle independently of model/session operations and terminal rendering. */
 export class OverviewRefresh {
@@ -55,6 +60,8 @@ export class OverviewRefresh {
   private sections: PanelSection[] = [];
   private status: Outcome | "idle" | "fetching" = "idle";
   private progress: { settled: number; total: number } | null = null;
+  private readonly lastQuotes = new Map<string, OverviewQuote>();
+  private readonly failedQuotes = new Set<string>();
 
   constructor(options: OverviewRefreshOptions = {}) {
     const timeout = options.timeoutMs ?? 120_000;
@@ -64,6 +71,13 @@ export class OverviewRefresh {
 
   /** Background triggers share an active refresh without asking for another one. */
   start(): Promise<void> { return this.active?.promise ?? this.launch(performance.now()); }
+
+  /** A running refresh already owns the requests; never start duplicate retries. */
+  retryFailed(): Promise<void> {
+    if (this.active) return this.active.promise;
+    if (!this.failedQuotes.size) return Promise.resolve();
+    return this.launch(performance.now(), true);
+  }
 
   /** Explicit refresh supersedes old inputs; concurrent requests share one follow-up. */
   refresh(): Promise<void> {
@@ -83,15 +97,18 @@ export class OverviewRefresh {
   render(): void {
     if (this.disposed) return;
     if (this.status === "idle") { this.options.onPanel?.(marketRefreshLoadingPanel(), true); return; }
+    const retryKey = this.options.retryKey ? this.options.retryKey() : DEFAULT_TERMINAL_OPERATION_KEYBINDINGS.retryFailedQuotes[0];
     const text = this.status === "fetching" ? (this.progress ? `fetching · ${this.progress.settled}/${this.progress.total} 已返回` : this.sections.length ? "fetching · 上次结果" : "fetching")
       : this.status === "timeout" ? "timeout · 刷新超时"
         : this.status === "error" ? "error · 刷新失败"
           : this.status === "partial" ? "partial · 部分可用" : this.status === "unavailable" ? "unavailable · 无数据" : "";
-    const retained = (this.status === "error" || this.status === "timeout") && this.sections.length > 0 && !this.progress;
+    const retained = this.sections.some(section => (section.kind === "quotes" || section.kind === "holdings" || section.kind === "group")
+      && section.rows.some(row => row.refreshState));
     const panel: PanelSection[] = text ? [{ kind: "keyvalue", title: "Market Refresh", rows: [
-      { label: "status", value: text }, ...(retained ? [{ label: "数值", value: "stale · 保留上次结果" }] : []),
+      { label: "status", value: text }, ...(retained ? [{ label: "数值", value: "stale · 保留上次结果，按标的日期" }] : []),
       ...((this.status === "error" || this.status === "timeout") && this.progress
-        ? [{ label: "本轮", value: `${this.progress.settled}/${this.progress.total} 已返回 · 未返回项 --` }] : []),
+        ? [{ label: "本轮", value: `${this.progress.settled}/${this.progress.total} 已返回 · 未返回项 ${retained ? "旧数据或 --" : "--"}` }] : []),
+      ...(this.failedQuotes.size ? [{ label: "重试", value: `仅重试失败标的 · ${retryKey ?? "快捷键已禁用"}` }] : []),
     ] }] : [];
     panel.push(...structuredClone(this.sections.length ? this.sections : this.status === "fetching" ? [] : marketUnavailablePanel()));
     this.options.onPanel?.(panel, this.status === "fetching");
@@ -104,7 +121,7 @@ export class OverviewRefresh {
     this.active?.controller.abort(new Error("Overview disposed"));
   }
 
-  private launch(requestedAt: number): Promise<void> {
+  private launch(requestedAt: number, failedOnly = false): Promise<void> {
     if (this.disposed) return Promise.resolve();
     if (this.active) return this.active.promise;
     if (this.timer) clearTimeout(this.timer);
@@ -112,7 +129,7 @@ export class OverviewRefresh {
     let finish!: () => void;
     const promise = new Promise<void>(resolve => { finish = resolve; });
     const run: RefreshRun = { generation: ++this.generation, controller: new AbortController(), promise,
-      startedAt: performance.now(), requestedAt, superseded: false };
+      startedAt: performance.now(), requestedAt, superseded: false, failedOnly };
     this.active = run;
     void this.perform(run).catch(() => {}).finally(() => {
       if (this.active === run) this.active = null;
@@ -140,11 +157,23 @@ export class OverviewRefresh {
       signal.throwIfAborted();
       const portfolio = (this.options.loadPortfolio ?? loadPanelPortfolio)();
       const portfolioSymbols = collectOverviewSymbols(portfolio);
+      const validKeys = new Set([...MARKET_INDICES.map(entry => quoteKey("market", entry)), ...portfolioSymbols.map(entry => quoteKey("portfolio", entry))]);
+      for (const key of this.lastQuotes.keys()) if (!validKeys.has(key)) this.lastQuotes.delete(key);
+      for (const key of this.failedQuotes) if (!validKeys.has(key)) this.failedQuotes.delete(key);
+      const retryKeys = new Set(this.failedQuotes);
+      const selected = (group: string, entry: OverviewSymbolEntry) => !run.failedOnly || retryKeys.has(quoteKey(group, entry));
+      const seed = (group: string, entry: OverviewSymbolEntry): OverviewQuote => {
+        const previous = this.lastQuotes.get(quoteKey(group, entry));
+        return previous ? { ...structuredClone(previous), name: entry.name, ...(selected(group, entry) ? { refreshState: "refreshing" as const } : {}) }
+          : { ...entry, price: Number.NaN, pct: Number.NaN };
+      };
       budget.check();
       pool = this.options.poolFactory?.(signal, budget) ?? new OverviewRequestPool({ signal, budget });
       const meta = { sources: [], asOfDates: [], signal, pool };
-      let marketQuotes: OverviewQuote[] = MARKET_INDICES.map(entry => ({ ...entry, price: Number.NaN, pct: Number.NaN }));
-      let portfolioRows: OverviewQuote[] = portfolioSymbols.map(entry => ({ ...entry, price: Number.NaN, pct: Number.NaN }));
+      const marketQuotes = MARKET_INDICES.map(entry => seed("market", entry));
+      const portfolioRows = portfolioSymbols.map(entry => seed("portfolio", entry));
+      const requestedRows = MARKET_INDICES.filter(entry => selected("market", entry)).length
+        + portfolioSymbols.filter(entry => selected("portfolio", entry)).length;
       const settled = new Set<string>();
       let publishQueued = false, publishedProgress = false;
       const publish = () => {
@@ -152,26 +181,47 @@ export class OverviewRefresh {
         if (this.status === "fetching") budget.check();
         const all = [...marketQuotes, ...portfolioRows];
         rows = all.length;
-        availableRows = all.filter(row => Number.isFinite(row.price) && Number.isFinite(row.pct)).length;
+        availableRows = all.filter(row => !row.refreshState && Number.isFinite(row.price) && Number.isFinite(row.pct)).length;
         const began = performance.now();
         this.sections = buildOverviewPanelSections({ portfolio, portfolioSymbols, marketQuotes, portfolioRows, pullMeta: meta, refreshedAt: new Date() });
         buildMs = (buildMs ?? 0) + performance.now() - began;
-        this.progress = { settled: settled.size, total: rows };
+        this.progress = { settled: settled.size, total: requestedRows };
         const publishStarted = performance.now();
         this.render(); publishMs = (publishMs ?? 0) + performance.now() - publishStarted;
         if (availableRows && firstResultMs === null) firstResultMs = performance.now() - run.startedAt;
       };
-      publishPartial = () => { if (!settled.size) return false; publish(); return true; };
+      publishPartial = () => {
+        for (const [entries, target, group] of [[MARKET_INDICES, marketQuotes, "market"], [portfolioSymbols, portfolioRows, "portfolio"]] as const) {
+          for (const [index, entry] of entries.entries()) if (selected(group, entry) && !settled.has(`${group}/${index}`)) {
+            const key = quoteKey(group, entry);
+            this.failedQuotes.add(key);
+            const previous = this.lastQuotes.get(key);
+            if (previous) target[index] = { ...structuredClone(previous), name: entry.name, refreshState: "stale" };
+          }
+        }
+        if (!settled.size && !this.lastQuotes.size) return false;
+        publish(); return true;
+      };
       const flushProgress = () => {
         publishQueued = false; publishedProgress = true; progressTimer = undefined;
         try { if (this.status === "fetching") publish(); }
         catch { run.controller.abort(new Error("Overview progress publication failed")); }
       };
-      const acceptRow = (target: OverviewQuote[], group: string, row: OverviewQuote, index: number) => {
+      const acceptRow = (entries: OverviewSymbolEntry[], target: OverviewQuote[], group: string, row: OverviewQuote, index: number) => {
         if (this.disposed || this.active !== run || run.superseded || signal.aborted || this.status !== "fetching") return;
         budget.check();
         if (!Number.isInteger(index) || index < 0 || index >= target.length || row.code !== target[index]!.code) return;
-        target[index] = structuredClone(row); settled.add(`${group}/${index}`);
+        if (!selected(group, entries[index]!)) return;
+        const key = quoteKey(group, entries[index]!);
+        if (Number.isFinite(row.price) && Number.isFinite(row.pct)) {
+          const current = structuredClone(row); delete current.refreshState;
+          target[index] = current; this.lastQuotes.set(key, structuredClone(current)); this.failedQuotes.delete(key);
+        } else {
+          this.failedQuotes.add(key);
+          const previous = this.lastQuotes.get(key);
+          target[index] = previous ? { ...structuredClone(previous), name: entries[index]!.name, refreshState: "stale" } : structuredClone(row);
+        }
+        settled.add(`${group}/${index}`);
         // Show the first result promptly, then coalesce bursts to at most one update per 16 ms.
         if (!publishQueued) {
           publishQueued = true;
@@ -179,9 +229,16 @@ export class OverviewRefresh {
           else queueMicrotask(flushProgress);
         }
       };
+      const fetchSelected = (entries: OverviewSymbolEntry[], target: OverviewQuote[], group: string, fetcher: OverviewQuoteFetcher) => {
+        const indexes = entries.flatMap((entry, index) => selected(group, entry) ? [index] : []);
+        if (!indexes.length) return Promise.resolve([]);
+        return fetcher(indexes.map(index => entries[index]!), { ...meta,
+          onRow: (row, index) => { if (indexes[index] !== undefined) acceptRow(entries, target, group, row, indexes[index]!); } });
+      };
+      if (this.lastQuotes.size) publish();
       const data = Promise.all([
-        (this.options.quoteFetcher ?? fetchOverviewQuotes)(MARKET_INDICES, { ...meta, onRow: (row, index) => acceptRow(marketQuotes, "market", row, index) }),
-        (this.options.holdingFetcher ?? fetchOverviewHoldings)(portfolioSymbols, { ...meta, onRow: (row, index) => acceptRow(portfolioRows, "portfolio", row, index) }),
+        fetchSelected(MARKET_INDICES, marketQuotes, "market", this.options.quoteFetcher ?? fetchOverviewQuotes),
+        fetchSelected(portfolioSymbols, portfolioRows, "portfolio", this.options.holdingFetcher ?? fetchOverviewHoldings),
       ]);
       const completed = await Promise.race([data, new Promise<never>((_, reject) => {
         onAbort = () => reject(signal.reason);
@@ -189,10 +246,20 @@ export class OverviewRefresh {
       })]);
       pullMs = performance.now() - run.startedAt;
       budget.check();
-      [marketQuotes, portfolioRows] = completed;
+      for (const [entries, target, group, returned] of [
+        [MARKET_INDICES, marketQuotes, "market", completed[0]], [portfolioSymbols, portfolioRows, "portfolio", completed[1]],
+      ] as const) {
+        for (const row of returned) {
+          const index = entries.findIndex(entry => entry.code === row.code);
+          if (index >= 0) acceptRow(entries, target, group, row, index);
+        }
+        for (const [index, entry] of entries.entries()) if (selected(group, entry) && !settled.has(`${group}/${index}`)) {
+          acceptRow(entries, target, group, { ...entry, price: Number.NaN, pct: Number.NaN }, index);
+        }
+      }
       const all = [...marketQuotes, ...portfolioRows];
       rows = all.length;
-      availableRows = all.filter(row => Number.isFinite(row.price) && Number.isFinite(row.pct)).length;
+      availableRows = all.filter(row => !row.refreshState && Number.isFinite(row.price) && Number.isFinite(row.pct)).length;
       outcome = !availableRows ? "unavailable" : availableRows < rows || all.some(row => row.observation?.state === "outside-window") ? "partial" : "success";
       if (!this.disposed && this.active === run && !run.superseded) {
         this.status = outcome; publish();

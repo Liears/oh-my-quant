@@ -46,7 +46,7 @@ function overviewBlockHeight(block: OverviewBlock): number {
     case "section-header": return OVERVIEW_SECTION_H;
     case "group-header": return OVERVIEW_SECTION_H;
     case "quote":
-    case "holding": return Math.max(OVERVIEW_ROW_H, block.row.observation ? 2 : 1);
+    case "holding": return Math.max(OVERVIEW_ROW_H, block.row.observation || block.row.refreshState ? 2 : 1);
     case "keyvalue": return 1;
     case "gap": return 1;
   }
@@ -137,10 +137,12 @@ function overviewRowLines(row: Holding, w: number): RenderLine[] {
       { text: pctPart, style: pctStyle(row.pct) },
     ],
   }];
-  if (row.observation) {
+  if (row.observation || row.refreshState) {
     const observation = row.observation;
-    const status = observation.state === "unavailable" ? "无数据" : observation.state === "outside-window" ? "旧窗口" : "";
-    const text = [status, observation.asOfDate, observation.sourceLabel, observation.fallback && observation.state !== "unavailable" ? "回退" : ""].filter(Boolean).join(" · ");
+    const status = row.refreshState === "stale" ? "stale 旧数据" : row.refreshState === "refreshing" ? "刷新中 · 上次结果"
+      : observation?.state === "unavailable" ? "无数据" : observation?.state === "outside-window" ? "旧窗口" : "";
+    const text = [status, observation?.asOfDate ?? (row.refreshState ? "日期未知" : ""), observation?.sourceLabel,
+      observation?.fallback && observation.state !== "unavailable" ? "回退" : ""].filter(Boolean).join(" · ");
     lines.push({ text: truncate(text, w), style: S.tableNote });
   }
   while (lines.length < OVERVIEW_ROW_H) lines.push({ text: "" });

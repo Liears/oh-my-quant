@@ -51,7 +51,9 @@ export function drawComposer(
   const inner = buf.box(r, {
     title: "⌘ Composer",
     titleStyle: S.muted,
-    titleRight: isCmd
+    titleRight: st.researchInterruptKey && (st.activity === "thinking" || st.activity === "running tool")
+      ? `${st.activity === "running tool" ? "工具" : "推理"}${st.researchStartedAt ? ` ${Math.max(0, Math.floor((Date.now() - st.researchStartedAt) / 1000))}s` : ""} · ${st.researchInterruptKey} 停止 · ↵ 排队`
+      : isCmd
       ? "↑↓ select · ↹ accept"
       : queueCount > 0
         ? `${queueCount} queued · ↵ send · / commands`

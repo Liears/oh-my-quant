@@ -1,6 +1,7 @@
 import manifest from "../package.json";
 import { AppRuntime, createInitialAppState } from "./app-runtime.ts";
 import { QuantTui } from "./tui/src/tui.ts";
+import { loadSettings } from "./storage/index.ts";
 
 export async function startApp(): Promise<void> {
   const initial = createInitialAppState(manifest.version);
@@ -26,7 +27,9 @@ export async function startApp(): Promise<void> {
     onSkillsChanged: () => { void tui?.refreshSkills(() => runtime.getSkillSuggestions()); },
   });
 
-  tui = new QuantTui(initial);
+  tui = new QuantTui(initial, loadSettings().keybindings);
+  tui.onResearchInterrupt(() => { void runtime.interruptResearch(); });
+  tui.onFailedQuotesRetry(() => { void runtime.retryFailedOverviewQuotes(); });
   tui.onDoctorClose(() => runtime.cancelDoctor());
   tui.onConfigurationChange(() => runtime.refreshConfiguration());
   tui.start();

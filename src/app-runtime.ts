@@ -21,6 +21,7 @@ import { extensionSessionDependencies } from "./runtime/extension-session.ts";
 import { loadRuntimeSkillSuggestions, toSkillEntries } from "./runtime/skill-suggestions.ts";
 import { resolveConfiguredModel } from "./agent/src/model-config.ts";
 import type { OhQuantSettings } from "./types/config.ts";
+import { DEFAULT_TERMINAL_OPERATION_KEYBINDINGS } from "./types/config.ts";
 import { skillPaths } from "./skill/index.ts";
 import { ensureDefaultSkills } from "./skill/store.ts";
 import { ensureDirs, loadSettings, loadPanelPortfolio } from "./storage/index.ts";
@@ -137,6 +138,9 @@ export class AppRuntime {
   private latestCompletedAssistantText: string | null = null;
   private autoArtifactRunning = false;
   private activePrompts = 0;
+  private interruption: Promise<boolean> | null = null;
+  private interruptionVersion = 0;
+  private researchInterrupted = false;
   private extensions: RuntimeExtensions | undefined;
   private baseDependencies: QuantAgentDependencies | undefined;
   private extensionShutdown: Promise<void> | undefined;
@@ -156,11 +160,41 @@ export class AppRuntime {
   ) {
     this.extensions = extensions;
     this.overview = new OverviewRefresh({ ...overviewOptions, quoteFetcher, holdingFetcher,
+      retryKey: () => (loadSettings().keybindings?.retryFailedQuotes ?? DEFAULT_TERMINAL_OPERATION_KEYBINDINGS.retryFailedQuotes)[0],
       onPanel: callbacks.onPanel, onMeasurement: callbacks.onMarketRefresh,
       timeoutMs: marketRefreshTimeoutMs, intervalMs: marketRefreshIntervalMs });
   }
 
   refreshOverviewPanel(): Promise<void> { return this.overview.refresh(); }
+  retryFailedOverviewQuotes(): Promise<void> { return this.overview.retryFailed(); }
+
+  /** Stop the current operation, retaining the session and its research evidence. */
+  interruptResearch(): Promise<boolean> {
+    if (this.interruption) return this.interruption;
+    const agent = this.agent;
+    if (this.disposed || !agent || !this.activePrompts && !isAgentTurnActive(agent)) return Promise.resolve(false);
+    this.interruptionVersion++;
+    this.researchInterrupted = true;
+    this.pendingAutoArtifactInput = null;
+    this.latestCompletedAssistantText = null;
+    this.emitComposerQueue([]);
+    this.setStatus({ kind: "info", text: "正在停止当前请求，保留已保存的研究记录…" });
+    this.interruption = Promise.resolve().then(async () => {
+      try {
+        agent.abort();
+        await agent.waitForIdle();
+        if (!this.disposed) {
+          this.setActivity("ready");
+          this.setStatus({ kind: "info", text: "请求已停止 · 已保存的研究记录保留；输入“继续”恢复未完成工作。" });
+        }
+        return true;
+      } catch (error) {
+        if (!this.disposed) this.setStatus({ kind: "error", text: `停止请求失败 · ${errorText(error)}` });
+        return false;
+      } finally { this.interruption = null; }
+    });
+    return this.interruption;
+  }
 
   async getSkillSuggestions() {
     if (this.disposed) return [];
@@ -244,6 +278,7 @@ export class AppRuntime {
         this.latestCompletedAssistantText = event.message.stopReason === "stop"
           && !event.message.content.some(part => part.type === "toolCall") ? extractAssistantText(event.message) : null;
       if (event.type === "agent_end") {
+        if (this.researchInterrupted) return;
         const answer = this.latestCompletedAssistantText;
         this.latestCompletedAssistantText = null;
         if (answer && (await this.flagContradictoryFundAnswer(answer) || await this.flagUnsupportedFactorAnswer(answer)
@@ -489,10 +524,13 @@ export class AppRuntime {
   }
 
   private async runAgentPrompt(input: string, signal?: AbortSignal): Promise<void> {
+    if (this.interruption) await this.interruption;
+    const version = this.interruptionVersion;
+    this.researchInterrupted = false;
     this.activePrompts++;
     try {
       if (!this.agent && this.bootstrapTask) await this.bootstrapTask;
-      if (this.disposed) return;
+      if (this.disposed || version !== this.interruptionVersion) return;
       if (!this.agent) {
         this.emitComposerQueue([input]);
         this.setActivity("thinking");
@@ -506,7 +544,7 @@ export class AppRuntime {
       await dispatchUserMessage(this.agent, input, input, signal);
       perfLog("runtime.agent.dispatch", startedAt);
     } catch (err) {
-      if (this.disposed) return;
+      if (this.disposed || version !== this.interruptionVersion) return;
       this.pendingAutoArtifactInput = null;
       this.emitComposerQueue([]);
       const message = errorText(err);

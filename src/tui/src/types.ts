@@ -9,6 +9,7 @@ export interface Holding {
   price: number;
   pct: number;
   observation?: QuoteObservation;
+  refreshState?: "refreshing" | "stale";
 }
 
 export interface Quote {
@@ -17,6 +18,7 @@ export interface Quote {
   price: number;
   pct: number;
   observation?: QuoteObservation;
+  refreshState?: "refreshing" | "stale";
 }
 
 import type { SkillState } from "../../types/skills.ts";
@@ -74,6 +76,9 @@ export interface AppState {
   /** Pending NL messages waiting for agent pickup (shown in Composer, not conversation). */
   composerQueue: string[];
   composerStatus: ComposerStatus | null;
+  researchInterruptKey?: string;
+  researchStartedAt?: number;
+  failedQuotesRetryKey?: string;
   /** Name of the currently active local portfolio (shown in status line). */
   activePortfolio: string;
   /** Active data source label (shown in status line). */

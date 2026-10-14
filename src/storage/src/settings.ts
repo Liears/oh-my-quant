@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import type { OhQuantSettings } from "../../types/config.ts";
-import { DEFAULT_SETTINGS, normalizeHudMode } from "../../types/config.ts";
+import { DEFAULT_SETTINGS, DEFAULT_TERMINAL_OPERATION_KEYBINDINGS, normalizeHudMode } from "../../types/config.ts";
 import { isModelOAuthId } from "../../types/model-auth.ts";
 import { normalizeMarketColorScheme } from "../../types/theme-colors.ts";
 import { emitFileEvent } from "./fs-events.ts";
@@ -53,13 +53,20 @@ export function saveSettings(s: OhQuantSettings): void {
 function parseSettings(raw: Partial<OhQuantSettings> | null, path: string): OhQuantSettings {
   try {
     if (raw) {
-      for (const value of [raw.env, raw.providers, raw.preferences, raw.permissions, raw.skillIntegrations, raw.artifactGeneration]) {
+      for (const value of [raw.env, raw.providers, raw.preferences, raw.permissions, raw.skillIntegrations, raw.artifactGeneration, raw.keybindings]) {
         if (value !== undefined && (!value || typeof value !== "object" || Array.isArray(value))) throw invalidStorageFile(path);
       }
       for (const value of [raw.provider, raw.model, raw.thinkingLevel]) {
         if (value !== undefined && typeof value !== "string") throw invalidStorageFile(path);
       }
       if (Object.values(raw.env ?? {}).some(value => typeof value !== "string")) throw invalidStorageFile(path);
+      for (const [action, chords] of Object.entries(raw.keybindings ?? {})) {
+        if (!["interruptResearch", "retryFailedQuotes"].includes(action) || !Array.isArray(chords)
+          || chords.some(chord => typeof chord !== "string" || !/^ctrl\+[abefgklnoqrstuvwxyz]$/i.test(chord))) throw invalidStorageFile(path);
+      }
+      const stopBindings = raw.keybindings?.interruptResearch ?? DEFAULT_TERMINAL_OPERATION_KEYBINDINGS.interruptResearch;
+      const retryBindings = raw.keybindings?.retryFailedQuotes ?? DEFAULT_TERMINAL_OPERATION_KEYBINDINGS.retryFailedQuotes;
+      if (stopBindings.some(chord => retryBindings.some(retry => retry.toLowerCase() === chord.toLowerCase()))) throw invalidStorageFile(path);
       if (raw.disabledExtensions !== undefined && (!Array.isArray(raw.disabledExtensions)
         || raw.disabledExtensions.some(id => typeof id !== "string" || !/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/.test(id)))) throw invalidStorageFile(path);
       for (const provider of Object.values(raw.providers ?? {})) {
@@ -125,6 +132,7 @@ function normalizeSettings(raw: Partial<OhQuantSettings>): OhQuantSettings {
     skillIntegrations: normalizeSkillIntegrations(raw.skillIntegrations),
     permissions: { ...DEFAULT_SETTINGS.permissions, ...(raw.permissions ?? {}) },
     ...(raw.disabledExtensions ? { disabledExtensions: [...new Set(raw.disabledExtensions)].sort() } : {}),
+    ...(raw.keybindings ? { keybindings: Object.fromEntries(Object.entries(raw.keybindings).map(([action, chords]) => [action, chords.map(chord => chord.toLowerCase())])) } : {}),
     preferences: normalizePreferences(raw.preferences),
   };
 }

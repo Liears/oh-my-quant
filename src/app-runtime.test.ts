@@ -649,11 +649,11 @@ description: Use for crypto market analysis.
     const h = harness(
       async (entries, _meta) => {
         marketSeen.push(entries.map((entry) => entry.code));
-        return [{ code: "000001", name: "上证指数", price: 3000, pct: 1 }];
+        return entries.map(entry => ({ ...entry, price: 3000, pct: 1 }));
       },
       async (entries, _meta) => {
         portfolioSeen.push(entries.map((entry) => entry.code));
-        return [{ code: "510300", name: "沪深300ETF", price: 4.2, pct: -0.5 }];
+        return entries.map(entry => ({ ...entry, price: 4.2, pct: -0.5 }));
       },
     );
     await h.runtime.submit("/help");
@@ -672,23 +672,25 @@ description: Use for crypto market analysis.
   it("clears the refreshing state and keeps the last good overview when a refresh fails", async () => {
     let failRefresh = false;
     const h = harness(
-      async () => {
+      async entries => {
         if (failRefresh) throw new Error("market source unavailable");
-        return [{ code: "000001", name: "上证指数", price: 3000, pct: 1 }];
+        return entries.map(entry => ({ ...entry, price: 3000, pct: 1 }));
       },
-      async () => [{ code: "510300", name: "沪深300ETF", price: 4.2, pct: -0.5 }],
+      async entries => entries.map(entry => ({ ...entry, price: 4.2, pct: -0.5 })),
     );
 
     await h.runtime.refreshOverviewPanel();
-    const readyPanel = h.panels.at(-1)!.panel;
     failRefresh = true;
     await h.runtime.refreshOverviewPanel();
 
     expect(h.panels.at(-2)).toMatchObject({ loading: true });
     expect(h.panels.at(-1)?.loading).toBe(false);
-    expect(h.panels.at(-1)?.panel.slice(1)).toEqual(readyPanel);
+    const retainedMarket = h.panels.at(-1)?.panel.find(section => section.kind === "quotes");
+    expect(retainedMarket).toMatchObject({ rows: expect.arrayContaining([
+      expect.objectContaining({ code: "000001.SH", price: 3000, refreshState: "stale" }),
+    ]) });
     expect(h.panels.at(-1)?.panel[0]).toMatchObject({ title: "Market Refresh", rows: expect.arrayContaining([
-      { label: "数值", value: "stale · 保留上次结果" },
+      { label: "数值", value: "stale · 保留上次结果，按标的日期" },
     ]) });
   });
 
