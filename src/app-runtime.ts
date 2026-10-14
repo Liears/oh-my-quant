@@ -141,6 +141,7 @@ export class AppRuntime {
   private interruption: Promise<boolean> | null = null;
   private interruptionVersion = 0;
   private researchInterrupted = false;
+  private readonly promptControllers = new Set<AbortController>();
   private extensions: RuntimeExtensions | undefined;
   private baseDependencies: QuantAgentDependencies | undefined;
   private extensionShutdown: Promise<void> | undefined;
@@ -175,6 +176,7 @@ export class AppRuntime {
     if (this.disposed || !agent || !this.activePrompts && !isAgentTurnActive(agent)) return Promise.resolve(false);
     this.interruptionVersion++;
     this.researchInterrupted = true;
+    for (const controller of this.promptControllers) controller.abort(new Error("Research interrupted"));
     this.pendingAutoArtifactInput = null;
     this.latestCompletedAssistantText = null;
     this.emitComposerQueue([]);
@@ -526,6 +528,8 @@ export class AppRuntime {
   private async runAgentPrompt(input: string, signal?: AbortSignal): Promise<void> {
     if (this.interruption) await this.interruption;
     const version = this.interruptionVersion;
+    const controller = new AbortController();
+    this.promptControllers.add(controller);
     this.researchInterrupted = false;
     this.activePrompts++;
     try {
@@ -541,7 +545,7 @@ export class AppRuntime {
       this.pendingAutoArtifactInput = input;
       this.prepareHudForRequest();
       const startedAt = perfNow();
-      await dispatchUserMessage(this.agent, input, input, signal);
+      await dispatchUserMessage(this.agent, input, input, signal ? AbortSignal.any([signal, controller.signal]) : controller.signal);
       perfLog("runtime.agent.dispatch", startedAt);
     } catch (err) {
       if (this.disposed || version !== this.interruptionVersion) return;
@@ -553,6 +557,7 @@ export class AppRuntime {
       this.setStatus({ kind: "error", text: agentStatusText(message) });
       if (!isAgentTurnActive(this.agent)) this.setActivity("ready");
     } finally {
+      this.promptControllers.delete(controller);
       this.activePrompts--;
     }
   }

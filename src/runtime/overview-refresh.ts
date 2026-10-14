@@ -271,6 +271,18 @@ export class OverviewRefresh {
       if (!this.disposed && this.active === run && !run.superseded) {
         this.status = outcome;
         if (!publishPartial?.()) {
+          let retainedRows = 0;
+          this.sections = this.sections.map(section => {
+            if (section.kind === "quotes" || section.kind === "holdings" || section.kind === "group") {
+              retainedRows += section.rows.filter(row => Number.isFinite(row.price) && Number.isFinite(row.pct)).length;
+              return { ...section, rows: section.rows.map(row => Number.isFinite(row.price) && Number.isFinite(row.pct)
+                ? { ...row, refreshState: "stale" as const } : row) };
+            }
+            return section;
+          });
+          this.sections = this.sections.map(section => section.kind === "keyvalue" && section.title === "Source"
+            ? { ...section, rows: section.rows.map(row => row.label === "覆盖" ? { ...row, value: `0 本轮可用 · ${retainedRows} 旧数据` } : row) } : section);
+          for (const key of this.lastQuotes.keys()) this.failedQuotes.add(key);
           const publishStarted = performance.now();
           this.render(); publishMs = (publishMs ?? 0) + performance.now() - publishStarted;
         }

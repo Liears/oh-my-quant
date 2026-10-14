@@ -41,6 +41,12 @@ it("interrupts the active request without exiting or reporting it, then accepts 
   let messages: UIMessage[] = [];
   let status: ComposerStatus | null = null;
   let reports = 0;
+  let forwardedSignal: AbortSignal | undefined;
+  const originalPrompt = agent.prompt.bind(agent);
+  agent.prompt = async (input: string, options?: { signal?: AbortSignal }) => {
+    forwardedSignal = options?.signal;
+    await originalPrompt(input);
+  };
   const runtime = new AppRuntime({ onMessages: value => { messages = value; }, onActivity: () => {}, onComposerStatus: value => { status = value; } },
     async () => [], async () => [], () => agent as never, async () => { reports++; return { success: true, message: "continued research" }; }, undefined, undefined, 0);
   try {
@@ -48,6 +54,7 @@ it("interrupts the active request without exiting or reporting it, then accepts 
     const request = runtime.submit("分析 AAPL 的动量和风险");
     await started;
     expect(await runtime.interruptResearch()).toBe(true);
+    expect(forwardedSignal?.aborted).toBe(true);
     await request;
     expect(reports).toBe(0);
     expect(messages.some(message => message.text?.includes("分析 AAPL"))).toBe(true);
@@ -59,6 +66,36 @@ it("interrupts the active request without exiting or reporting it, then accepts 
     expect(agent.state.thinkingLevel).toBe("max");
   } finally {
     runtime.dispose();
+    if (previous === undefined) delete process.env.OHQUANT_DIR;
+    else process.env.OHQUANT_DIR = previous;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("cancels a prompt still preparing before the model starts", async () => {
+  const root = mkdtempSync(join(tmpdir(), "whyj-preparing-interruption-"));
+  const previous = process.env.OHQUANT_DIR;
+  process.env.OHQUANT_DIR = root;
+  let release!: () => void, prepared!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const preparing = new Promise<void>(resolve => { prepared = resolve; });
+  let modelStarts = 0;
+  const agent = { state: { isStreaming: false, pendingToolCalls: new Set<string>(), messages: [], thinkingText: "" },
+    subscribe: () => () => {}, abort: () => {}, waitForIdle: async () => {},
+    prompt: async (_input: string, options?: { signal?: AbortSignal }) => {
+      prepared(); await gate; options?.signal?.throwIfAborted(); modelStarts++;
+    } };
+  const runtime = new AppRuntime({ onMessages: () => {}, onActivity: () => {} }, async () => [], async () => [], () => agent as never,
+    undefined, undefined, undefined, 0);
+  try {
+    await runtime.bootstrap();
+    const request = runtime.submit("分析 AAPL 的风险");
+    await preparing;
+    expect(await runtime.interruptResearch()).toBe(true);
+    release(); await request;
+    expect(modelStarts).toBe(0);
+  } finally {
+    release(); runtime.dispose();
     if (previous === undefined) delete process.env.OHQUANT_DIR;
     else process.env.OHQUANT_DIR = previous;
     rmSync(root, { recursive: true, force: true });

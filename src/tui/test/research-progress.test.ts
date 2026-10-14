@@ -20,6 +20,11 @@ it("shows the active stage, elapsed time and configured stop key, then clears el
   expect(text).toContain("工具");
   expect(text).toContain("ctrl+x 停止");
   expect(text).toMatch(/\d+s/);
+  state.researchInterruptKey = undefined;
+  buffer.clear();
+  drawComposer(buffer, layout(120, 32).composer, state, "");
+  expect(buffer.toPlain().join("\n")).toContain("工具");
+  expect(buffer.toPlain().join("\n")).toMatch(/\d+s/);
   tui.update({ activity: "ready" });
   expect(state.researchStartedAt).toBeUndefined();
 });

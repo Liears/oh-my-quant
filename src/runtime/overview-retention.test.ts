@@ -20,8 +20,12 @@ it("retains an unavailable symbol's original observation and retries only the fa
   const seen: string[][] = [];
   let panel: PanelSection[] = [];
   let refreshingText = "";
+  let initializationFails = false;
   const rows = (): OverviewQuote[] => panel.flatMap(section => section.kind === "quotes" || section.kind === "holdings" || section.kind === "group" ? section.rows : []);
-  const refresh = new OverviewRefresh({ intervalMs: 0, onPanel: (value, loading) => {
+  const refresh = new OverviewRefresh({ intervalMs: 0, loadPortfolio: () => {
+    if (initializationFails) throw new Error("portfolio read failed");
+    return { symbols: [{ code: "AAPL", name: "Apple" }], groups: [] };
+  }, onPanel: (value, loading) => {
     panel = value;
     if (loading && rows().some(row => row.refreshState === "refreshing" && row.code === "AAPL")) {
       const buffer = new Buffer(160, 48);
@@ -60,6 +64,11 @@ it("retains an unavailable symbol's original observation and retries only the fa
     expect(recovered.observation?.asOfDate).toBe("2026-09-12");
     await refresh.retryFailed();
     expect(seen.length).toBe(3);
+    initializationFails = true;
+    await refresh.refresh();
+    expect(rows().filter(row => Number.isFinite(row.price)).every(row => row.refreshState === "stale")).toBe(true);
+    expect(rows().find(row => row.code === "AAPL")?.observation?.asOfDate).toBe("2026-09-12");
+    expect(buildOverviewLines(panel, 48).map(line => line.text).join("\n")).toContain("0 本轮可用");
   } finally {
     refresh.dispose();
     if (previous === undefined) delete process.env.OHQUANT_DIR;
