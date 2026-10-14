@@ -25,6 +25,7 @@ export interface MouseEvent {
 }
 
 export type InputAction =
+  | { type: "paste"; text: string }
   | { type: "mouse"; events: MouseEvent[] }
   | { type: "key"; name: string; shift: boolean; ctrl: boolean; meta: boolean; char?: string }
   | { type: "discard" };
@@ -78,6 +79,9 @@ function readCsi(buf: string): { len: number; name: string; shift: boolean; ctrl
   const modifier = nums.length > 1 ? nums[nums.length - 1] : 1;
   const shift = [2, 4, 6, 8].includes(modifier);
   const ctrl = [5, 6, 7, 8].includes(modifier);
+  if (m[2] === "u" && nums[0] >= 32 && nums[0] <= 0x10ffff) {
+    return { len: m[0].length, name: String.fromCodePoint(nums[0]).toLowerCase(), shift, ctrl };
+  }
   const map: Record<string, string> = { A: "up", B: "down", C: "right", D: "left", H: "home", F: "end", Z: "tab" };
   const name = m[2] === "~" ? ({ 5: "pageup", 6: "pagedown" } as Record<number, string>)[nums[0]] ?? `${nums[0]}~` : map[m[2]] ?? m[2];
   return { len: m[0].length, name, shift: m[2] === "Z" || shift, ctrl };
@@ -89,6 +93,13 @@ function waitForMore(buf: string): boolean {
 
 export function nextInputAction(buf: string): { action: InputAction | null; rest: string } {
   if (!buf) return { action: null, rest: "" };
+
+  if (buf.startsWith("\x1b[200~")) {
+    const end = buf.indexOf("\x1b[201~", 6);
+    if (end < 0) return { action: null, rest: buf };
+    const text = buf.slice(6, end).replace(/\r\n?/g, "\n").replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "");
+    return { action: { type: "paste", text }, rest: buf.slice(end + 6) };
+  }
 
   const mouse = readMouse(buf);
   if (mouse) return { action: { type: "mouse", events: mouse.events }, rest: mouse.rest };

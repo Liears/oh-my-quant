@@ -105,6 +105,15 @@ it("rejects a repository name collision with a different origin", () => fixture(
   expect(existsSync(join(f.target, "SKILL.md"))).toBe(true);
 }));
 
+it.skipIf(process.platform !== "win32")("accepts Windows directory aliases when Git reports a different path spelling", () => fixture(async f => {
+  expect((await f.install()).success).toBe(true);
+  const result = await installSkillRepository(f.root, "owner/repo", async (args, timeout) => {
+    const output = await f.transport(args, timeout);
+    return args.includes("--show-toplevel") ? output.toUpperCase() : output;
+  });
+  expect(result.success).toBe(true);
+}));
+
 it("does not treat a plain subdirectory of a Git repo as its own installation", () => fixture(async f => {
   mkdirSync(f.target, { recursive: true });
   writeFileSync(join(f.target, "notes"), "preserve");

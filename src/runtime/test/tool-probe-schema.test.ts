@@ -17,15 +17,18 @@ import { commandPreflight } from "../workspace/command-preflight.ts";
 import { probeToolEndpoint } from "../data/tool-probe.ts";
 import { DEFAULT_SETTINGS } from "../../types/config.ts";
 
-let root: string, previous: string | undefined, network: ReturnType<typeof spyOn<typeof globalThis, "fetch">>;
+let root: string, previous: string | undefined, previousPython: string | undefined, network: ReturnType<typeof spyOn<typeof globalThis, "fetch">>;
 beforeEach(() => {
   previous = process.env.OHQUANT_DIR; root = mkdtempSync(join(tmpdir(), "whyj-probe-schema-")); process.env.OHQUANT_DIR = root;
+  previousPython = process.env.WHYJ_PYTHON;
+  process.env.WHYJ_PYTHON = join(root, "intentionally-missing-python.exe");
   writeFileSync(join(root, "settings.json"), "INVALID_SETTINGS_SCHEMA_MUST_NOT_READ");
   network = spyOn(globalThis, "fetch").mockRejectedValue(new Error("No network in schema discovery"));
 });
 afterEach(() => {
   expect(network).not.toHaveBeenCalled(); network.mockRestore();
   if (previous === undefined) delete process.env.OHQUANT_DIR; else process.env.OHQUANT_DIR = previous;
+  if (previousPython === undefined) delete process.env.WHYJ_PYTHON; else process.env.WHYJ_PYTHON = previousPython;
   if (!resolve(root).startsWith(resolve(tmpdir()) + sep)) throw new Error("Unexpected schema fixture directory");
   rmSync(root, { recursive: true, force: true });
 });
@@ -296,7 +299,7 @@ test("AppRuntime installed schema stays local without opening Doctor or market d
   } finally { await runtime.shutdown(); }
 }, 15000);
 
-test("actual installed schema query runs before damaged settings and writes no workspace state", async () => {
+test("actual installed schema request reports missing Python before damaged settings and writes no workspace state", async () => {
   const before = readdirSync(root);
   const command = '/doctor --tool fetch_index_rows --market A --schema --installed --endpoint index_stock_info';
   const child = Bun.spawn([process.execPath, "src/index.ts", "--json", "-c", command],
@@ -306,13 +309,9 @@ test("actual installed schema query runs before damaged settings and writes no w
     const [out, error, exit] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
     expect(error).toBe("");
     const result = JSON.parse(out);
-    expect(exit).toBe(result.ok ? 0 : 1);
-    if (result.ok) {
-      expect(result.data).toMatchObject({ kind: "tool-probe-schemas", scope: "installed-signatures",
-        comparison: { packagedVersion: AKSHARE_INDEX_SIGNATURE_VERSION } });
-      expect(typeof result.data.comparison.matchesPackaged).toBe("boolean");
-    }
-    else expect(result.error).toMatchObject({ code: "command_failed" });
+    expect(exit).toBe(1);
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatchObject({ code: "command_failed" });
     expect(readdirSync(root)).toEqual(before);
     expect(readFileSync(join(root, "settings.json"), "utf8")).toBe("INVALID_SETTINGS_SCHEMA_MUST_NOT_READ");
   } finally { clearTimeout(deadline); child.kill(); await child.exited; }

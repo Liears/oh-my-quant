@@ -67,6 +67,7 @@ Use `/help` in the terminal or `whyj --help` in your shell. The [command referen
 ## Documentation
 
 - **Use the terminal:** [Configuration](./docs/quant-harness/configuration.md), [data providers](./docs/quant-harness/source-data-providers.md), [reports](./docs/quant-harness/artifacts-design.md), [tools and skills](./docs/quant-harness/trader-skills.md).
+- **Windows desktop:** [Setup, shared CLI, and build verification](./docs/quant-harness/desktop.md).
 - **Agent Runtime design:** [Runtime, lifecycle, and Pi integration](./docs/agent-runtime/README.md).
 - **Quant Harness design:** [Data, computation, execution, reports, and UI/UX](./docs/quant-harness/README.md).
 - **System and UI:** [Module architecture](./docs/quant-harness/module-architecture.md), [visual design](./DESIGN.md).

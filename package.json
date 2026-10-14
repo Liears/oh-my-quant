@@ -1,6 +1,6 @@
 {
   "name": "whyj-quant",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
@@ -50,7 +50,9 @@
     "bench:model": "bun run scripts/measure-model.ts",
     "eval:research": "bun run scripts/evaluate-research.ts",
     "test:watch": "bun test --watch",
-    "prepublishOnly": "bun run gen:insights && bun run check:release"
+    "prepublishOnly": "bun run gen:insights && bun run check:release",
+    "desktop:build": "bun run --cwd desktop build",
+    "desktop:dist": "bun run desktop:build && bun run --cwd desktop dist:win"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "1.2.0",

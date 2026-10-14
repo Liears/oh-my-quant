@@ -1,4 +1,4 @@
-import { Buffer, strWidth, truncate } from "./buffer.ts";
+import { Buffer, charWidth, strWidth, truncate } from "./buffer.ts";
 import { S, HEADER_H, COMPOSER_H, STATUS_H, DIVIDER_CHAR, UI_DENSITY, GOLD_HIGHLIGHT, GOLD, CASH_DARK, CASH_WARM, STEP_DIM } from "./styles.ts";
 import { mixHex } from "./theme.ts";
 import type { ComposerSuggestion } from "./input.ts";
@@ -70,21 +70,32 @@ export function drawComposer(
 
   const inputRow = row;
   if (input) {
-    if (isCmd) {
-      buf.text(inner.x, inputRow, "/", S.goldB);
-      buf.text(inner.x + 1, inputRow, input.slice(1), S.gold);
-      buf.text(inner.x + 1 + strWidth(input.slice(1)), inputRow, "▏", S.gold);
-    } else {
-      buf.text(inner.x, inputRow, "›", S.gold);
-      buf.text(inner.x + 2, inputRow, input, S.cream);
-      buf.text(inner.x + 2 + strWidth(input), inputRow, "▏", S.cream);
+    const inset = isCmd ? 0 : 2;
+    const width = Math.max(1, inner.w - inset);
+    const lines: string[] = [];
+    let line = "", cells = 0;
+    const displayInput = input.replace(/\r\n?/g, "\n").replace(/\t/g, "    ").replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "");
+    for (const ch of displayInput + "▏") {
+      if (ch === "\n") { lines.push(line); line = ""; cells = 0; continue; }
+      const size = charWidth(ch);
+      if (cells + size > width && line) { lines.push(line); line = ""; cells = 0; }
+      line += ch;
+      cells += size;
     }
+    lines.push(line);
+    const available = Math.max(0, inner.y + inner.h - row);
+    if (!available) return;
+    // Keep the insertion point visible while a long paste scrolls inside Composer.
+    const visible = lines.slice(-available);
+    if (!isCmd) buf.text(inner.x, row, lines.length > available ? "…" : "›", S.gold);
+    for (const text of visible) buf.text(inner.x + inset, row++, text, isCmd ? S.gold : S.cream, width);
+    if (isCmd && lines.length <= available) buf.text(inner.x, inputRow, "/", S.goldB);
   } else {
     buf.text(inner.x, inputRow, "›", S.gold);
     const hint = "write a task, or just ask a question…";
     buf.text(inner.x + 2, inputRow, truncate(`${hint}▏`, inner.w - 2), S.dim);
+    row++;
   }
-  row++;
 
   const remainingRows = Math.max(0, inner.y + inner.h - row);
   if (suggestions.length > 0) {

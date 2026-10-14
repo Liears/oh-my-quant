@@ -26,6 +26,8 @@ export const ansi = {
   /** Click, drag, wheel reporting (SGR coords). No 1003 — hover floods stdin during loading. */
   mouseOn: `${ESC}[?1000h${ESC}[?1002h${ESC}[?1006h`,
   mouseOff: `${ESC}[?1006l${ESC}[?1002l${ESC}[?1000l`,
+  pasteOn: `${ESC}[?2004h`,
+  pasteOff: `${ESC}[?2004l`,
   moveTo: (r: number, c: number) => `${ESC}[${r};${c}H`,
   fg: (hex: string) => {
     const n = hex.replace("#", "");
@@ -364,14 +366,14 @@ export class Screen {
   get cols() { return (this.out as any).columns ?? 80; }
   get rows() { return (this.out as any).rows ?? 24; }
   enter(): void {
-    if (!this.out.write(ansi.altOn + ansi.hideCursor + ansi.mouseOn + ansi.clear)) this.waitForDrain();
+    if (!this.out.write(ansi.altOn + ansi.hideCursor + ansi.mouseOn + ansi.pasteOn + ansi.clear)) this.waitForDrain();
     this.resize();
   }
   exit(): void {
     if (this.blocked) this.out.off("drain", this.drainOutput);
     this.blocked = false;
     this.pendingFrame = false;
-    this.out.write(ansi.reset + ansi.showCursor + ansi.mouseOff + ansi.altOff);
+    this.out.write(ansi.reset + ansi.showCursor + ansi.mouseOff + ansi.pasteOff + ansi.altOff);
   }
   resize(): void { this.buf = new Buffer(this.cols, this.rows); }
   flush(): void {

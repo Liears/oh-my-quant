@@ -8,6 +8,7 @@
 import { COMMAND_CATALOG } from "./cli/catalog.ts";
 import { parseDoctorPhases } from "./runtime/workspace/doctor-phases.ts";
 import manifest from "../package.json";
+import { existsSync } from "node:fs";
 import type { OhQuantSettings } from "./types/config.ts";
 
 interface CliEnvelope {
@@ -156,9 +157,14 @@ if (positional[0] === "doctor") {
 
 let settings: OhQuantSettings;
 try {
-  const { migrateOldConfig, loadSettings } = await import("./storage/index.ts");
+  const { migrateOldConfig, loadSettings, saveSettings, resolveSettingsPath } = await import("./storage/index.ts");
   migrateOldConfig();
+  const initializeDesktop = process.env.WHYJ_DESKTOP === "1" && !existsSync(resolveSettingsPath());
   settings = loadSettings();
+  if (initializeDesktop) {
+    settings.preferences.source = "akshare";
+    saveSettings(settings);
+  }
 } catch (error) {
   const code = (error as NodeJS.ErrnoException).code;
   const message = code === "ESTORAGEFORMAT" || code === "ELOCKED"

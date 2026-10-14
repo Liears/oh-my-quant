@@ -1,0 +1,6 @@
+# Match the packaged AKShare endpoint signatures and the CLI's alpha adapter.
+akshare==1.18.63
+akquant==0.3.58
+# Dependencies used by the curated market research skills.
+yfinance>=0.2.0
+pandas-market-calendars==5.2.2

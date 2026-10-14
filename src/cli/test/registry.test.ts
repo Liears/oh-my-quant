@@ -228,13 +228,17 @@ describe("executeCommand", () => {
 
   it("runs doctor as a local slash command", async () => {
     const previous = process.env.WHYJ_DOCTOR_SKIP_NETWORK;
+    const previousPython = process.env.WHYJ_PYTHON;
     process.env.WHYJ_DOCTOR_SKIP_NETWORK = "1";
+    process.env.WHYJ_PYTHON = "whyj-intentionally-missing-registry-python";
     let result: Awaited<ReturnType<typeof executeCommand>>;
     try {
       result = await executeCommand(parseCommand("/doctor")!);
     } finally {
       if (previous === undefined) delete process.env.WHYJ_DOCTOR_SKIP_NETWORK;
       else process.env.WHYJ_DOCTOR_SKIP_NETWORK = previous;
+      if (previousPython === undefined) delete process.env.WHYJ_PYTHON;
+      else process.env.WHYJ_PYTHON = previousPython;
     }
     expect(result.success).toBe(true);
     expect(result.message).toContain("whyj doctor");
