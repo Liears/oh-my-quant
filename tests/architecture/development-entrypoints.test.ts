@@ -70,4 +70,3 @@ test("npm script entrypoints keep source and root integration scopes explicit", 
   expect(manifest.scripts.start).toBe("node dist/index.js");
   expect(Object.values(manifest.scripts).filter(command => typeof command === "string" && /\b(?:run|node) scripts\//.test(command))).toEqual([]);
 });
-

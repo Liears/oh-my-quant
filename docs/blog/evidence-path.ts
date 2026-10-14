@@ -5,4 +5,3 @@ export function isOptionalPrivateEvidence(root: string, target: string): boolean
   const path = relative(resolve(root), resolve(target));
   return path.startsWith(`output${sep}`);
 }
-

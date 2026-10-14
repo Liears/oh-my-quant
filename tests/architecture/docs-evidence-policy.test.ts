@@ -11,4 +11,3 @@ test("only repository-local private output receipts may be absent from a clone",
   }
   expect(isOptionalPrivateEvidence(root, root)).toBe(false);
 });
-
