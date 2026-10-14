@@ -1,0 +1,32 @@
+name: PR policy
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: pr-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    name: PR policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Run only trusted base-branch policy. Never check out or execute PR code here.
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const { checkPullRequest } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/pr-policy.mjs`);
+            const issue = await checkPullRequest({ github, ...context.repo, number: context.issue.number });
+            core.info(`Validated issue #${issue}; scope and evidence still require human review.`);

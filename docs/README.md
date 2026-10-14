@@ -12,6 +12,7 @@
 | 当前范围、缺口与实施顺序 | [GOALS](./quant-harness/GOALS.md) → [PRD](./quant-harness/PRD.md) → [Roadmap](./quant-harness/roadmap.md) |
 | 配置、数据源与工具为何不同步 | [配置](./quant-harness/configuration.md) → [数据源](./quant-harness/source-data-providers.md) → [UI/UX](./quant-harness/quant-uiux.md) |
 | 怎样验证，哪些结论尚未得到证明 | [评测指南](./quant-harness/evaluation.md) · [测试与反例](./blog/05-evaluation-beyond-green.md) |
+| 仓库质量管理与 npm 发布 | [维护规范](./quant-harness/ci-release.md) · [Agent Repo 基础建设](./blog/agent-repo-infrastructure.md) |
 | 产品、架构与 UI/UX 的选择理由 | [技术博客](./blog/README.md) · [离线版](./blog/index.html) |
 
 当前工作区不等于发布版。产品完成度由 PRD 维护；代码和测试链接定位可重复检查，不把旧验证记成本轮成绩。这里的“归档整理”是把现行文档归入责任目录，不恢复 archive、旧稿汇编或重定向页面。
@@ -36,13 +37,13 @@ docs/
 
 Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/runtime/quant-harness.ts` 实现其中的任务装配与守卫；Source、Quant、Storage、Execution、Artifact 和 UI/UX 是这一应用体系内职责不同的组成部分。归入同一目录不抹平模块边界，不表示执行能力已经接入默认研究 Agent，也不放宽账户授权。
 
-当前共 **61 个文件**：39 份 Markdown、2 份 HTML、2 个 TypeScript、5 张 PNG、13 张 SVG。23 份原顶层文档已迁入两个目录；桌面宿主设计也归入 Quant Harness。顶层 Markdown 只保留本页。
+当前共 **63 个文件**：41 份 Markdown、2 份 HTML、2 个 TypeScript、5 张 PNG、13 张 SVG。23 份原顶层文档已迁入两个目录；桌面宿主设计也归入 Quant Harness。顶层 Markdown 只保留本页。
 
 | 位置 | 文件数 | 内容 |
 |---|---:|---|
 | `agent-runtime/` | 2 | 通用运行时与扩展契约 |
-| `quant-harness/` | 22 | 完整量化应用的设计、产品与使用文档 |
-| `blog/` | 29 | 12 篇正文、目录与编辑说明、12 张 SVG、构建/检查脚本和离线 HTML |
+| `quant-harness/` | 23 | 完整量化应用的设计、产品、使用与仓库维护文档 |
+| `blog/` | 30 | 12 篇系列正文、1 篇工程补篇、目录与编辑说明、12 张 SVG、构建/检查脚本和离线 HTML |
 | `assets/` | 6 | 共用产品与设计素材 |
 | 顶层 | 2 | 本页和讲解演示 |
 

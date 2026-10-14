@@ -1,0 +1,69 @@
+---
+name: issue-skill
+description: Draft and manage single-module issues for oh-my-quant with explicit scope, acceptance criteria, and one implementation PR.
+---
+
+# Issue Skill
+
+## Scope
+
+- One implementation issue, one primary functional module, one implementation PR.
+- Keep only one active implementation PR per issue. Document replacements and close abandoned PRs; track new regressions separately.
+- Split independent module changes into separate issues. Planning issues may group dependencies but are not implementation PR closing targets.
+- List allowed production, test, and documentation paths. Justify essential integration changes outside the primary module.
+- Separate changes to another module's behavior, persistence, or public interface. Exclude unrelated fixes, formatting, renaming, dependency upgrades, and cleanup.
+- Revise the issue or split dependencies before expanding implementation scope.
+
+## Preparation
+
+1. Confirm the repository, base branch, version, and related issues or PRs. Distinguish released behavior, current main, and local changes.
+2. Read the [documentation index](../../../docs/README.md), [module architecture](../../../docs/quant-harness/module-architecture.md), and relevant module documentation.
+3. Separate observed behavior, user reports, and suspected causes. Mark unverified claims explicitly.
+
+## Issue Template
+
+Title: `[type][module] Observable problem or capability`
+
+Types: `bug`, `feature`, `refactor`, `docs`, `ci`.
+
+~~~markdown
+## Problem
+Affected user, scenario, current behavior, and intended outcome.
+
+## Evidence
+- Version, branch, commit, and environment:
+- Minimal reproduction or feature use case:
+- Logs, screenshots, or source references:
+- Root cause: confirmed or suspected, with supporting evidence.
+
+## Scope
+- Primary module:
+- Allowed production and test paths:
+- Essential integration changes and justification:
+- Required docs updates:
+- Non-goals and dependencies:
+
+## Acceptance Criteria
+- [ ] AC1: Given ..., when ..., then ...
+- [ ] AC2: Relevant error or boundary behavior.
+- [ ] AC3: Compatibility that must be preserved.
+
+## Verification
+Regression cases, full repository checks, build, and documentation checks.
+For UI changes: affected states, viewport sizes, and actual screenshot plan.
+Identify required live-environment checks and unavailable prerequisites.
+
+## Risks and Rollback
+Compatibility, configuration, or data impact; recovery approach.
+
+## Implementation PR
+Pending, or the single implementation PR link.
+~~~
+
+Each acceptance criterion must specify observable behavior and a verification method. “Tests pass” alone is insufficient.
+
+## Handoff
+
+For draft requests, return the proposed issue without publishing or implementing. Create or update GitHub issues only within the user's authorization, then return the link. Use [pr-skill](../pr-skill/SKILL.md) for implementation and acceptance mapping.
+
+This skill defines contributor practice; it does not configure GitHub enforcement.
