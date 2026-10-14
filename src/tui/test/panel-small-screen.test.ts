@@ -31,7 +31,9 @@ it.each(sizes)("shows complete empty-state instructions at %s x %s", (width, hei
   try {
     panel.open("artifact");
     let text = screen(panel, width, height).join(" ");
-    expect(text).toContain("Enable Auto Artifacts in /config, then complete a quant-analysis turn.");
+    expect(text).toContain("/config → Auto Artifacts 开启自动报告");
+    expect(text).toContain("完成量化研究并通过核验");
+    expect(text).toContain("Enter 恢复会话并打开报告");
     expect(text).toContain("0 reports");
     expect(raw(panel, "\r")).toEqual({});
     expect(raw(panel, "\x1b")).toEqual({ close: true });
@@ -47,23 +49,23 @@ it.each(sizes)("keeps settings focus, draft, validation and controls separate at
   const panel = controller();
   try {
     panel.open("config");
-    const labels = ["Model", "Market Data", "Data Token", "Portfolios", "External Skills", "Overview Dock", "Auto Artifacts", "Market Colors", "Status HUD", "Compact At"];
+    const labels = ["模型 Model", "行情 Market Data", "数据凭证 Data Token", "观察组合 Portfolios", "External Skills", "Overview Dock", "自动报告 Auto Artifacts", "Market Colors", "Status HUD", "Compact At"];
     for (const [index, label] of labels.entries()) {
       if (index) raw(panel, "\x1b[B");
       const lines = screen(panel, width, height);
       expect(lines.some(line => line.startsWith(`> ${label}`))).toBe(true);
-      expect(lines).toContain("Up/Down select · Enter change · Esc close");
+      expect(lines).toContain("↑↓ 选择 · Enter 修改 · Esc 关闭");
     }
     raw(panel, "\r"); raw(panel, "a"); raw(panel, "b"); raw(panel, "c"); raw(panel, "\r");
     const lines = screen(panel, width, height);
     expect(lines).toContain("Compact At: abc|");
-    expect(lines).toContain("Enter save · Esc cancel");
+    expect(lines).toContain("Enter 保存 · Esc 取消");
     expect(lines.some(line => line.startsWith("Use auto or 1.."))).toBe(true);
     expect(lines.some(line => line.startsWith("> Compact At"))).toBe(true);
     expect(raw(panel, "\x1b")).toEqual({});
-    expect(screen(panel, width, height)).toContain("Up/Down select · Enter change · Esc close");
+    expect(screen(panel, width, height)).toContain("↑↓ 选择 · Enter 修改 · Esc 关闭");
     raw(panel, "\x1b[B");
-    expect(screen(panel, width, height).some(line => line.startsWith("> Model"))).toBe(true);
+    expect(screen(panel, width, height).some(line => line.startsWith("> 模型 Model"))).toBe(true);
   } finally { panel.close(); }
 });
 

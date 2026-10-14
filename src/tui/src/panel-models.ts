@@ -131,7 +131,7 @@ export function buildArtifactPanelData(args: {
       selected: index === selection,
     })),
     footer: status || `${items.length} report${items.length === 1 ? "" : "s"}`,
-    emptyMessage: "No artifacts yet.\n\nEnable Auto Artifacts in /config, then complete a quant-analysis turn.",
+    emptyMessage: "No artifacts yet. 暂无研究报告。\n\n1. /config → Auto Artifacts 开启自动报告。\n2. 完成量化研究并通过核验。\n3. /artifact → Enter 恢复会话并打开报告。",
   };
 }
 

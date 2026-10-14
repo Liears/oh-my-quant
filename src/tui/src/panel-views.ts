@@ -15,6 +15,17 @@ export function renderConfigPanelView(
   editorActive = false,
 ): void {
   const { inner } = frame;
+  const labels: Record<string, string> = {
+    "Model": "模型 Model", "Market Data": "行情 Market Data", "Data Token": "数据凭证 Data Token",
+    "Portfolios": "观察组合 Portfolios", "Auto Artifacts": "自动报告 Auto Artifacts",
+  };
+  const hints: Record<string, string> = {
+    "Model": "模型：提供商 → 模型 → 凭证 → 保存并验证。",
+    "Market Data": "行情：选择数据源，检查有效样本后保存。",
+    "Data Token": "凭证：进入数据连接检查；凭证输入会遮蔽。",
+    "Portfolios": "观察组合：管理关注标的和分组。",
+    "Auto Artifacts": "自动报告：核验完成后生成；/artifact 查看。",
+  };
   const visible = frame.contentH;
   const selectedRow = rows.findIndex((row) => row.kind === "field" && row.active);
   const start = Math.max(0, Math.min(selectedRow - Math.floor(visible / 2), rows.length - visible));
@@ -26,12 +37,14 @@ export function renderConfigPanelView(
       continue;
     }
     const valueStyle = row.editing ? { fg: GOLD_HIGHLIGHT } : row.action ? S.dim : { fg: GOLD };
-    buf.text(inner.x, y, truncate(`${row.active ? "> " : "  "}${row.label}`, Math.max(10, inner.w - 22)), row.active ? S.goldB : S.cream);
+    buf.text(inner.x, y, truncate(`${row.active ? "> " : "  "}${labels[row.label] ?? row.label}`, Math.max(10, inner.w - 22)), row.active ? S.goldB : S.cream);
     buf.textRight(inner.x + inner.w, y++, truncate(row.value, 20), valueStyle);
   }
 
-  buf.text(inner.x, frame.footerY, truncate(footer, inner.w), S.dim);
-  buf.text(inner.x, frame.footerY - 1, truncate(editorActive ? "Enter save · Esc cancel" : "Up/Down select · Enter change · Esc close", inner.w), S.gold);
+  const selected = rows[selectedRow];
+  const help = selected?.kind === "field" ? hints[selected.label] : undefined;
+  buf.text(inner.x, frame.footerY, truncate(footer || help || "", inner.w), S.muted);
+  buf.text(inner.x, frame.footerY - 1, truncate(editorActive ? "Enter 保存 · Esc 取消" : "↑↓ 选择 · Enter 修改 · Esc 关闭", inner.w), S.gold);
   if (editorLine) {
     const lines = wrap(editorLine, inner.w).slice(0, 2);
     const startY = frame.footerY - 1 - lines.length;
@@ -154,6 +167,7 @@ export function renderArtifactPanelView(
 
   if (data.items.length === 0) {
     renderEmptyPanelView(buf, frame, data.emptyMessage ?? "No artifacts yet.", data.footer);
+    buf.text(inner.x, frame.footerY - 1, truncate("先开启 Auto Artifacts · Esc 关闭", inner.w), S.gold);
     return;
   }
 
@@ -170,6 +184,7 @@ export function renderArtifactPanelView(
   }
 
   buf.text(inner.x, frame.footerY, truncate(data.footer, inner.w), S.dim);
+  buf.text(inner.x, frame.footerY - 1, truncate("↑↓ 选择 · Enter 恢复并打开 · Esc 关闭", inner.w), S.gold);
 }
 export function renderHelpPanelView(
   buf: Buffer,
