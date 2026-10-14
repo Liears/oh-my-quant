@@ -15,7 +15,7 @@
 <a href="#chapter-09"><span>09</span>模块与变化边界</a>
 <a href="#chapter-10"><span>10</span>布局与视觉语义</a>
 <a href="#chapter-11"><span>11</span>功能发现与交互</a>
-<a href="#chapter-12"><span>12</span>反馈与失败恢复</a></nav><a class="back" href="../README.md">← 项目文档</a></aside><main id="main"><header class="hero" id="top"><p class="eyebrow">TWELVE NOTES ON BUILDING A RESEARCH AGENT</p><h1>Agent Engineering<span>产品、架构与体验，如何一起演进</span></h1><p class="lead">oh-my-quant 的十二个问题，十二组取舍。从研究工作流到模块边界，从证据与状态到界面的空间、反馈和恢复。</p><p class="scope">技术负责人阅读版 · 系列始于 2026-10-12 / 2026-10-14 最近修订 · 非发布说明<br>配图为机制与布局示意，不是真实终端截图或效果测量。<a href="./editorial-notes.md">证据与编辑说明</a></p></header><section class="contents" id="contents" aria-labelledby="contents-title"><h2 id="contents-title">沿着产品、技术架构与 UI/UX 阅读</h2><p class="scope">产品：08 → 11 → 12 → 07　·　架构：01 → 09 → 02 → 03 → 04 → 05　·　UI/UX：10 → 11 → 12 → 06</p><nav aria-label="文章目录"><a href="#chapter-01"><span>01</span>内核与所有权</a>
+<a href="#chapter-12"><span>12</span>反馈与失败恢复</a></nav><a class="back" href="../README.md">← 项目文档</a></aside><main id="main"><header class="hero" id="top"><p class="eyebrow">TWELVE NOTES ON BUILDING A RESEARCH AGENT</p><h1>Agent Engineering<span>产品、架构与体验，如何一起演进</span></h1><p class="lead">oh-my-quant 的十二个问题，十二组取舍。从研究工作流到模块边界，从证据与状态到界面的空间、反馈和恢复。</p><p class="scope">技术负责人阅读版 · 系列始于 2026-10-12 / 2026-10-15 最近修订 · 非发布说明<br>配图为机制与布局示意，不是真实终端截图或效果测量。<a href="./editorial-notes.md">证据与编辑说明</a></p></header><section class="contents" id="contents" aria-labelledby="contents-title"><h2 id="contents-title">沿着产品、技术架构与 UI/UX 阅读</h2><p class="scope">产品：08 → 11 → 12 → 07　·　架构：01 → 09 → 02 → 03 → 04 → 05　·　UI/UX：10 → 11 → 12 → 06</p><nav aria-label="文章目录"><a href="#chapter-01"><span>01</span>内核与所有权</a>
 <a href="#chapter-02"><span>02</span>数据与成功语义</a>
 <a href="#chapter-03"><span>03</span>上下文与恢复</a>
 <a href="#chapter-04"><span>04</span>工具与 Skill</a>
@@ -204,7 +204,7 @@ Skill 运行模式 = 这份工具集合与依赖证据能够支持的模式
 </ul>
 <p><a href="#chapter-03">← 上一篇</a> · <a href="#chapter-05">下一篇：测试全绿，为什么仍然不能交付一个结论 →</a></p>
 </article>
-<article id="chapter-05" aria-labelledby="chapter-05-title"><p class="eyebrow">FIELD NOTES / 05</p><h2 id="chapter-05-title">测试全绿，为什么仍然不能交付一个结论</h2><p class="article-meta">初稿 2026-10-12 · 修订 2026-10-13 · oh-my-quant · <a href="./05-evaluation-beyond-green.md">Markdown 原文</a></p><p>2026-09-14 的核验记录里，有两个事实同时成立：调整后的项目测试 691 项通过；独立回测探针仍算出了错误权益。绿色结果没有撒谎，它只是没有检查这些数值契约。</p>
+<article id="chapter-05" aria-labelledby="chapter-05-title"><p class="eyebrow">FIELD NOTES / 05</p><h2 id="chapter-05-title">测试全绿，为什么仍然不能交付一个结论</h2><p class="article-meta">初稿 2026-10-12 · 修订 2026-10-15 · oh-my-quant · <a href="./05-evaluation-beyond-green.md">Markdown 原文</a></p><p>2026-09-14 的核验记录里，有两个事实同时成立：调整后的项目测试 691 项通过；独立回测探针仍算出了错误权益。绿色结果没有撒谎，它只是没有检查这些数值契约。</p>
 <h3>什么证据足以支持一个研究结论？</h3>
 <p>测试首先帮助我们确认程序行为：参数校验、工具调用、状态提交和页面渲染是否符合预期。Agent 应用还需要确认外部请求是否可用、模型是否选择正确工具，以及最终文字是否忠实于结果。</p>
 <p>这些工作都可以叫验证，但不能因此合成一张没有边界的成绩单。模型正常结束，不等于研究条件满足；研究条件满足，也不等于每个解释都正确。</p>
@@ -251,6 +251,7 @@ equity[t] = cash[t] + positionShares[t] × price[t]
 <p>六因子的真实运行就是这个区别：数值已经正确，表头、中文逗号和编号标题仍使有限解析器误判；调整解析器后离线重读原文，只能更新重审结论，不能制造一次新的模型通过。同时，回答仍可能把均线差说成斜率，或对极小样本给出过强解释。源码快照与人工审阅分别留在<a href="../../output/quant-factor-final-freeze-2026-10-13.json">本地修订记录</a>和<a href="../../output/quant-factor-production-review-2026-10-13.json">回答复核</a>；旧 33 场景与新增后的 34 场景也不能拼接为同一总体成功率。</p>
 <p>因此，一份回执要留下任务、输入、真实或合成环境、检查规则版本、失败回答位置，以及未验证项。成功率的分母也要固定：返回文字、完成工具、满足任务条件、人工确认解释正确，不是同一个事件。</p>
 <p>文档清理在这里有一条硬边界：旧汇编可以删除，错误不能被改写成成功。我们把有解释力的失败与修正写进本文，把可重复输入放在测试、原始回执留在内部输出；没有把每次测试数量和运行日志重新搬成一本博客附录。代价是本文不再提供逐次运行的完整历史，追溯个别数字仍需对应原始回执。</p>
+<p>工程回归本身也会偷带本机假设。2026-10-15 整理测试入口时，本地全量通过，但<a href="https://github.com/yangjingo/oh-my-quant/actions/runs/38603140139">干净 Windows CI</a>暴露 Doctor JSON 的「提示必须为空」依赖预装 AKShare。后来把测试改为显式缺 Python，断言 Tools 失败原因与结构化回执，而不把联网跳过误当依赖已经就绪。同期首个同步子进程返回空退出状态：最初怀疑工作目录，固定入口后全量仍复现、单组却通过。这份反例没有证明 Bun 的具体根因；测试改为等待实际退出并读完输出，仍检查退出码和原 JSON 契约。<a href="../../tests/app/index.test.ts">入口回归</a>维护可重复条件，完整发布门槛与最终提交 CI 仍须分别通过，不能把单组成功外推成整库成功。</p>
 <p>对下一笔工程投入，我们更愿意从反例出发。缺数据就修数据链路，误读口径就改证据与解释检查，调用越界就审查资源装配。测试的价值不仅是让发布前多一个勾选，还在于让「下一步改哪里」有具体依据。</p>
 <h3>实现索引</h3>
 <ul>

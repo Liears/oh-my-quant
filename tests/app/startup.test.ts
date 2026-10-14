@@ -28,20 +28,24 @@ afterAll(() => {
   if (root && resolve(root).startsWith(resolve(tmpdir()) + sep)) rmSync(root, { recursive: true, force: true });
 });
 
-function run(runtime: string, entry: string, args: string[], guards: Record<string, string> = {}) {
+async function run(runtime: string, entry: string, args: string[], guards: Record<string, string> = {}) {
   // No inherited provider secrets or user settings; all fixture data is disposable.
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => /^(PATH|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|TEMP|TMP)$/i.test(key)));
   const state = join(root, `state-${crypto.randomUUID()}`);
-  return { state, ...Bun.spawnSync([runtime, join(root, "bundle", entry), ...args], {
+  const child = Bun.spawn([runtime, join(root, "bundle", entry), ...args], {
     cwd: root, env: { ...env, OHQUANT_DIR: state, HOME: root, USERPROFILE: root, ...guards },
     stdout: "pipe", stderr: "pipe", timeout: 15000,
-  }) };
+  });
+  const [exitCode, stdout, stderr] = await Promise.all([
+    child.exited, new Response(child.stdout).arrayBuffer(), new Response(child.stderr).arrayBuffer(),
+  ]);
+  return { state, exitCode, stdout: Buffer.from(stdout), stderr: Buffer.from(stderr) };
 }
 for (const runtime of [process.execPath, "node"]) {
   const label = runtime === "node" ? "Node" : "Bun";
-  test(`${label}: help, version and invalid arguments never load application services`, () => {
+  test(`${label}: help, version and invalid arguments never load application services`, async () => {
     for (const args of [["--help"], ["--version"], ["--help", "--version"], ["--unknown"], ["-c"]]) {
-      const result = run(runtime, "index.js", ["--json", ...args], { WHYJ_TEST_NO_SDK: "1", WHYJ_TEST_SHELL_ONLY: "1" });
+      const result = await run(runtime, "index.js", ["--json", ...args], { WHYJ_TEST_NO_SDK: "1", WHYJ_TEST_SHELL_ONLY: "1" });
       expect(result.stderr.toString()).toBe("");
       const body = JSON.parse(result.stdout.toString());
       expect(body.ok).toBe(args.length === 1 && ["--help", "--version"].includes(args[0]!));
@@ -50,8 +54,8 @@ for (const runtime of [process.execPath, "node"]) {
     }
   }, 30000);
   for (const mode of ["catalog", "transports", "abort", "oauth"]) {
-    test(`${label}: isolated split bundle supports ${mode}`, () => {
-      const result = run(runtime, "lazy-startup.js", [mode], mode === "catalog" ? { WHYJ_TEST_NO_SDK: "1" } : {});
+    test(`${label}: isolated split bundle supports ${mode}`, async () => {
+      const result = await run(runtime, "lazy-startup.js", [mode], mode === "catalog" ? { WHYJ_TEST_NO_SDK: "1" } : {});
       expect(result.stderr.toString()).toBe("");
       expect(result.exitCode).toBe(0);
       expect(JSON.parse(result.stdout.toString())).toEqual({ ok: true, mode });

@@ -208,6 +208,8 @@ storage
 
 `npm test` 显式运行 `src` 与 `tests` 两个测试根，`npm run test:modules` 和 `npm run test:integration` 可分别执行。默认 Bun 发现同样排除 module dev、手动 Artifact 生成器、reference、desktop、site 和内部 output 等目录；不能为了检查文件迁移，顺带执行付费模型或真实市场脚本。根目录 `scripts/` 已退役，测试围栏要求目录不存在；迁移后未清理的旧缓存也会使该门槛失败。
 
+跨模块子进程回归固定仓库入口与工作目录，不能依赖其他用例留下的 `process.cwd()`。Doctor CLI 测试只继承宿主进程必需变量，显式设置合成凭证、禁用网络并指定不存在的 Python；验证 Tools 缺依赖时仍返回结构化诊断，不要求维护者或 CI 预先安装 AKShare。真实依赖可用性另由显式 Doctor/探针验证。
+
 常用入口为 `npm run dev`、`npm run build`、`npm start`、`npm test` 和 `npm run check`，具体范围及开发依赖见[英文 README](../../README.md#development)。npm 统一调度，底层构建和测试继续使用 Bun；本轮没有更换测试框架，也没有把脚本移动当成真实性验收。
 
 ## 当前文档
