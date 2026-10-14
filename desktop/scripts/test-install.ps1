@@ -11,7 +11,7 @@ $installDir = Join-Path $env:RUNNER_TEMP '安装 验收\WhyJ Quant'
 $exe = Join-Path $installDir 'WhyJ Quant.exe'
 $uninstallRoot = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
 function Get-InstalledApp {
-  @(Get-ChildItem $uninstallRoot | Get-ItemProperty | Where-Object DisplayName -eq 'WhyJ Quant')
+  @(Get-ChildItem $uninstallRoot | Get-ItemProperty | Where-Object { $_.DisplayName -match '^WhyJ Quant(?: \d.*)?$' })
 }
 if ((Get-InstalledApp).Count -ne 0 -or (Test-Path -LiteralPath $installDir)) {
   throw 'Expected a clean account without an existing WhyJ Quant installation.'
@@ -29,6 +29,7 @@ function Install-App([string[]]$InstallerArguments) {
   if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
   if (-not (Test-Path -LiteralPath $exe)) { throw "Installed executable missing: $exe" }
   if ((Get-InstalledApp).Count -ne 1) { throw 'Per-user uninstall registration missing or duplicated.' }
+  if ((Get-InstalledApp)[0].DisplayVersion -ne $version) { throw 'Registered version does not match the installer.' }
   if ((Get-Content -LiteralPath $sentinel -Raw) -ne $marker) { throw 'Research data changed during installation.' }
   $shell = New-Object -ComObject WScript.Shell
   foreach ($folder in @([Environment]::GetFolderPath('DesktopDirectory'), [Environment]::GetFolderPath('Programs'))) {
