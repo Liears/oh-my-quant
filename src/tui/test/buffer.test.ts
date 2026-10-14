@@ -1,13 +1,19 @@
 import { describe, expect, it } from "bun:test";
 import { EventEmitter } from "node:events";
 import { Writable } from "node:stream";
-import { Buffer, Screen, ansi } from "../src/buffer.ts";
+import { Buffer, Screen, ansi, strWidth } from "../src/buffer.ts";
 import { CANVAS, S } from "../src/styles.ts";
 
 describe("buffer render", () => {
+  it("exports mixed-width plain rows at their cell width without adding extra padding", () => {
+    const buffer = new Buffer(12, 2);
+    buffer.text(0, 0, "A中文B");
+    expect(buffer.toPlain()[0]).toBe("A中文B      ");
+    expect(buffer.toPlain().map(strWidth)).toEqual([12, 12]);
+  });
   it("resets dim before non-dim cells on the same row", () => {
     const buf = new Buffer(24, 1);
-    buf.text(0, 0, "dim", S.thinking);
+    buf.text(0, 0, "dim", { ...S.thinking, dim: true });
     buf.text(8, 0, "ok", S.cream, Infinity, 24);
     const rendered = buf.render();
     const okIdx = rendered.indexOf("ok");
@@ -19,7 +25,7 @@ describe("buffer render", () => {
   it("does not leave dim active after canvas padding cells", () => {
     const buf = new Buffer(20, 1);
     buf.fillRect({ x: 0, y: 0, w: 20, h: 1 }, { fg: CANVAS });
-    buf.text(2, 0, "think", S.thinking);
+    buf.text(2, 0, "think", { ...S.thinking, dim: true });
     const rendered = buf.render();
     const tail = rendered.slice(rendered.indexOf("think") + 5);
     const nextStyle = tail.match(/\x1b\[[0-9;]*m/);

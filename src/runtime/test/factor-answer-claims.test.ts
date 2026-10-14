@@ -1,6 +1,34 @@
 import { expect, it } from "bun:test";
 import { factorLatestClaimViolations, hasExplicitFactorLatestClaim, knownFactorAnswerViolations } from "../evidence/factor-answer-claims.ts";
 
+it.each([
+  "momentum 分位不预测后续收益，均值回归已经出现。",
+  "momentum 分位不预测后续收益，因此均值回归已成立。",
+  "momentum 分位不预测后续收益，同时存在均值回归。",
+  "不预测后续收益、均值回归已经出现。",
+  "不预测后续收益，均值回归或交易优势已经出现。",
+  "均值回归，尚未确认后续收益。",
+  "Mean reversion is present, future returns were not tested.",
+])("does not extend a limitation to an independent assertion: %s", text => {
+  expect(knownFactorAnswerViolations(text)).toEqual(["unsupported-mean-reversion-claim"]);
+});
+
+it("allows explicit non-prediction without hiding a subsequent mean-reversion assertion", () => {
+  expect(knownFactorAnswerViolations("momentum 分位不预测后续收益或均值回归。")).toEqual([]);
+  expect(knownFactorAnswerViolations("momentum 分位不预测后续收益或均值回归，但能确认均值回归。"))
+    .toEqual(["unsupported-mean-reversion-claim"]);
+  expect(knownFactorAnswerViolations("momentum 分位不预测后续收益，均值回归已经确认。"))
+    .toEqual(["unsupported-mean-reversion-claim"]);
+  expect(knownFactorAnswerViolations("momentum 分位不预测后续收益或均值回归，同时本指标能确认均值回归。"))
+    .toEqual(["unsupported-mean-reversion-claim"]);
+  for (const warning of ["不能同时确认均值回归。", "历史分位无法同时检验均值回归和收益预测。",
+    "不检验未来收益, mean reversion 或预测优势。", "不预测后续收益，均值回归或交易优势。",
+    "均值回归，尚未确认。", "均值回归，需进一步检验。", "均值回归，仍待验证。",
+    "不预测后续收益，均值回归，交易优势。", "Mean reversion, requires testing.", "Mean reversion, not established."]) {
+    expect(knownFactorAnswerViolations(warning)).toEqual([]);
+  }
+});
+
 it("flags an asserted reversal from a low momentum rank while allowing explicit uncertainty", () => {
   expect(knownFactorAnswerViolations("momentum(2) 最新值 0.0146 低于均值，分位 0%：属短周期均值回归型特征。"))
     .toEqual(["unsupported-mean-reversion-claim"]);

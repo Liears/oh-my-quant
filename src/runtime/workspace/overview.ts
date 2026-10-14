@@ -104,7 +104,8 @@ function buildMarketSection(marketQuotes: OverviewQuote[]): PanelSection {
 }
 
 function buildSourceSection(meta: OverviewPullMeta, refreshedAt: Date, rows: OverviewQuote[]): PanelSection {
-  const dates = [...new Set(meta.asOfDates)].sort();
+  const dates = [...new Set([...meta.asOfDates, ...rows.flatMap(row => row.observation?.asOfDate ? [row.observation.asOfDate] : [])])].sort();
+  const retained = rows.filter(row => row.refreshState).length;
   const asOfDate = dates.length > 1 ? `${dates[0]} → ${dates.at(-1)}` : dates[0] ?? "--";
   return {
     kind: "keyvalue",
@@ -113,7 +114,7 @@ function buildSourceSection(meta: OverviewPullMeta, refreshedAt: Date, rows: Ove
       { label: "来源", value: formatSourceLabels(meta.sources) },
       { label: "更新", value: formatRefreshMinute(refreshedAt) },
       { label: "数据", value: asOfDate },
-      { label: "覆盖", value: `${rows.filter(row => Number.isFinite(row.price) && Number.isFinite(row.pct)).length}/${rows.length} 可用` },
+      { label: "覆盖", value: `${rows.filter(row => !row.refreshState && Number.isFinite(row.price) && Number.isFinite(row.pct)).length}/${rows.length} 可用${retained ? ` · ${retained} 旧数据` : ""}` },
     ],
   };
 }

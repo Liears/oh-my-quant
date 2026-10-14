@@ -1,5 +1,26 @@
 import { unquotedMethodProse } from "./performance-method-claims.ts";
 
+const LIST_TOPIC = String.raw`(?:未来收益|后续收益|收益预测|交易优势|预测优势|均值回(?:归|复)|mean[-\s]?reversion)`;
+const TOPIC_LIST = `${LIST_TOPIC}(?:\\s*(?:或|和|及|与|、|，|,|\\band\\b|\\bor\\b)\\s*${LIST_TOPIC})*`;
+const NOMINAL_LIST = new RegExp(`^\\s*${TOPIC_LIST}\\s*$`, "iu");
+const NEGATED_LIST_END = new RegExp(`(?:不预测|不检验|不测试|不能预测|不能检验|不能测试|无法预测|无法检验|无法测试)\\s*${TOPIC_LIST}\\s*$`, "iu");
+const POSTPOSED_LIMITATION = /^(?:(?:仍)?(?:尚未|未|未经|没有|尚无|待|需要|尚待|需)(?:被|经|进一步)?(?:检验|验证|证明|确认|测试)|not tested|untested|unverified|not established|requires? testing)$/iu;
+
+/** Commas delimit claims, except a bounded negated topic list or a postposed limitation. */
+function meanReversionClauses(text: string): string[] {
+  return text.split(/(?:[。！？；;\n]|\.(?!\d)|但(?:是)?|然而|\bbut\b)/iu).flatMap(sentence => {
+    const clauses: string[] = [];
+    for (const fragment of sentence.split(/[，,、]/u).map(part => part.trim())) {
+      const previous = clauses.at(-1);
+      if (previous && (NOMINAL_LIST.test(fragment) && NEGATED_LIST_END.test(previous)
+        || NOMINAL_LIST.test(previous) && POSTPOSED_LIMITATION.test(fragment))) {
+        clauses[clauses.length - 1] = `${previous}，${fragment}`;
+      } else clauses.push(fragment);
+    }
+    return clauses;
+  });
+}
+
 /** Narrow regression check for the fixed factor/risk evaluation, not a semantic judge. */
 export function knownFactorAnswerViolations(text: string): string[] {
   const topic = /均值回(?:归|复)|mean[-\s]?reversion/iu;
@@ -7,7 +28,7 @@ export function knownFactorAnswerViolations(text: string): string[] {
   const untested = /(?:均值回(?:归|复)|mean[-\s]?reversion).{0,35}(?:未|未经|尚未|没有|尚无|待|需要|尚待|需)(?:被|经|进一步)?(?:检验|验证|证明|确认|测试)/iu;
   const pending = /(?:需|需要|待|尚待|应).{0,20}(?:检验|验证|测试).{0,20}(?:均值回(?:归|复)|mean[-\s]?reversion)/iu;
   const englishRejected = /(?:not|no|cannot|never|without).{0,35}mean[-\s]?reversion|mean[-\s]?reversion.{0,35}(?:not tested|untested|unverified|not established|requires? testing)/iu;
-  const meanReversion = text.split(/(?:[。！？；\n]|但(?:是)?|然而|\bbut\b)/iu).some(clause => topic.test(clause) && !rejected.test(clause)
+  const meanReversion = meanReversionClauses(text).some(clause => topic.test(clause) && !rejected.test(clause)
     && !untested.test(clause) && !pending.test(clause) && !englishRejected.test(clause))
     ? ["unsupported-mean-reversion-claim"] : [];
   return [...meanReversion, ...annualizationProhibitionViolations(text)];

@@ -228,8 +228,8 @@ describe("panel isolation", () => {
 
     const x = rows[y].indexOf("Need");
     const cell = buf.cells[y * buf.w + x];
-    expect(cell.fg).toBe("#7F807D");
-    expect(cell.dim).toBe(true);
+    expect(cell.fg).toBe(S.thinking.fg);
+    expect(cell.dim).not.toBe(true);
   });
 
   it("keeps finalized thinking content without a polite heading", () => {
@@ -250,8 +250,8 @@ describe("panel isolation", () => {
 
     const x = rows[y].indexOf("Need");
     const cell = buf.cells[y * buf.w + x];
-    expect(cell.fg).toBe("#7F807D");
-    expect(cell.dim).toBe(true);
+    expect(cell.fg).toBe(S.thinking.fg);
+    expect(cell.dim).not.toBe(true);
   });
 
   it("renders active thinking status and tips on separate bottom lines", () => {
@@ -940,7 +940,7 @@ describe("drawStatus", () => {
     const turnLabelX = statusLine.indexOf("T 7");
     const turnTCell = buf.cells[3 * buf.w + turnLabelX];
     const turnValueCell = buf.cells[3 * buf.w + turnLabelX + 2];
-    expect(turnTCell.dim).toBe(true);
+    expect(turnTCell.dim).not.toBe(true);
     expect(turnTCell.fg).toBe(S.dim.fg);
     expect(turnValueCell.fg).toBe(S.code.fg);
   });

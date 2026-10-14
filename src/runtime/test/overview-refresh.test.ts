@@ -75,14 +75,13 @@ it("supersedes a hung generation immediately, reads the latest portfolio, and re
 it("keeps the last values visibly stale after failure or timeout and recovers on the following refresh", async () => {
   let mode = "success";
   const panels: PanelSection[][] = [], measures: OverviewRefreshMeasurement[] = [];
-  const portfolio = loadPanelPortfolio();
   // Test lifecycle outcomes, not whether filesystem reads finish within a 10 ms deadline.
-  const refresh = new OverviewRefresh({ intervalMs: 0, timeoutMs: 1000, loadPortfolio: () => portfolio,
+  const refresh = new OverviewRefresh({ intervalMs: 0, timeoutMs: 1000, loadPortfolio: () => ({ symbols: [] }),
     onPanel: panel => panels.push(panel), onMeasurement: value => { measures.push(value); },
-    quoteFetcher: async () => {
+    quoteFetcher: async entries => {
       if (mode === "error") throw new Error("PRIVATE provider detail");
       if (mode === "timeout") return new Promise(() => {});
-      return [{ code: "000001.SH", name: "saved", price: 105, pct: 5 }];
+      return entries.map(entry => ({ ...entry, price: 105, pct: 5 }));
     }, holdingFetcher: async () => [],
   });
   disposables.push(refresh);
@@ -92,7 +91,11 @@ it("keeps the last values visibly stale after failure or timeout and recovers on
   for (mode of ["error", "timeout"]) {
     await refresh.refresh();
     const panel = panels.at(-1)!;
-    expect(panel.slice(1)).toEqual(first);
+    const retained = panel.find(section => section.kind === "quotes");
+    expect(retained?.kind).toBe("quotes");
+    if (retained?.kind === "quotes") {
+      expect(retained.rows.every(row => row.price === 105 && row.refreshState === "stale")).toBe(true);
+    }
     const text = JSON.stringify(panel);
     expect(text).toContain(mode); expect(text).toContain("stale"); expect(text).not.toContain("PRIVATE");
   }
@@ -149,10 +152,10 @@ it("publishes usable rows before a slow request finishes and retains this genera
   expect(panels).toEqual(saved);
 });
 
-it("does not mix previous quotes into a partially refreshed generation or accept callbacks after superseding it", async () => {
+it("labels retained previous quotes during partial refresh and rejects callbacks after superseding it", async () => {
   const panels: PanelSection[][] = [], measures: OverviewRefreshMeasurement[] = [];
   let round = 0, late: (() => void) | undefined;
-  const refresh = new OverviewRefresh({ intervalMs: 0, timeoutMs: 1000,
+  const refresh = new OverviewRefresh({ intervalMs: 0, timeoutMs: 1000, loadPortfolio: () => ({ symbols: [] }),
     onPanel: panel => panels.push(panel), onMeasurement: value => { measures.push(value); },
     quoteFetcher: async (entries, meta) => {
       round++;
@@ -169,8 +172,9 @@ it("does not mix previous quotes into a partially refreshed generation or accept
   await refresh.refresh();
   const second = refresh.refresh(); await setImmediate();
   const interim = JSON.stringify(panels.at(-1));
-  expect(interim).toContain('"price":200'); expect(interim).not.toContain('"price":100');
-  expect(interim).toContain("1/7 已返回");
+  expect(interim).toContain('"price":200'); expect(interim).toContain('"price":100');
+  expect(interim).toContain('"refreshState":"refreshing"');
+  expect(interim).toContain("1/5 已返回");
   const third = refresh.refresh();
   await Promise.all([second, third]);
   expect(measures.map(value => value.outcome)).toEqual(["success", "superseded", "success"]);
@@ -264,7 +268,7 @@ it("stops dispatching queued quotes when response processing exhausts the round 
 it("retains only on-time partial rows after synchronous work overruns the budget and recovers next round", async () => {
   const panels: PanelSection[][] = [], measures: OverviewRefreshMeasurement[] = [];
   let overrun = true;
-  const refresh = new OverviewRefresh({ intervalMs: 0, timeoutMs: 20,
+  const refresh = new OverviewRefresh({ intervalMs: 0, timeoutMs: 20, loadPortfolio: () => ({ symbols: [] }),
     onPanel: panel => panels.push(panel), onMeasurement: value => { measures.push(value); },
     quoteFetcher: async (entries, meta) => {
       const rows = entries.map((entry, index) => ({ ...entry, price: 100 + index, pct: 5 }));
@@ -283,7 +287,7 @@ it("retains only on-time partial rows after synchronous work overruns the budget
   const panel = JSON.stringify(panels.at(-1));
   expect(panel).toContain('"price":100');
   expect(panel).not.toContain('"price":101');
-  expect(panel).toContain("1/7 已返回 · 未返回项 --");
+  expect(panel).toContain("1/5 已返回 · 未返回项 --");
   expect(panel).not.toContain("stale");
   overrun = false; await refresh.refresh();
   expect(measures[1]).toMatchObject({ outcome: "success", availableRows: 5 });

@@ -15,6 +15,7 @@ import { buildSuggestions, hitTestScrollRegion, nextInputAction, type InputActio
 import { loadRuntimeSkillSuggestions } from "../../runtime/skills/skill-suggestions.ts";
 import { copyToClipboard } from "./clipboard.ts";
 import { resolveCopyText } from "./tui-copy.ts";
+import { DEFAULT_APP_KEYBINDINGS } from "./model-settings-panel.ts";
 import {
   applyScrollDelta as applyScrollDeltaToState,
   clampScrollState as clampScrollStateForLayout,
@@ -40,6 +41,9 @@ export class QuantTui {
   private panelRefreshHandler: (() => void) | null = null;
   private configurationChangeHandler: (() => void) | null = null;
   private doctorCloseHandler: (() => void) | null = null;
+  private researchInterruptHandler: (() => void) | null = null;
+  private failedQuotesRetryHandler: (() => void) | null = null;
+  private readonly operationBindings: Record<"interruptResearch" | "retryFailedQuotes", readonly string[]>;
   private running = false;
   private animTimer: ReturnType<typeof setInterval> | null = null;
   private suggestionIdx = 0;
@@ -67,8 +71,11 @@ export class QuantTui {
   private copyStatusTimer: ReturnType<typeof setTimeout> | null = null;
   private portfolioStatusTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(state: AppState) {
+  constructor(state: AppState, bindings: Partial<Record<"interruptResearch" | "retryFailedQuotes", readonly string[]>> = {}) {
     this.state = state;
+    this.operationBindings = { ...DEFAULT_APP_KEYBINDINGS, ...bindings };
+    this.state.researchInterruptKey = this.operationBindings.interruptResearch[0];
+    this.state.failedQuotesRetryKey = this.operationBindings.retryFailedQuotes[0];
     this.screen = new Screen(process.stdout);
   }
 
@@ -100,6 +107,9 @@ export class QuantTui {
   }
 
   update(partial: Partial<AppState>): void {
+    if (partial.activity === "thinking" || partial.activity === "running tool") {
+      this.state.researchStartedAt ??= Date.now();
+    } else if (partial.activity === "ready") this.state.researchStartedAt = undefined;
     Object.assign(this.state, partial);
     if (!this.running) return;
     this.screen.resize();
@@ -112,6 +122,8 @@ export class QuantTui {
   onPanelRefresh(handler: () => void): void { this.panelRefreshHandler = handler; }
   onConfigurationChange(handler: () => void): void { this.configurationChangeHandler = handler; }
   onDoctorClose(handler: () => void): void { this.doctorCloseHandler = handler; }
+  onResearchInterrupt(handler: () => void): void { this.researchInterruptHandler = handler; }
+  onFailedQuotesRetry(handler: () => void): void { this.failedQuotesRetryHandler = handler; }
   openConfig(): void { this.panel.open("config"); this.paint(); }
   openDoctor(doctor?: unknown): void {
     if (!this.panel.isDoctorMode()) this.panel.open("doctor");
@@ -383,6 +395,16 @@ export class QuantTui {
       sequence: action.char ?? (action.name || ""),
     };
     const ch = action.char ?? "";
+    const chord = `${key.ctrl ? "ctrl+" : ""}${key.meta ? "meta+" : ""}${key.shift ? "shift+" : ""}${key.name ?? ch}`;
+    if (this.operationBindings.interruptResearch.includes(chord)
+      && (this.state.activity === "thinking" || this.state.activity === "running tool")) {
+      this.researchInterruptHandler?.();
+      return;
+    }
+    if (this.operationBindings.retryFailedQuotes.includes(chord)) {
+      this.failedQuotesRetryHandler?.();
+      return;
+    }
 
     if (this.panel.isOpen()) {
       const result = this.panel.handleKey(ch, key);
