@@ -73,9 +73,15 @@ describe("CLI doctor command", () => {
         ready: true,
         auth: expect.any(Object),
         config: expect.any(Object),
-        hints: [],
+        hints: expect.any(Array),
       }),
     }));
+    // Network probes are skipped; local Python/AKShare readiness still depends
+    // on the machine. Every failed phase must retain its actionable diagnosis.
+    const failedPhases = body.data.phases.filter((phase: { status: string }) => phase.status === "fail");
+    expect(body.data.overall).toBe(failedPhases.length ? "partial_fail" : "all_pass");
+    expect(body.data.hints).toEqual([...new Set(failedPhases
+      .map((phase: { action?: string }) => phase.action).filter(Boolean))]);
     expect(body.data.auth.WHYJ_QUANT_API_KEY).toEqual(expect.objectContaining({
       available: true,
       source: "env",

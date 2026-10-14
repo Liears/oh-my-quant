@@ -7,6 +7,14 @@ import { DEFAULT_SETTINGS } from "../../types/config.ts";
 import { isCompleteEvaluationAnswer } from "../evaluation/evaluation-answers.ts";
 import { createSkillWorkflowReader, runSkillEvaluation, stageSkillEvaluation } from "../evaluation/skill-evaluation.ts";
 
+// Include cold Pi/skill initialization in the deadline without assuming that a
+// hosted Windows runner can reach the provider in 250 ms. The fixture must stay
+// stalled beyond the assertion budget so a missing abort still fails the test.
+const DEADLINE_MS = 2_000;
+const COMPLETION_BUDGET_MS = 8_000;
+const STALL_MS = 10_000;
+const TEST_TIMEOUT_MS = 15_000;
+
 let root: string, previous: string | undefined, proxy: string | undefined;
 let server: ReturnType<typeof Bun.serve>, requests: number, delayResponse: boolean, callWorkflow: boolean;
 let onRequest: () => void;
@@ -32,7 +40,7 @@ beforeEach(() => {
     if (!delayResponse) return new Response(body, { headers: { "content-type": "text/event-stream" } });
     // A bounded stalled stream makes the missing-abort regression fail without hanging the suite.
     return new Response(new ReadableStream({ start(controller) {
-      const timer = setTimeout(() => { controller.enqueue(new TextEncoder().encode(body)); controller.close(); }, 1200);
+      const timer = setTimeout(() => { controller.enqueue(new TextEncoder().encode(body)); controller.close(); }, STALL_MS);
       timers.push(timer);
     } }), { headers: { "content-type": "text/event-stream" } });
   } });
@@ -61,11 +69,11 @@ function setup() {
 test("skill deadline interrupts a stalled real Pi provider stream", async () => {
   delayResponse = true;
   const { deps, reader } = setup();
-  const report = await runSkillEvaluation("skill-risk-health", deps, reader.trace, { timeoutMs: 250 });
+  const report = await runSkillEvaluation("skill-risk-health", deps, reader.trace, { timeoutMs: DEADLINE_MS });
   expect(report.outcome).toBe("timeout"); expect(report.passed).toBe(false);
   expect(requests).toBe(1); expect(report.requests).toBe(1);
-  expect(report.durationMs).toBeLessThan(1000); expect(report.answers.some(isCompleteEvaluationAnswer)).toBe(false);
-});
+  expect(report.durationMs).toBeLessThan(COMPLETION_BUDGET_MS); expect(report.answers.some(isCompleteEvaluationAnswer)).toBe(false);
+}, TEST_TIMEOUT_MS);
 
 test("external cancellation interrupts a stalled real Pi provider stream", async () => {
   delayResponse = true;
@@ -74,8 +82,8 @@ test("external cancellation interrupts a stalled real Pi provider stream", async
   const report = await runSkillEvaluation("skill-risk-health", deps, reader.trace, { signal: controller.signal, timeoutMs: 3000 });
   expect(report.outcome).toBe("cancelled"); expect(report.passed).toBe(false);
   expect(requests).toBe(1); expect(report.requests).toBe(1);
-  expect(report.durationMs).toBeLessThan(1000); expect(report.answers.some(isCompleteEvaluationAnswer)).toBe(false);
-});
+  expect(report.durationMs).toBeLessThan(COMPLETION_BUDGET_MS); expect(report.answers.some(isCompleteEvaluationAnswer)).toBe(false);
+}, TEST_TIMEOUT_MS);
 
 test("pre-cancelled skill evaluation makes no provider request", async () => {
   const controller = new AbortController(); controller.abort();
@@ -104,15 +112,15 @@ test("skill deadline reaches an executing workflow tool without another provider
     entered = true;
     await new Promise<void>((done, reject) => {
       const abort = () => { aborted = true; clearTimeout(timer); reject(signal?.reason); };
-      const timer = setTimeout(() => { signal?.removeEventListener("abort", abort); done(); }, 1200);
+      const timer = setTimeout(() => { signal?.removeEventListener("abort", abort); done(); }, STALL_MS);
       timers.push(timer); signal?.addEventListener("abort", abort, { once: true });
       if (signal?.aborted) abort();
     });
     return execute(id, args, signal, update);
   };
-  const report = await runSkillEvaluation("skill-risk-health", deps, reader.trace, { timeoutMs: 250 });
+  const report = await runSkillEvaluation("skill-risk-health", deps, reader.trace, { timeoutMs: DEADLINE_MS });
   expect(report.outcome).toBe("timeout"); expect(report.passed).toBe(false);
   expect(entered).toBe(true); expect(aborted).toBe(true);
   expect(requests).toBe(1); expect(reader.trace.reads).toHaveLength(0);
-  expect(report.durationMs).toBeLessThan(1000);
-});
+  expect(report.durationMs).toBeLessThan(COMPLETION_BUDGET_MS);
+}, TEST_TIMEOUT_MS);
