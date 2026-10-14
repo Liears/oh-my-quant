@@ -11,6 +11,7 @@ $installDir = Join-Path $env:RUNNER_TEMP '安装 验收\WhyJ Quant'
 $exe = Join-Path $installDir 'WhyJ Quant.exe'
 $uninstallRoot = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
 function Get-InstalledApp {
+  if (-not (Test-Path -LiteralPath $uninstallRoot)) { return @() }
   @(Get-ChildItem $uninstallRoot | Get-ItemProperty | Where-Object { $_.DisplayName -match '^WhyJ Quant(?: \d.*)?$' })
 }
 if ((Get-InstalledApp).Count -ne 0 -or (Test-Path -LiteralPath $installDir)) {
