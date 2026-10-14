@@ -278,8 +278,8 @@ export class Buffer {
         if (c.cont) continue;
         line += c.ch === "" ? " " : c.ch;
       }
-      // Pad to full width: cont cells (from double-width chars) shorten the line
-      while (line.length < this.w) line += " ";
+      // Continuation cells are already represented by the wide glyph's display width.
+      while (strWidth(line) < this.w) line += " ";
       rows.push(line);
     }
     return rows;

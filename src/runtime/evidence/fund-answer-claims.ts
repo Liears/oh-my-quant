@@ -8,7 +8,7 @@ export interface VerifiedFundAnswerMetrics {
   maximumDrawdownTwr: number;
 }
 
-const METRIC_LABELS = /Principal\s+return|本金收益率|本金收益|Time[- ]weighted\s+return|时间加权收益率|TWR(?!\s*[)）])|Maximum\s+drawdown|MaxDD|最大回撤|XIRR|Annualized\s+return|年化收益率/giu;
+const METRIC_LABELS = /Principal\s+return|本金收益率|本金收益|Time[- ]weighted\s+return|时间加权收益率|TWR(?!\s*[)）])|(?:Maximum\s+drawdown|MaxDD|最大回撤)(?:\s*[(（]\s*TWR\s*(?:口径\s*)?[)）])?|XIRR|Annualized\s+return|年化收益率/giu;
 const PERCENT = /([+\-−]?\d+(?:[.]\d+)?)\s*[%％]/u;
 
 function metricCode(label: string): keyof VerifiedFundAnswerMetrics | null {

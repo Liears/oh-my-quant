@@ -1,5 +1,6 @@
 import type { Key } from "node:readline";
 import type { ModelProviderSettings, OhQuantSettings } from "../../types/config.ts";
+import { DEFAULT_TERMINAL_OPERATION_KEYBINDINGS } from "../../types/config.ts";
 import {
   createModelSettingsDraft, resolveConfiguredModel, configuredThinking, configuredThinkingLevels,
   modelProviders, providerModels, modelProtocols, selectModelProvider, modelAuthLabel, validateModelBaseUrl,
@@ -26,6 +27,7 @@ export const DEFAULT_APP_KEYBINDINGS = {
   helpSection: ["tab", "shift+tab"], helpUsage: ["?"],
   openAuthLink: ["ctrl+o"], authPageUp: ["pageup"], authPageDown: ["pagedown"],
   doctorPageUp: ["pageup"], doctorPageDown: ["pagedown"],
+  ...DEFAULT_TERMINAL_OPERATION_KEYBINDINGS,
 };
 type ModelKeybindings = Record<keyof typeof DEFAULT_EDITOR_KEYBINDINGS | keyof typeof DEFAULT_APP_KEYBINDINGS, readonly string[]>;
 

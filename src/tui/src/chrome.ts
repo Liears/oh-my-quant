@@ -51,7 +51,9 @@ export function drawComposer(
   const inner = buf.box(r, {
     title: "⌘ Composer",
     titleStyle: S.muted,
-    titleRight: isCmd
+    titleRight: st.activity === "thinking" || st.activity === "running tool"
+      ? `${st.activity === "running tool" ? "工具" : "推理"}${st.researchStartedAt ? ` ${Math.max(0, Math.floor((Date.now() - st.researchStartedAt) / 1000))}s` : ""}${st.researchInterruptKey ? ` · ${st.researchInterruptKey} 停止` : ""} · ↵ 排队`
+      : isCmd
       ? "↑↓ select · ↹ accept"
       : queueCount > 0
         ? `${queueCount} queued · ↵ send · / commands`
@@ -92,7 +94,7 @@ export function drawComposer(
     if (isCmd && lines.length <= available) buf.text(inner.x, inputRow, "/", S.goldB);
   } else {
     buf.text(inner.x, inputRow, "›", S.gold);
-    const hint = "write a task, or just ask a question…";
+    const hint = "输入研究问题 · /config 配置 · /artifact 报告";
     buf.text(inner.x + 2, inputRow, truncate(`${hint}▏`, inner.w - 2), S.dim);
     row++;
   }

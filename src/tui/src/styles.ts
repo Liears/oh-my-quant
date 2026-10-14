@@ -45,14 +45,14 @@ export const S = {
   cash:     { fg: CASH } as Style,
   cream:    { fg: CREAM } as Style,
   creamB:   { fg: CREAM, bold: true } as Style,
-  dim:      { fg: MUTED, dim: true } as Style,
+  dim:      { fg: MUTED } as Style,
   muted:    { fg: MUTED } as Style,
   mutedB:   { fg: MUTED, bold: true } as Style,
   rule:     { fg: HAIRLINE } as Style,
   positive: { fg: POSITIVE } as Style,
   negative: { fg: NEGATIVE } as Style,
-  code:     { fg: CODE_DIM } as Style,
-  thinking: { fg: THINKING, dim: true } as Style,
+  code:     { fg: MUTED } as Style,
+  thinking: { fg: MUTED } as Style,
   canvas:   { fg: CANVAS } as Style,
   selection:{ fg: SELECTION_FG, bg: SELECTION_BG, bold: true } as Style,
 
@@ -62,7 +62,7 @@ export const S = {
   tableKey:      { fg: GOLD } as Style,
   tableValue:    { fg: CREAM } as Style,
   tableStrong:   { fg: CREAM, bold: true } as Style,
-  tableNote:     { fg: MUTED, dim: true } as Style,
+  tableNote:     { fg: MUTED } as Style,
   tableRule:     { fg: HAIRLINE } as Style,
   tableSpacing:  { fg: MUTED, dim: true } as Style,
   tablePositive: { fg: POSITIVE } as Style,
@@ -75,7 +75,7 @@ export const S = {
   chartUp:       { fg: MARKET_UP, fgRole: "market-up" } as Style,
   chartDown:     { fg: MARKET_DOWN, fgRole: "market-down" } as Style,
   chartAxis:     { fg: HAIRLINE } as Style,
-  chartMuted:    { fg: MUTED, dim: true } as Style,
+  chartMuted:    { fg: MUTED } as Style,
 };
 
 export function pctStyle(pct: number): Style {

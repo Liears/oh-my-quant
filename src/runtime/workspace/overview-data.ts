@@ -7,7 +7,7 @@ import type { QuoteObservation } from "../../types/market-observation.ts";
 import type { OverviewBudget } from "./overview-budget.ts";
 
 export type OverviewSymbolEntry = MarketSymbol & { name: string; instrument?: "fund" | "security" };
-export type OverviewQuote = { code: string; name: string; price: number; pct: number; observation?: QuoteObservation };
+export type OverviewQuote = { code: string; name: string; price: number; pct: number; observation?: QuoteObservation; refreshState?: "refreshing" | "stale" };
 export type OverviewHolding = OverviewQuote;
 export interface OverviewPullMeta {
   signal?: AbortSignal;

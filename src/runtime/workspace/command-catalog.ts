@@ -1,3 +1,5 @@
+import { DEFAULT_TERMINAL_OPERATION_KEYBINDINGS } from "../../types/config.ts";
+
 export interface CommandCatalogEntry {
   name: string;
   desc: string;
@@ -31,6 +33,8 @@ export function buildCommandHelpText(): string {
     "",
     "Hotkeys",
     "  Ctrl+P     Open settings",
+    `  ${DEFAULT_TERMINAL_OPERATION_KEYBINDINGS.interruptResearch[0]}     Stop current research request (default; keeps saved evidence)`,
+    `  ${DEFAULT_TERMINAL_OPERATION_KEYBINDINGS.retryFailedQuotes[0]}     Retry failed Overview symbols (default)`,
     "  Enter      Submit input",
     "  Tab        Accept slash suggestion",
     "  Esc        Clear input / close panel",

@@ -35,6 +35,16 @@ function visible(panel: PanelController, width: number, height: number): string 
   const buf = new Buffer(width, height); panel.render(buf); return buf.toPlain().join("\n");
 }
 
+it.each([[60, 20], [80, 24], [120, 32]])("shows blocking failures and their repair before nonblocking warnings at %s x %s", (width, height) => {
+  const panel = controller();
+  try {
+    const first = visible(panel, width, height);
+    expect(first).toContain("DATA_FAILURE_MARKER");
+    expect(first).toContain("REPAIR_MARKER");
+    expect(first.indexOf("DATA_FAILURE_MARKER")).toBeLessThan(first.indexOf("Warn") === -1 ? first.length : first.indexOf("Warn"));
+  } finally { panel.close(); }
+});
+
 it.each([[60, 20], [80, 24], [120, 32]])("makes late failures, repairs and logs reachable without running checks at %s x %s", (width, height) => {
   const panel = controller();
   try {

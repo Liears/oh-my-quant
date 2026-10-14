@@ -2,6 +2,23 @@
 
 WhyJ Quant 的配置保存在 `.ohquant/settings.json`；`OHQUANT_DIR` 可指定其他配置目录。使用 `/config` 或 `Ctrl+P` 打开 Settings，选择 `Model`。Doctor 的 `Configure → Model connection` 打开同一个编辑器。
 
+<a id="terminal-keys"></a>
+
+## 研究操作快捷键
+
+默认 `Ctrl+G` 停止当前研究请求，`Ctrl+R` 仅重试失败的 Overview 标的。可在 `settings.json` 中配置，下一次启动生效；空数组禁用对应操作：
+
+```json
+{
+  "keybindings": {
+    "interruptResearch": ["ctrl+x"],
+    "retryFailedQuotes": ["ctrl+r"]
+  }
+}
+```
+
+键名不区分大小写，只接受受支持的 Ctrl 字母组合；退出、Settings、Tab、Enter 和 Backspace 已用的控制键保留，两项操作不能占用同一组合。中断保留已保存研究记录，输入“继续”才发起后续请求。它不改变模型 Thinking 设置，也不自动生成被中断轮的报告。
+
 ## 模型连接
 
 1. 选择 `Provider`，输入厂商名称或 ID 搜索。

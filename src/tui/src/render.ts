@@ -276,7 +276,7 @@ export function drawPortfolio(
     titleRightStyle: S.dim, border: S.rule,
   });
 
-  if (loading) {
+  if (loading && !sections.some(section => section.rows.length > 0)) {
     const frames = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"];
     const spinner = frames[Math.floor(Date.now() / 80) % frames.length];
     const accent = thinkingBannerStyle().fg!;
