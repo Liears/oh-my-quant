@@ -2,7 +2,7 @@ import { expect, mock, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { createChartReferenceReader, type ChartReferenceRead } from "../../../scripts/chart-reference-reader.ts";
+import { createChartReferenceReader, type ChartReferenceRead } from "../dev/chart/chart-reference-reader.ts";
 import { bashTool } from "../../tools/bash-tool.ts";
 
 test("valid production read variants delegate with a bounded workdir and preserve partial-read provenance", async () => {

@@ -77,7 +77,7 @@ Reports use an atomic `{id}.report.json` head containing HTML/meta/provenance. E
 
 ## Import rules
 
-`LocalSessionFile` implements the shared `src/types/session-file.ts` port. It verifies the exact byte revision under a writer lock and atomically replaces the complete transcript, preserving JSONL v3's logical append-only history. Session tree parsing, active-leaf transactions and fork construction remain in the agent layer. Stale writers must reopen; they cannot silently merge stale research context. `listStoredSessions()` excludes damaged/cyclic/truncated trees without rewriting them. Process crash and eight-writer tests live in `session-process.test.ts`; large synthetic transcript timings can be measured with `bun run scripts/measure-session-storage.ts`.
+`LocalSessionFile` implements the shared `src/types/session-file.ts` port. It verifies the exact byte revision under a writer lock and atomically replaces the complete transcript, preserving JSONL v3's logical append-only history. Session tree parsing, active-leaf transactions and fork construction remain in the agent layer. Stale writers must reopen; they cannot silently merge stale research context. `listStoredSessions()` excludes damaged/cyclic/truncated trees without rewriting them. Process crash and eight-writer tests live in `session-process.test.ts`; large synthetic transcript timings can be measured with `bun run src/storage/dev/measure-session-storage.ts`.
 
 1. External callers import from `src/storage/index.ts` (the barrel).
 2. Tests may import deep paths (`src/storage/src/*.ts`) when targeting a single module directly.
@@ -102,7 +102,7 @@ The barrel export is a compatibility boundary, not a convenience-only layer. Sha
 
 ```bash
 bun test src/storage/test
-bun test src/test/app/app-runtime.test.ts src/cli/test/handlers/system.test.ts src/cli/test/handlers/workflow.test.ts
+bun test tests/app/app-runtime.test.ts src/cli/test/handlers/system.test.ts src/cli/test/handlers/workflow.test.ts
 bun run typecheck
 ```
 

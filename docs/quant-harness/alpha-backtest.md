@@ -53,14 +53,14 @@ bun run check:architecture
 $alphaEnv = Join-Path $env:TEMP 'whyj-akquant-0.3.58'
 uv venv --python 3.14 $alphaEnv
 $alphaPython = Join-Path $alphaEnv 'Scripts/python.exe'
-uv pip install --python $alphaPython -r scripts/akquant-requirements.txt
+uv pip install --python $alphaPython -r src/alpha/dev/akquant-requirements.txt
 uv pip check --python $alphaPython
-bun run scripts/check-akquant.ts --python $alphaPython
+bun run src/alpha/dev/check-akquant.ts --python $alphaPython
 ```
 
-已有环境可直接执行最后两步，勿重新创建。安装使用 [固定版本清单](../../scripts/akquant-requirements.txt)；运行入口不自动安装或升级。`unavailable` 表示 Python 或依赖不可用，`version` 表示版本不符；`input`、`timeout`、`cancelled`、`process`、`output` 分别标记输入、期限、取消、进程失败和响应不可信。原始 stderr 不回传到研究结果；超过 256 KiB 或 stdout 超过 16 MiB 会停止进程。默认进程期限 60 秒，可显式调整至不超过 600 秒，真实检查脚本每例 180 秒。取消/超时等待子进程 close 后才返回。
+已有环境可直接执行最后两步，勿重新创建。安装使用 [固定版本清单](../../src/alpha/dev/akquant-requirements.txt)；运行入口不自动安装或升级。`unavailable` 表示 Python 或依赖不可用，`version` 表示版本不符；`input`、`timeout`、`cancelled`、`process`、`output` 分别标记输入、期限、取消、进程失败和响应不可信。原始 stderr 不回传到研究结果；超过 256 KiB 或 stdout 超过 16 MiB 会停止进程。默认进程期限 60 秒，可显式调整至不超过 600 秒，真实检查脚本每例 180 秒。取消/超时等待子进程 close 后才返回。
 
-真实检查脚本覆盖次根开盘与成本、部分成交后重算目标、最后一日不下单、SMA 预热、现金不足及缺失成交额；具体输入和预期在[合成样本](../../src/alpha/test/fixtures/sample.ts)与[检查脚本](../../scripts/check-akquant.ts)维护。它只消费合成 Bars，不联网取行情、调用模型或访问账户；普通 Bun 协议 fixture 不冒充真实引擎验证。
+真实检查脚本覆盖次根开盘与成本、部分成交后重算目标、最后一日不下单、SMA 预热、现金不足及缺失成交额；具体输入和预期在[合成样本](../../src/alpha/test/fixtures/sample.ts)与[检查脚本](../../src/alpha/dev/check-akquant.ts)维护。它只消费合成 Bars，不联网取行情、调用模型或访问账户；普通 Bun 协议 fixture 不冒充真实引擎验证。
 
 缺失成交额保留 `amount:null` 和对应输入哈希，Python 只接收撮合所需 OHLCV。旧归档误填的零值无法从 v1 数值反推出原始缺失状态，不能凭这次修正赋予旧数据新的字段来源证明。
 
@@ -99,7 +99,7 @@ Tool capabilities 会显示额外的引擎要求；已配置不等于已经通�
 
 ```powershell
 bun test src/alpha/test src/runtime/test/alpha-research.test.ts
-bun run scripts/check-alpha-research.ts --python $alphaPython
+bun run src/runtime/dev/check-alpha-research.ts --python $alphaPython
 ```
 
 新增集成测试覆盖默认注册工具、缺依赖前置失败、参数 schema、空数据、陈旧来源、取消、伪造账本、请求不符、损坏/缺失归档、历史数据修订、报告过滤和研究任务验收。默认测试不依赖安装 Python。

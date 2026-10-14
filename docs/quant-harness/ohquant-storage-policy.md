@@ -143,7 +143,7 @@ Windows 释放锁目录时也可能短暂拒绝下一次 mkdir。同步与异步
 
 活动会话通过 `SessionFilePort` 注入文件读写实现；默认 `LocalSessionFile` 使用精确字节 SHA-256、进程锁与 fsync/rename 原子替换。JSONL v3 逻辑追加不变，外部修改/追加/删除后旧 writer 报 `ESTORAGECONFLICT` 并要求重新打开。完整 fork 一次提交，leaf 移动和摘要是同一事务；失败不提前修改内存，读口返回副本。取消贯通压缩/导航的锁等待，文件观察者抛错不影响提交确认。详见 [会话适配](../agent-runtime/README.md#pi-integration)。
 
-打开与列表读取都拒绝重复 ID、缺失父项/leaf 目标和截断文件，防止 Resume 遍历循环或把部分文件当成完整会话；列表隐藏损坏条目，原文件保留。提交中的临时文件不进入列表，不自动清理或修复历史。进程终止测试在真实写入、fsync 后的 rename 前/后分别 kill；完整文件恢复通过，但不承诺所有文件系统的断电行为。追加复制完整转录，成本随文件大小增长，可用 scripts/measure-session-storage.ts 重新测量。
+打开与列表读取都拒绝重复 ID、缺失父项/leaf 目标和截断文件，防止 Resume 遍历循环或把部分文件当成完整会话；列表隐藏损坏条目，原文件保留。提交中的临时文件不进入列表，不自动清理或修复历史。进程终止测试在真实写入、fsync 后的 rename 前/后分别 kill；完整文件恢复通过，但不承诺所有文件系统的断电行为。追加复制完整转录，成本随文件大小增长，可用 src/storage/dev/measure-session-storage.ts 重新测量。
 
 `listStoredSessions()` 在解析 JSONL session 文件时，会额外计算当前分支的上下文用量：
 

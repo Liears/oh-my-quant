@@ -1,6 +1,6 @@
 /**
  * Shared insight generation: parses notes/*.md → InsightEntry[].
- * Used by both scripts/generate-insights.ts (CLI) and insight.ts (auto-regenerate).
+ * Used by both src/insight/dev/generate-insights.ts (CLI) and insight.ts (auto-regenerate).
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";

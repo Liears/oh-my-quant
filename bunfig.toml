@@ -8,8 +8,16 @@ dir = ".bun-cache"
 # `bun test` must only discover this repository's deterministic test suite.
 # Vendored/reference trees can use a different runner, and gen-* artifact files
 # are manual demo generators that write into .ohquant at module load time.
+# Module-local dev entrypoints are explicit consumers, not automatic tests.
 [test]
-root = "src"
+root = "."
 pathIgnorePatterns = [
   "**/gen-*.test.ts",
+  "**/dev/**",
+  "reference/**",
+  "desktop/**",
+  "site/**",
+  "output/**",
+  ".ohquant/**",
+  "**/node_modules/**",
 ]

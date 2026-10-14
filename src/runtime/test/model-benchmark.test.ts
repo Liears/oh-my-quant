@@ -139,7 +139,7 @@ it("provides a real script entry, immutable output and read-only legacy configur
     const original = JSON.stringify({ ...settings, version: 2 });
     writeFileSync(configPath, original);
     const run = async (...args: string[]) => {
-      const child = Bun.spawn([process.execPath, "run", "scripts/measure-model.ts", ...args], {
+      const child = Bun.spawn([process.execPath, "run", "src/runtime/dev/measure-model.ts", ...args], {
         cwd: resolve(import.meta.dir, "../../.."), env: { ...process.env, OHQUANT_DIR: root }, stdout: "pipe", stderr: "pipe",
       });
       const [exit, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);

@@ -120,7 +120,9 @@ OAuth-only provider 可导入有效的选定 OAuth 记录，不能用 type=api_k
 
 <a id="pi-verification"></a>
 
-构建后的 [Pi/WhyJ 双 CLI 检查脚本](../../scripts/check-pi-dual-cli.ts)可对显式选定的 API-key 连接做隔离导入，再并行发送两条真实模型请求，会产生用量。Pi 禁用 session、扩展、技能和工具；WhyJ 使用临时配置、只检查模型阶段，输出必须是新文件。它不验证共享 OAuth 刷新、完整研究任务或长期可用性，运行参数先查看脚本帮助。
+连接导入后，可用 `/doctor --phase model` 验证 WhyJ 当前选定的连接；构建后的非交互入口是 `node dist/index.js --json doctor --phase model`。这会发送真实模型请求并产生用量，不验证 Pi CLI 的并发使用、共享 OAuth 刷新、完整研究任务或长期可用性。
+
+2026-10-15 移除了早期双 CLI 检查脚本：它硬编码 `deepseek/deepseek-v4-flash` 和旧 `@mariozechner/pi-coding-agent` 安装布局，只有 `--output` 参数，并没有此前文档声称的模型选择与帮助入口。那次观察不能充当任意当前连接的复验方法。Pi 导入与 OAuth 的确定性回归仍按上方实现索引运行；若需要重新验证双 CLI 并发，必须显式选择实际安装版本、连接与隔离目录，不从单侧 Doctor 成功推断双侧通过。
 
 <a id="oauth"></a>
 
@@ -306,12 +308,12 @@ Doctor 的 `Run diagnostics` 检查已保存的模型、工具和数据，不保
 
 ```powershell
 bun test src/tui/test/settings-refresh.test.ts src/tui/test/research-workflow.test.ts
-bun test src/runtime/test/model-benchmark.test.ts src/runtime/test/hud.test.ts src/test/app/app-hud.test.ts src/tui/test/hud-settings.test.ts
+bun test src/runtime/test/model-benchmark.test.ts src/runtime/test/hud.test.ts tests/app/app-hud.test.ts src/tui/test/hud-settings.test.ts
 bun test src/tui/test/market-colors.test.ts src/artifact/test/market-colors.test.ts
 bun test src/agent/test/model-connection.test.ts src/agent/test/model-request.test.ts src/tui/test/model-settings-panel.test.ts
 bun test src/storage/test/durable-preferences.test.ts src/tui/test/settings-conflict.test.ts
 bun test src/runtime/test/data-readiness.test.ts src/cli/test/doctor-data.test.ts
-bun test src/runtime/test/data-settings.test.ts src/tui/test/data-settings-panel.test.ts src/test/app/app-doctor.test.ts
+bun test src/runtime/test/data-settings.test.ts src/tui/test/data-settings-panel.test.ts tests/app/app-doctor.test.ts
 bun test src/runtime/test/tool-readiness.test.ts src/cli/test/doctor-tools.test.ts src/tools/test/tool-cancellation.test.ts
 bun test src/runtime/test/tool-probe.test.ts src/tui/test/tool-capabilities-panel.test.ts
 bun run typecheck

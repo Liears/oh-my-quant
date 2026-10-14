@@ -33,11 +33,11 @@ Provider credentials and optional Python dependencies depend on your data source
 <details>
 <summary>Run from source</summary>
 
-With Bun installed, run from the repository root:
+Development requires Node.js 22.19+ and Bun 1.3.14 (the build tool and test runner). From the repository root:
 
 ```sh
-bun install
-bun run src/index.ts
+bun install --frozen-lockfile
+npm run dev
 ```
 
 The checkout and npm release may differ. Check `whyj --version` and the [changelog](./CHANGELOG.md) for the version you are using.
@@ -77,18 +77,41 @@ Most technical references are in Chinese. The [website](https://oh-my-quant.verc
 
 ## Development
 
+The package exposes npm script entrypoints; Bun remains a development prerequisite, not a requirement for running the built Node CLI.
+
 ```sh
-bun run typecheck
-bun run check:architecture
-bun run test
-bun run build
+npm run dev            # Source CLI with watch mode
+npm run build          # Build the Node CLI into dist/
+npm start             # Run the built CLI (build first)
+npm test              # Test fence, module tests, and repository integration tests
+npm run check         # Types, architecture, tests, CLI build, and documentation
 ```
+
+| npm script | Scope |
+| --- | --- |
+| `npm run typecheck` | Source, module-local development entrypoints, and root tests |
+| `npm run check:architecture` | Production dependency boundaries; excludes manual dev consumers |
+| `npm run test:modules` | Tests owned by individual `src` modules |
+| `npm run test:integration` | Cross-module checks in `tests/architecture/` and `tests/app/` |
+| `npm run test:watch` | Watch both test roots |
+| `npm run docs:build` / `npm run check:docs` | Offline blog generation and documentation checks |
+
+Maintenance tools live alongside their owners under `src/<module>/dev/`; there is no shared root scripts entrypoint. Production code cannot import dev tools or test fixtures. Module tests stay inside their module, while repository architecture and application integration tests live in root `tests/`.
+
+Explicit model checks consume provider usage; `--help` does not:
+
+```sh
+npm run bench:model -- --help
+npm run eval:research -- --help
+```
+
+On Windows PowerShell, if the `npm.ps1` shim consumes forwarded flags, use `npm.cmd run bench:model -- --help` (and the same `npm.cmd` spelling for other forwarded commands).
 
 The product website lives in [`site/`](./site/README.md) and has its own build:
 
 ```sh
-bun run --cwd site dev
-bun run --cwd site build
+npm --prefix site run dev
+npm --prefix site run build
 ```
 
 ## License

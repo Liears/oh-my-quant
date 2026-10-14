@@ -125,7 +125,7 @@ Doctor 报告支持 ↑/↓ 逐行、PageUp/PageDown 翻页、Home/End 到首尾
 
 多路由时文本列出端点，筛选到一路时显示该参数 JSON schema。`whyj --json -c "/doctor --tool … --schema"` 的 `data.kind` 为 `tool-probe-schemas`、`scope` 为 `static-declarations`；`routes` 包含所有匹配路由的 provider、endpoint、parameters 和 parameterContract，`parameterRules` 为实际检查器共用的名称、长度、标量值及控制字符规则。指数路由另含 `signatureSources.akshareIndex`，标明打包签名的 AKShare 版本。查询成功的退出码 0 仅表示找到声明。
 
-`declared-parameters` 使用已声明的字段类型、required 和额外字段规则；仍可能有日期/标的等后续语义检查。当前 92 个白名单指数端点的字段、默认值和说明来自本机 AKShare 1.18.63 的函数签名及 docstring，经 [生成器](../../scripts/generate-akshare-index-signatures.py) 写入[静态声明](../../src/runtime/data/akshare-index-signatures.generated.ts)。例如 `index_stock_info` 没有参数，`index_zh_a_hist` 接受 symbol、period、start_date、end_date；未声明字段在 Python/网络前拒绝。当前注册表已无 `scalar-forwarding` 路由。查询本身不加载 Python，也不验证本机包版本、凭证、权限、数据覆盖或当前扩展启用情况；包升级后须用同一解释器运行生成器并重新验证。未覆盖的参数语义仍以 [AKShare 官方指数文档](https://akshare.akfamily.xyz/data/index/index.html)和实际端点响应为准。
+`declared-parameters` 使用已声明的字段类型、required 和额外字段规则；仍可能有日期/标的等后续语义检查。当前 92 个白名单指数端点的字段、默认值和说明来自本机 AKShare 1.18.63 的函数签名及 docstring，经 [生成器](../../src/runtime/dev/generate-akshare-index-signatures.py) 写入[静态声明](../../src/runtime/data/akshare-index-signatures.generated.ts)。例如 `index_stock_info` 没有参数，`index_zh_a_hist` 接受 symbol、period、start_date、end_date；未声明字段在 Python/网络前拒绝。当前注册表已无 `scalar-forwarding` 路由。查询本身不加载 Python，也不验证本机包版本、凭证、权限、数据覆盖或当前扩展启用情况；包升级后须用同一解释器运行生成器并重新验证。未覆盖的参数语义仍以 [AKShare 官方指数文档](https://akshare.akfamily.xyz/data/index/index.html)和实际端点响应为准。
 
 日线、新闻和汇率的 `start` / `end` 字段现在声明 `YYYY-MM-DD` 模式及本构建的 `whyj-daily-date` 公历校验；单独消费 JSON schema 的外部程序需要实现这个自定义 `format`。跨字段的起止顺序由实际探测入口检查，schema 字段本身不表达此约束。格式正确不证明供应商有该时段的数据。
 
@@ -135,7 +135,7 @@ Doctor 报告支持 ↑/↓ 逐行、PageUp/PageDown 翻页、Home/End 到首尾
 
 需要核对运行环境时，显式添加无值开关 `--installed`。它仅支持 AKShare 白名单指数路由；混合 provider 的查询先用 `--provider akshare` 或 `--endpoint` 限定。查询使用行情请求同一 Python 选择器导入本地 AKShare，读取所选函数的签名和说明，不访问数据端点、模型、凭证或设置。普通 `--schema` 仍只读打包声明，不启动 Python。
 
-安装版回执的 `scope` 为 `installed-signatures`，`signatureSources.akshareIndex` 为实际包版本；`comparison` 分别给出 `packagedVersion`、`versionMatches`、`matchesPackaged` 与 `changedEndpoints`。版本不同但字段相同会分别标记，避免把版本号变化误作参数变化。缺少 Python/AKShare、函数或不支持的参数签名会返回失败；取消不继续显示旧结果。安装版 schema 用于诊断漂移，实际端点探测仍使用当前构建的静态声明；更新依赖后可运行[生成器](../../scripts/generate-akshare-index-signatures.py)并复核探测。签名一致也不证明参数可选值、响应内容或权限。
+安装版回执的 `scope` 为 `installed-signatures`，`signatureSources.akshareIndex` 为实际包版本；`comparison` 分别给出 `packagedVersion`、`versionMatches`、`matchesPackaged` 与 `changedEndpoints`。版本不同但字段相同会分别标记，避免把版本号变化误作参数变化。缺少 Python/AKShare、函数或不支持的参数签名会返回失败；取消不继续显示旧结果。安装版 schema 用于诊断漂移，实际端点探测仍使用当前构建的静态声明；更新依赖后可运行[生成器](../../src/runtime/dev/generate-akshare-index-signatures.py)并复核探测。签名一致也不证明参数可选值、响应内容或权限。
 
 ### `/skill`
 
