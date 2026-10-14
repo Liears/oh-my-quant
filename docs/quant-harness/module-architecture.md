@@ -1,0 +1,200 @@
+# WhyJ Quant 模块架构
+
+本文档是面向维护者的代码库地图。解释每个模块的职责、数据允许流动的方向，以及其他模块应使用的入口点。
+
+这些边界为什么这样划分、组装层增加了什么成本，见 [模块与变化边界](../blog/09-boundaries-for-change.md)；产品工作流对架构的约束见 [研究终端的产品设计](../blog/08-research-workbench.md)。博客说明选择理由，本页维护当前依赖契约。
+
+设计实际分为两个目录：[Agent Runtime](../agent-runtime/README.md)维护通用执行与会话生命周期；[Quant Harness](./README.md)包含完整量化应用的产品、数据、计算、执行、报告和 UI/UX。本页属于后者，维护其内部模块的依赖和组装；任务范围、证据与完成判据是这一应用体系中的研究编排核心。文档归属不改变代码依赖和授权边界，完整分类见[文档目录](../README.md#design)。
+
+## 顶层布局
+
+| 路径 | 角色 | 备注 |
+|------|------|------|
+| `src/cli/` | slash 命令解析、本地命令处理、JSON one-shot 模式 | 仅限本地 UI/session 控制 |
+| `src/tui/` | 终端渲染、面板、输入、布局、显示组件 | 消费运行时事件；不应持有业务状态 |
+| `src/app-runtime.ts` | TUI/CLI 到 agent session 和本地面板的桥接 | 编排 UI 状态刷新 |
+| `src/app-watchlist.ts` | watchlist 应用服务 | 让 TUI 不直接访问 storage |
+| `src/insight/` | 笔记生成与 storage-backed insight/quote 服务 | 拥有笔记读取与缓存服务；quant 不再转发此服务 |
+| `src/quant/` | 显式数据上的计算与方法解释 | 公共入口为 `index.ts`，不取数、保存、读取笔记或运行工作流 |
+| `src/agent/` | 上游 pi kernel 接入、WhyJ 会话适配、session facade | 持有 prompt loop、compaction、resume |
+| `src/research/` | 分支研究状态与共享证据核验 | 参数/引用/重算独立于 Agent 与报告渲染，不调用实时数据源 |
+| `src/performance/` | 私有账户区间业绩的只读历史端口与计算 | 只接收显式输入；文件读取归 CLI，私有年报组装归 runtime，不进入默认研究 Agent，见 [账户业绩](./performance.md) |
+| `src/execution/` / `src/app/paper-execution/` | 独立订单端口 / 宿主显式选择的本地模拟盘 | 通用端口不持久化或读取凭证；paper 宿主在指定绝对目录保存私有账户/订单，合成成交由宿主注入，不进默认 Agent，见 [执行契约](./execution.md) |
+| `src/tools/` | 内置 agent 工具 | 数据工具、量化工具、shell 工具、注册表 |
+| `src/source/` | 行情数据 provider adapter 和回退编排 | 公共入口点为 `src/source/index.ts` |
+| `src/market/` | 无 IO 的代码、日期和 Bar 规范化 | source/storage 共用，保留交易所与基金后缀身份 |
+| `src/runtime/research/portfolio.ts` | 自定义组合编辑服务 | TUI 与 CLI 共用校验和增删改逻辑 |
+| `src/runtime/quant-harness.ts` | 结构化研究任务宿主与工具执行守卫 | 组合现有 Session/Pi；任务事件仍存原 session，状态由 research/tasks 投影 |
+| `src/tools/research-task-tool.ts` | 会话绑定的研究控制工具 | registry.bindResearchTools 组装，注入分支读口；成功结果提交事件，不在工具内等待自身 idle |
+| `src/runtime/workspace/research-task-view.ts` / `src/tui/src/research-task-panel.ts` | 任务投影文本与只读终端面板 | `/resume --task` 经 AppRuntime 回调传入快照；渲染与按键不执行模型、行情或状态写入 |
+| `src/runtime/data/analysis-data.ts` | 量化工具数据入口 | 按分析窗口自动取数 |
+| `src/runtime/data/data-readiness.ts` | 数据连接诊断 | 明确市场/样本/窗口，仅探测所选源，无缓存或隐式保存；CLI/数据配置面板共用 |
+| `src/runtime/data/data-settings.ts` | 数据配置草稿与验证生命周期 | 编辑使证据失效，取消隔离迟到结果；验证成功才生成可保存草稿，不直接持久化 |
+| `src/runtime/data/tool-readiness.ts` | 工具能力投影 | 从实际 registry 检查市场、凭证、Python 依赖与日线样本范围，不执行工具 |
+| `src/runtime/data/tool-probe.ts` / `tool-probe-draft.ts` | 端点响应检查与编辑生命周期 | CLI/TUI 共用；只调用所选 source adapter，复用基金参数 schema；固定配置快照、超时/取消、不持久化 |
+| `src/tui/src/data-settings-panel.ts` | 数据编辑器 | 键盘/焦点/脱敏展示；PanelController 经 PanelDataService 保存，完成事件驱动 TUI 重绘 |
+| `src/runtime/workspace/overview-refresh.ts` | Overview 周期/手动刷新生命周期 | 取消、超时、代次、状态和观测；AppRuntime 转发入口 |
+| `src/runtime/workspace/overview-data.ts` | 本轮公开报价请求池与来源映射 | 最多 8 个活跃请求，跨指数/组合去重，可注入 source fetcher；无行情缓存 |
+| `src/runtime/data/source-runtime.ts` | storage-backed source runtime adapter | 将 source 的可注入 cache/settings deps 绑定到 storage |
+| `src/storage/` | `.ohquant` 持久化、缓存、session 摘要、显式 legacy portfolio 迁移 | 本地持久化状态规则的唯一位置；只暴露 resolver/API，不暴露 import-time path constants |
+| `src/types/` | 共享领域契约 | 保持与 provider 无关 |
+| `docs/` | 设计、架构、运维文档 | 将实现说明放在此处，而非埋在代码注释中 |
+
+## 边界规则
+
+1. `tui` 渲染状态；不决定 session 真值。
+2. `cli` 处理确定性 slash 命令；自然语言转给 agent。
+3. `agent` 持有 harness 生命周期、`compact`、`resume` 和 session 重建。
+4. `tools` 是唯一可供 agent 调用的执行层。
+5. `source` 获取并标准化 provider 数据；不决定 portfolio 语义。
+6. `storage` 持有文件系统布局和去重/缓存规则；调用方不应手工拼接 `.ohquant` 路径。
+7. `runtime` 负责把 source 的依赖注入接口绑定到 storage/settings；`source` 本身不导入 storage。
+8. `execution` 只定义私有执行契约和调用边界；显式应用宿主可以持有独立执行服务账本，不能将其并入 `.ohquant` 公开行情/观察组合存储或默认研究上下文。
+
+## 模块契约
+
+### 功能替换与淘汰边界
+
+- `performance`、`alpha`、`execution`、`extensions`、`skill`、`quant` 的跨模块生产依赖只通过各自 `index.ts`，包含类型导入和再导出；内部实现与测试夹具不成为公共契约。架构检查强制这六个模块的入口约束，其他旧模块仍按各自现有契约渐进收敛。
+- 功能专属类型留在所属模块；只有确实跨域共享的契约进入 `types`。文件、凭证、存储和工具注册由宿主接线，计算模块不反向依赖宿主。`performance` 的依赖限定为自身、`quant`、`types` 与 `node:util`；文件历史适配器位于 `src/cli/account-history.ts`。
+- 淘汰功能时先撤销宿主入口与注册，再删除功能实现及所属测试，并核对配置、持久化格式和历史会话读取的兼容策略；不能随功能删除自动清理用户数据。这是变更流程，当前没有删除任何产品功能。
+- 生产代码不得引用 `test/`、`tests/`、测试文件或 `bun:test`；跨模块测试可以复用合成夹具。这些静态依赖检查不等于运行时插件沙箱。
+
+### `src/quant/`
+
+- `index.ts` 显式列出因子、回测、风险、基准、组合比较、基金定投、评分及方法解释的公共函数和类型；内部新增导出不会自动扩展公共接口。外部生产调用不直接引用实现文件。
+- 只允许依赖自身、无 IO 的 market 规范化及共享数据契约；禁止依赖应用宿主、insight、Node/Bun IO、第三方 provider 和 CLI 结果类型。计算接收价格、日期和假设，返回计算结果，不发现配置或用户文件。
+- `runtime/research/comparison.ts` 拥有取数、生成制品身份、时间与保存的编排，调用 quant 的分类/NAV/风险计算；`insight/generator.ts` 拥有笔记读取，`insight/index.ts` 继续负责提示语和缓存服务。quant 不再保留转发这些服务的旧入口。
+- 模块测试与合成夹具集中在 `quant/test/`；insight 测试归 `insight/test/`，比较编排测试归 runtime。隔离回归只复制 quant、market 和 types 到临时目录，分别在 Bun 与 Node 下运行公共计算，无应用源码、依赖包或笔记数据。
+
+### `src/runtime/`
+
+根目录保留会话/扩展组装、私有执行命令和通用错误处理。业务服务按职责分组，不使用一个加载所有功能的总入口：
+
+| 子目录 | 所有权 |
+|---|---|
+| `data/` | 行情入口、数据配置与端点能力诊断 |
+| `models/` | 模型编辑、OAuth、Pi 导入与显式图片读取 |
+| `skills/` | 技能安装根、发现刷新、探测执行器和资格接线 |
+| `research/` | 有 IO 的研究服务、观察组、新闻与报告编排；区别于顶层 `research` 的证据重算 |
+| `evidence/` | 根据提供的研究状态和文本核对回答；不依赖其他 runtime 分组 |
+| `evaluation/` | 可选评测运行器及合成场景；其他生产模块不得反向引用 |
+| `workspace/` | 命令目录、界面状态、Overview 生命周期和展示投影 |
+
+runtime 不导入 CLI 或 TUI，包括类型。共享 `AppState`、`UIMessage`、面板与 HUD 数据契约归 `types/ui.ts`、`types/hud.ts`。CLI 与 TUI 消费这些契约及服务；`runtime/session.ts` 的 `createLocalAgent()` 组装默认本地会话，`agent` 的 `createAgent()` 必须接收完整依赖。
+
+### `src/skill/`
+
+- `index.ts` 暴露精选目录、安装事务、文件/报告核验及资格判断；只依赖模块内部、共享技能类型和 Node 标准库，不依赖 Agent、runtime、CLI、行情或应用存储。
+- Python 探测必须显式接收 `SkillPythonRunner`，只向端口交付固定脚本、参数、超时和取消信号；`runtime/skills/skill-probes.ts` 绑定默认解释器执行器。探测观察按工作目录保留，取消及旧请求不能覆盖新结果。
+- `runtime/skills/skill-store.ts` 绑定安装根、精选路径与安装后的发现缓存失效；`runtime/skills/skill-discovery.ts` 绑定 settings、Agent loader 与 readiness。安装事务仍在 skill 模块内，接收明确目录和 Git 端口。
+- `cli/handlers/skill.ts` 与 `skill-*-audit.ts` 负责 slash 参数、文件选择及文字/JSON 回执；skill 模块不返回 CLI 的 `CommandResult`。
+- 模块测试位于 `src/skill/test/`；宿主安装/刷新测试位于 runtime，命令测试位于 CLI。隔离回归在仅包含 skill 与共享技能类型的临时目录运行公开服务，验证无其他产品模块也可使用。
+
+### `src/source/`
+
+- 职责：
+  - 各 provider 特定的行情数据获取
+  - 数据源回退顺序
+  - 通过 `SourceRuntimeDeps` 接收可选缓存/settings hooks
+  - Overview/TUI 的数据源归属文本
+- 公共导入：
+  - `src/source/index.ts`
+- 内部分割：
+  - `src/source/src/` 实现
+  - `src/source/tests/` 模块测试
+
+### `src/storage/`
+
+- 职责：
+  - 设置、bars 缓存、benchmark/comparison 制品、sessions、显式 legacy portfolio 迁移
+  - 本地 portfolio 去重和精简摘要生成
+  - `.ohquant` 策略执行
+  - runtime path resolver：`resolveOhquantDir()`、`resolveDataDir()`、`resolveBenchmarkResultsDir()` 等
+- 公共导入：
+  - `src/storage/index.ts` 或依赖范围有意缩小时使用特定的 storage 模块
+
+### `src/tools/`
+
+- 职责：
+  - 向 agent 暴露稳定的工具契约
+  - 将工具 IO 转换为 domain/storage/source 调用
+  - 干净地呈现面向用户的错误
+- 规则：
+  - 新的内置工具应通过 `docs/quant-harness/quant-tools-design.md#registry` 记录的注册表路径注册
+
+### `src/agent/`
+
+- 职责：
+  - harness phase、运行循环、session tree、compaction、resume
+  - system prompt/context 组装
+- 规则：
+  - UI 应调用 facade，不直接修改 agent 状态
+  - `kernel/loop.ts` 唯一导入上游执行循环；`kernel/llm.ts` 唯一导入上游协议与模型目录
+  - `model-config.ts` 解析配置；`session-state.ts` 映射事件；每个 Agent 自有 SessionCtx
+  - `session-contracts.ts` 定义完整模型/工具/skills/repo/prompt/证据端口；`runtime/session-dependencies.ts` 组装默认本地 IO，`agent/src/session.ts` 消费端口与分支快照。独立替换与失败契约见 [Session 依赖注入](../agent-runtime/README.md#dependencies)
+  - 架构 gate 禁止 `session.ts` 直接导入 storage、tools、source、tui；不以默认组装替代可注入宿主
+  - `session-runtime/harness/operation.ts` 统一取消与完成等待；`session/compact-session.ts`、`navigate-session.ts` 管理独占会话操作
+  - pi 两包精确锁定同一版本；架构检查禁止 TypeScript 路径别名覆盖和绕过 kernel 的协议实现导入
+
+## 推荐的依赖方向
+
+`agent` 和 `artifact` 共用 `research/input.ts` 的归档核验及七类计算重算；`research/state.ts` 消费结构化分支快照并生成内部状态，见 [研究状态](./README.md#research-state)。Research 只可向 quant、market、storage、types 依赖；低层和 TUI 不反向依赖 research。数据归档修订/缺失的判定在报告与恢复上下文中一致，新增核验逻辑无需依赖 HTML 或 TUI。
+
+```text
+cli/tui
+  -> app-runtime
+    -> agent
+    -> storage
+    -> tools
+
+tools
+  -> runtime/source-runtime
+  -> storage
+  -> market/types
+
+source
+  -> market/types
+
+app services (`app-runtime`, `app-watchlist`, `insight`)
+  -> storage
+  -> source/tools/agent as needed
+
+runtime/source-runtime
+  -> source
+  -> storage
+
+storage
+  -> market/types
+```
+
+避免反向依赖：`source` 和 `storage` 不应互相依赖，`tui` 不应直接依赖 provider adapter，也不应手工拼 `.ohquant` 路径。`scripts/architecture-boundary-baseline.json` 当前为空，新增违规由 `bun run check:architecture` 阻止。
+
+## 测试布局
+
+将测试放在所验证模块的附近，但按模块分组：
+
+- `src/source/tests/`
+- `src/storage/test/`
+- `src/tui/test/`
+- `src/agent/test/`
+- `src/performance/test/`
+- `src/skill/test/`
+- `src/quant/test/`（合成数据与独立数值参考在 `test/fixtures/`）
+- `src/insight/test/`
+- `src/cli/test/`（handler 测试在 `test/handlers/`）
+- `src/test/`（仓库级架构门禁回归）
+
+全部模块的测试布局由 `bun run test:fence` 强制检查：使用模块内 `test/`，现有 `source/tests/` 保留；app 内独立适配器使用各自的 `test/`。runtime、tools、research、market 的测试已集中，入口集成测试位于 `src/test/app/`。测试进程与数据夹具归各自测试目录；评测运行器的合成场景仍属于可选 evaluation 功能，不作为单元测试夹具混入应用服务。
+
+对于 provider bug，在修复之前或同时，在模块测试文件夹中添加回归测试。
+
+## 当前文档
+
+- [Quant UI/UX](./quant-uiux.md)
+- [Quant Harness](./README.md)
+- [Agent 运行时设计](../agent-runtime/README.md)
+- [OhQuant 存储策略](./ohquant-storage-policy.md)
+- [内置工具注册表](./quant-tools-design.md#registry)
+- [数据源 Provider](./source-data-providers.md)
+- [Skill 系统](./trader-skills.md)

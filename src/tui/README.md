@@ -7,7 +7,7 @@ WhyJ Quant's TUI is a zero-dependency frame-buffer terminal UI. It renders a fix
 - Composer: natural-language input and a compact slash-command suggestion list rendered inside Composer.
 - Status: active model, A-share source, global source, and active local portfolio.
 
-The layout spec lives in `docs/tui-layout-design.md`. This README is the code map for working in `src/tui`.
+The current interaction and layout contract lives in [Quant UI/UX](../../docs/quant-harness/quant-uiux.md); superseded layout choices are recorded in [design decisions](../../docs/blog/10-layout-and-visual-language.md#visual-language). This README is the code map for working in `src/tui`.
 
 ## Module Map
 
@@ -102,7 +102,7 @@ Important interactions:
 - `Ctrl+P` or `/config`: open the compact Settings panel.
 - `Esc`: clear input/suggestions or close active panel.
 
-Slash suggestions and the Help panel share the canonical `name` + `desc` catalog from `src/runtime/command-catalog.ts`. Exact top-level commands submit directly; only the contextual `/skill:name` flow expands into skill suggestions. Symbol/name suggestions come from the local watchlist.
+Slash suggestions and the Help panel share the canonical `name` + `desc` catalog from `src/runtime/workspace/command-catalog.ts`. Exact top-level commands submit directly; only the contextual `/skill:name` flow expands into skill suggestions. Symbol/name suggestions come from the local watchlist.
 
 ## Panels
 

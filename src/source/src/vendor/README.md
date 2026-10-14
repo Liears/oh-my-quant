@@ -1,0 +1,11 @@
+# Sina history decoder provenance
+
+[sina-history-decoder.js](./sina-history-decoder.js) vendors the `hk_js_decode` literal from installed AKShare **1.18.63**, `akshare/stock/cons.py`. Original UTF-8 literal SHA-256: `39a599c94dde4df1c2eb0882d4bff9560160cfd52ead0797cebb04b3122c2f52`. On 2026-10-12 the literal in the [official source](https://github.com/akfamily/akshare/blob/main/akshare/stock/cons.py) matched that hash. This records a content pin; no upstream Git commit was obtained.
+
+The sole algorithm change exports outer `d` as `decodeSinaHistory`. Keep the upstream internals intact. The [MIT license](./sina-history-decoder.LICENSE), copyright 2019–2026 Albert King, also appears in a preserved `/*! */` source comment so the built CLI carries the permission notice. Upstream [license](https://github.com/akfamily/akshare/blob/main/LICENSE), [US client](https://github.com/akfamily/akshare/blob/main/akshare/stock/stock_us_sina.py) and [HK client](https://github.com/akfamily/akshare/blob/main/akshare/stock/stock_hk_sina.py) describe the corresponding usage.
+
+This licensed JavaScript module is isolated from application TypeScript. [sina-history-decoder.d.ts](./sina-history-decoder.d.ts) exposes `unknown`; the owned [adapter](../sina-global-history.ts) checks declaration identity, supported OHLC formats, bounded input/output, dates and selected OHLCV. The network response contributes an encoded string only, never executable code. Do not use `eval`, `Function` or a VM for responses.
+
+As of 2026-10-13, [sina-history-payload.ts](../sina-history-payload.ts) owns those shared checks for US/HK and [A stock/index histories](../sina-a-history.ts). The A stock client separately parses identity-matched JSON factor literals; index levels require no factor request. The decoder algorithm and license remain unchanged. [A tests](../../tests/sina-a-history.test.ts) cover effective-date division and failure/cancellation boundaries in addition to the existing protocol fixtures.
+
+Deterministic [tests](../../tests/sina-global-history.test.ts) use independently constructed packets for formats 1479/3466 and adapter rejection cases. Current adapter boundaries are documented in [data sources](../../../../docs/quant-harness/source-data-providers.md); historical sample success is not a service availability guarantee.

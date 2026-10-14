@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:,">
+<title>WhyJ Quant — Research Before Conviction</title>
+<style>
+:root{--gold:#D4AF37;--focus:#E2BE4D;--bright:#F0D77A;--ink:#F5F5F5;--muted:#A6A6A6;--line:#242424;--bg:#0B0B0C;--surface:#111111;font-family:"Geist Sans","Inter","Microsoft YaHei",system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+*{box-sizing:border-box}body{margin:0}a{color:inherit;text-decoration-color:var(--gold);text-underline-offset:5px}a:hover{color:var(--bright)}button,select{font:inherit;color:inherit;background:transparent;border:1px solid var(--line);padding:9px 14px;border-radius:0;cursor:pointer}button:hover,select:hover{border-color:var(--gold)}button:disabled{opacity:.25;cursor:default}button:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--focus);outline-offset:5px}select option{background:var(--bg)}.skip{position:fixed;top:-100px;left:16px;z-index:20;background:var(--bg);padding:15px}.skip:focus{top:10px}
+.top{height:76px;display:flex;align-items:center;justify-content:space-between;padding:0 5.5vw;border-bottom:1px solid var(--line);gap:20px}.wordmark{font-weight:600;letter-spacing:-.03em;font-size:21px}.wordmark span{color:var(--gold)}.edition,.eyebrow,.mono{font-family:"Cascadia Code",Consolas,monospace}.edition{color:var(--muted);font-size:11px;letter-spacing:.13em}.deck{position:relative}.deck:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}.slide{min-height:calc(100svh - 146px);padding:4.5vh 5.5vw 4vh;display:flex;flex-direction:column;position:relative}.slide[hidden]{display:none}.eyebrow{color:var(--gold);font-size:12px;letter-spacing:.16em;text-transform:uppercase;margin:0 0 23px}.title{font-size:clamp(30px,3.55vw,62px);font-weight:500;line-height:1.18;letter-spacing:-.055em;margin:0 0 30px;max-width:1100px}.hero-title{font-size:clamp(56px,8.6vw,144px);line-height:.95;letter-spacing:-.065em;font-weight:500;margin:20px 0 32px}.gold{color:var(--gold)}.lead{font-size:clamp(18px,1.7vw,27px);line-height:1.65;color:var(--muted);max-width:860px;margin:0}.body{font-size:clamp(16px,1.35vw,21px);line-height:1.75;color:var(--muted);margin:12px 0 0}.source{margin-top:auto;padding-top:28px;font-size:12px;line-height:1.8;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:1fr 1fr;gap:5vw;align-items:center;flex:1}.wide{grid-template-columns:1.12fr 1fr}.rule{border-top:1px solid var(--line);padding:23px 0}.rule h3{font-size:22px;font-weight:500;margin:0 0 10px}.tag{display:inline-block;border:1px solid var(--gold);color:var(--bright);padding:5px 10px;font-size:11px;letter-spacing:.1em}.tag.dim{color:var(--muted);border-color:var(--line)}.oversized{font-size:clamp(54px,7vw,110px);font-weight:400;letter-spacing:-.055em;line-height:1.05}.diagram{border:1px solid var(--line);background:var(--surface);padding:28px}.layer{border-top:1px solid var(--line);padding:24px 0;display:flex;justify-content:space-between;gap:16px;align-items:center}.layer:first-child{border-top:0}.layer strong{font-weight:500;font-size:25px}.layer span{color:var(--muted);font-size:14px}.layer.focus{color:var(--bright)}.flow{display:grid;grid-template-columns:repeat(3,1fr);gap:0;flex:1;align-items:center}.step{padding:24px;border-left:1px solid var(--line);min-height:200px}.step .n{font-family:Consolas,monospace;color:var(--gold);font-size:13px;margin-bottom:36px}.step h3{font-size:28px;font-weight:400;margin:0 0 16px}.step p{font-size:17px;line-height:1.7;color:var(--muted);margin:0}.shot{width:100%;height:auto;max-height:38svh;object-fit:contain;display:block;border:1px solid var(--line);margin:auto 0}.caption{color:var(--muted);font-size:13px;line-height:1.6}.timeline{display:grid;grid-template-columns:145px 1fr;gap:18px;align-items:center;margin:20px 0}.rail{border-top:2px solid var(--gold);padding-top:16px;font-size:19px}.rail.soft{border-color:var(--muted);color:var(--muted)}.numbers{display:flex;flex-direction:column;gap:22px}.number-row{padding:20px 0;border-top:1px solid var(--line)}.number-row small{display:block;color:var(--muted);font-size:13px;margin-bottom:12px}.number-row strong{font-size:clamp(40px,5vw,76px);font-weight:400;font-family:Consolas,monospace;letter-spacing:-.05em}.pillars{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}.pillar{border-top:1px solid var(--gold);padding-top:25px}.pillar h3{font-size:24px;font-weight:400;margin:22px 0}.pillar p{color:var(--muted);font-size:17px;line-height:1.8}.code{display:block;font-family:"Cascadia Code",Consolas,monospace;font-size:clamp(16px,1.5vw,25px);line-height:2;padding:25px;border:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--bright)}.nav{height:70px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 5.5vw;gap:14px;background:var(--bg);position:sticky;bottom:0;z-index:5}.nav-group{display:flex;gap:10px;align-items:center}.count{color:var(--muted);font:12px Consolas,monospace;white-space:nowrap}.progress{height:2px;position:absolute;top:-1px;left:0;background:var(--gold);transition:width .18s ease}.notes{display:none;border-top:1px solid var(--gold);margin-top:24px;padding:20px 0;color:var(--muted);font-size:16px;line-height:1.7}.show-notes .notes{display:block}.notes strong{color:var(--bright);font-weight:500}.hint{font-size:12px;color:var(--muted)}.slide.animate .title,.slide.animate .hero-title{animation:enter .28s ease both}@keyframes enter{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+button{white-space:nowrap}
+@media(max-width:800px){.nav{gap:8px}.nav-group{gap:7px}.nav #jump{max-width:116px}.nav button{padding:9px 10px}}
+@media(max-width:800px){.top{height:64px;padding:0 6vw}.edition{font-size:9px;max-width:130px;text-align:right;line-height:1.7}.slide{padding:32px 6vw;min-height:calc(100svh - 134px)}.grid,.wide{grid-template-columns:1fr;gap:28px}.title{margin-bottom:25px}.hero-title{margin:24px 0}.flow{grid-template-columns:1fr;align-items:start}.step{min-height:0;padding:18px 0;border-left:0;border-top:1px solid var(--line)}.step .n{margin-bottom:12px}.step h3{font-size:25px}.pillars{grid-template-columns:1fr 1fr;gap:25px}.pillar h3{font-size:21px}.diagram{padding:20px}.layer{padding:18px 0}.layer strong{font-size:21px}.layer span{font-size:12px}.source{padding-top:28px}.nav{padding:0 4vw}.nav button{padding:9px 12px}.nav select{max-width:128px;font-size:12px;padding:9px 5px}.hint{display:none}.timeline{grid-template-columns:95px 1fr}.rail{font-size:16px}.shot{margin:20px 0}}
+@media print{@page{size:landscape;margin:12mm}:root{color:#111;background:white}body{background:white}.top,.nav,.skip,.notes{display:none!important}.slide,.slide[hidden]{display:flex!important;min-height:170mm;break-after:page;padding:10mm 6mm;color:#111}.slide:last-child{break-after:auto}.source{color:#555}.lead,.body,.caption,.pillar p,.step p,.layer span{color:#555}.diagram{background:white}.title{font-size:32px}.hero-title{font-size:70px}.oversized{font-size:65px}.grid{grid-template-columns:1fr 1fr}.flow{grid-template-columns:repeat(3,1fr)}.pillars{grid-template-columns:repeat(4,1fr)}.gold,.eyebrow,.code,.tag{color:#776020}.code{font-size:20px}.number-row strong{font-size:48px}.source a{color:#555}.shot{max-height:115mm;object-fit:contain}}
+</style>
+</head>
+<body>
+<a class="skip" href="#deck">跳到演示内容</a>
+<header class="top"><a class="wordmark" href="./README.md">WhyJ <span>Quant</span></a><span class="edition">PRODUCT × ENGINEERING<br>WORKTREE / 2026.10.13</span></header>
+<main id="deck" class="deck" tabindex="-1">
+<section class="slide" id="slide-1" data-title="研究先于判断">
+<p class="eyebrow">01 / Research before conviction</p>
+<h1 class="hero-title">Think in<br><span class="gold">Signals.</span></h1>
+<p class="lead">把量化研究留在一个终端里。<br>让数据、计算与判断有迹可循。</p>
+<div class="source"><span>讲解演示 · 不连接模型、行情或账户</span><a href="./quant-harness/PRD.md">当前工作区范围 · 非发布说明</a></div>
+<aside class="notes"><strong>讲述线索：</strong>从个人研究者的日常任务进入。观察组合比较、固定报告、年度研究、结构化恢复和 WhyJ 扩展宿主已有各自的本地实现与验收边界。模型解释、真实供应商、账号授权与实体终端体验仍有缺口；本次只是更新演示，不提高产品完成度。</aside>
+</section>
+<section class="slide" id="slide-2" data-title="研究如何接续" hidden>
+<p class="eyebrow">02 / The daily workflow</p><h2 class="title">今天的分析，明天还能接着做。</h2>
+<div class="flow"><div class="step"><div class="n">01 — PREPARE</div><h3>配置 · 观察</h3><p>检查模型与数据连接<br>维护标的和观察组</p></div><div class="step"><div class="n">02 — RESEARCH</div><h3>分析 · 比较</h3><p>明确区间、基准与币种<br>读取来源、假设和缺项</p></div><div class="step"><div class="n">03 — RETURN</div><h3>报告 · 恢复</h3><p>保存当时的输入与结果<br>从原分支继续研究</p></div></div>
+<div class="source"><a href="./quant-harness/user-guide.md">按任务操作</a><a href="./quant-harness/portfolio-comparison.md">观察组合比较</a><a href="./quant-harness/README.md#tasks">任务与验收</a></div>
+<aside class="notes">组合比较已有自然语言工具入口，结构化任务与恢复也有固定输入的连续链路回归；这不等于任意提问都会成功。Portfolio 保存观察对象和分组，不是券商账户持仓。假设权重、币种、共同日期与缺失策略仍须明确。</aside>
+</section>
+<section class="slide" id="slide-3" data-title="一套视觉语言" hidden>
+<p class="eyebrow">03 / One visual language</p><h2 class="title">金色组织界面，红绿解释数据。</h2>
+<img class="shot" src="./assets/terminal-renderer-2026-10-13.png" width="1200" height="640" alt="2026-10-13 当前 QuantTui 缓冲区投影：合成输入、研究区、Composer 与 Overview；默认红涨绿跌">
+<p class="caption">当前渲染器的合成输入快照，非真实行情、模型回答或实体终端验收。按 DESIGN：品牌金 #D4AF37；Market Colors 默认红涨绿跌，可显式切换为绿涨红跌。</p>
+<div class="source"><a href="../DESIGN.md">唯一视觉规范</a><a href="./quant-harness/quant-uiux.md#structured-render">渲染与配色语义</a><span>成功 / 失败与风险色不随行情约定翻转</span></div>
+<aside class="notes">品牌金、行情方向和操作状态分别承担不同职责。切换行情约定重绘界面，不额外请求数据；新报告捕获选择，历史版本不变。零变化、缺失仍以文本区分，颜色不是唯一信号。终端字体由宿主控制，参考图和缓冲区测试不能证明所有实体终端体验。</aside>
+</section>
+<section class="slide" id="slide-4" data-title="内核与产品边界" hidden>
+<p class="eyebrow">04 / The ownership decision</p><h2 class="title">复用 Pi 的循环，维护研究的语义。</h2>
+<div class="grid"><div><span class="tag">精确依赖 / 自有会话</span><div class="rule"><h3>内核跟随上游</h3><p class="body">模型目录、协议与循环来自精确依赖。</p></div><div class="rule"><h3>会话由 WhyJ 承接</h3><p class="body">JSONL 分支、操作状态、压缩与研究恢复。</p></div></div><div class="diagram"><div class="layer"><strong>CLI / TUI</strong><span>输入与展示</span></div><div class="layer focus"><strong>WhyJ runtime</strong><span>端口组装与领域生命周期</span></div><div class="layer"><strong>Pi kernel</strong><span>Loop / Provider</span></div></div></div>
+<div class="source"><a href="./agent-runtime/README.md#pi-integration">版本与适配边界</a><a href="./quant-harness/module-architecture.md">Source / Runtime / Storage</a></div>
+<aside class="notes">版本以 package.json 的精确依赖和运行时 --version 为准，不在演示中复制一个会过时的版本号。Source 管规范化与回退，Runtime 绑定配置、缓存和宿主端口，Storage 管持久化。本地协议副本已移除，但仍需承担上游兼容与自有会话生命周期测试；不宣称接入 Pi Coding Agent 的完整宿主或任意插件。</aside>
+</section>
+<section class="slide" id="slide-5" data-title="配置与请求边界" hidden>
+<p class="eyebrow">05 / Configuration is runtime state</p><h2 class="title">保存成功，还要问哪条请求成功。</h2>
+<div class="grid wide"><div><p class="lead">Settings、Doctor、Agent<br>共享连接配置，各自证明不同的事。</p><p class="body">Model：Save / Save &amp; Verify<br>Market Data：Check data → Save verified</p></div><div><div class="timeline"><span class="mono">IN FLIGHT</span><div class="rail soft">在途操作保留自己的连接快照</div></div><div class="timeline"><span class="mono gold">NEXT</span><div class="rail">保存后的新操作使用新配置</div></div><div class="timeline"><span class="mono">PROBE</span><div class="rail soft">指定 provider / endpoint 核实权限</div></div></div></div>
+<div class="source"><a href="./quant-harness/configuration.md">配置与生效边界</a><a href="./quant-harness/configuration.md#diagnostics">诊断语义</a><a href="./quant-harness/configuration.md#pi-import">Pi 导入</a><a href="./quant-harness/configuration.md#oauth">OAuth 边界</a></div>
+<aside class="notes">OAuth 生命周期和 Pi 文件互通已实现，真实账号授权另需验证。模型连接与行情密钥是不同配置。研究取数允许契约内回退，因此另一来源成功不能证明 Tushare daily_basic 权限；Doctor 的单源检查保留失败归属。不要在演示中展示真实密钥。</aside>
+</section>
+<section class="slide" id="slide-6" data-title="刷新时间不是数据时间" hidden>
+<p class="eyebrow">06 / Two clocks, one honest result</p><h2 class="title">刚刷新，不等于行情刚更新。</h2>
+<div class="grid"><div class="numbers"><div class="number-row"><small>本地动作</small><div class="oversized gold">FETCHED</div><p class="body">何时获取、是否用了缓存</p></div><div class="number-row"><small>上游事实</small><div class="oversized">AS OF</div><p class="body">实际交易日或净值日</p></div></div><div><div class="rule"><h3>刷新有生命周期</h3><p class="body">请求预算、取消、渐进发布与迟到结果隔离。</p></div><div class="rule"><h3>缺失与陈旧可辨认</h3><p class="body">无行情显示 --，回退保留来源与日期。</p></div></div></div>
+<div class="source"><a href="./quant-harness/evaluation.md#data">测量与真实服务矩阵</a><a href="./blog/06-terminal-consistency.md">刷新一致性的取舍</a><a href="./quant-harness/source-data-providers.md">数据契约</a></div>
+<aside class="notes">刷新测量与公开源规模样本已经存在，不能继续写成“尚无基线”。但已测样本不能外推到所有市场、权限、时段或供应商，F08/F21 仍有未覆盖项。日线与基金净值都不是逐笔报价，本页不宣称新的性能改善。</aside>
+</section>
+<section class="slide" id="slide-7" data-title="事实如何恢复" hidden>
+<p class="eyebrow">07 / Facts survive the summary</p><h2 class="title">压缩的是对话，不是事实的依据。</h2>
+<div class="grid"><div><p class="lead">交流摘要可以有损。<br>研究事实必须有来源。</p><p class="body">任务对象、参数、数据引用与报告版本<br>从原分支投影，按支持的规则核验。</p></div><div class="diagram"><div class="layer"><strong>Conversation</strong><span>显示原文 / 有损摘要</span></div><div class="layer focus"><strong>Research state</strong><span>任务 / 参数 / 数据 / 缺项</span></div><div class="layer"><strong>Fixed inputs</strong><span>不可变归档 / 固定报告版本</span></div></div></div>
+<div class="source"><a href="./quant-harness/README.md#research-state">结构化恢复</a><a href="./quant-harness/artifacts-design.md">报告与来源</a><a href="./blog/03-context-as-projection.md">为什么分成两层</a></div>
+<aside class="notes">恢复不再只有最近标的或结果形状提示。原归档缺失、报告版本失效时需要降级证据状态，不能偷换为最新缓存。固定输入的恢复链路有回归；机械恢复仍不保证模型每一句解释正确，也不意味着无限上下文。</aside>
+</section>
+<section class="slide" id="slide-8" data-title="一次可复现的错误" hidden>
+<p class="eyebrow">08 / A counterexample changed the priority</p><h2 class="title">测试全绿，账本仍可能算错。</h2>
+<div class="grid"><div><span class="tag">历史反例 / 已有修复</span><p class="lead" style="margin-top:24px">1000 股，价格 100 → 110。<br>零费用，初始资金 100000。</p><p class="body">持仓增加的价值应为 10000。<br>独立账本揭露了权益递推的问题。</p></div><div class="numbers"><div class="number-row"><small>人工账本与修复后末值</small><strong class="gold">110,000</strong></div><div class="number-row"><small>修复前末值 · 四舍五入显示</small><strong>111,000</strong></div></div></div>
+<div class="source"><a href="./blog/05-evaluation-beyond-green.md#counterexamples">反例与反思</a><a href="./quant-harness/quant-tools-design.md">当前计算契约</a><a href="./quant-harness/evaluation.md#suite">模型回答评测</a><span>合成示例，非投资收益</span></div>
+<aside class="notes">历史输入为 signals=[1,1,1]、prices=[100,100,110]、initialCash=100000、commission=0、stampDuty=0。R01 已改用现金/股数账本及复利年化。本轮没有重新执行该历史实验；数值正确、流程完成与模型解释正确仍须分别验证。</aside>
+</section>
+<section class="slide" id="slide-9" data-title="注册不等于能力就绪" hidden>
+<p class="eyebrow">09 / Capability must be earned</p><h2 class="title">知道一个工具，不等于可以使用它。</h2>
+<div class="flow"><div class="step"><div class="n">01 — DECLARED</div><h3>已声明</h3><p>注册表给出名称与 schema<br>不是权限或服务可用证明</p></div><div class="step"><div class="n">02 — READY</div><h3>已具备条件</h3><p>依赖、版本、文件回执<br>按当前模式逐项检查</p></div><div class="step"><div class="n">03 — VERIFIED</div><h3>已验证结果</h3><p>计算、证据与解释<br>分别保留检查范围</p></div></div>
+<div class="source"><a href="./quant-harness/quant-tools-design.md#registry">注册表与能力清单</a><a href="./quant-harness/trader-skills.md#readiness">Skill 就绪规则</a><a href="./blog/05-evaluation-beyond-green.md#answer-checks">回答校验的边界</a></div>
+<aside class="notes">移除旧演示的 88/6/1 注册数，避免把会随实现变化的数量当成卖点或完成度。Skill 安装、发现、调用资格和输出质量不是同一个状态；文件变动后旧成功回执也可能失效。已有 shell 不等于默认研究 Agent 获得下单能力。</aside>
+</section>
+<section class="slide" id="slide-10" data-title="围绕研究装配能力" hidden>
+<p class="eyebrow">10 / Assemble around the research</p><h2 class="title">围绕一项研究，装配可用能力。</h2>
+<div class="grid"><div><span class="tag">已有宿主契约</span><p class="lead" style="margin-top:24px">目标、数据、工具、证据<br>由 Quant Harness 连接。</p><p class="body">WhyJ Extension API 管资源生命周期。<br>完成条件来自可核验的结果。</p></div><div class="diagram"><div class="layer focus"><strong>Research task</strong><span>目标 / 对象 / 约束</span></div><div class="layer"><strong>Capabilities</strong><span>Data / Tools / Skills</span></div><div class="layer"><strong>Evidence</strong><span>版本 / 参数 / 结果 / 缺项</span></div></div></div>
+<div class="source"><a href="./quant-harness/README.md">Harness 契约</a><a href="./agent-runtime/extensions.md">WhyJ 扩展宿主</a><a href="./agent-runtime/README.md#dependencies">宿主依赖注入</a></div>
+<aside class="notes">扩展宿主和结构化任务已存在，不再标成待实施。当前显式静态加载，不扫描任意目录，不实现 Pi Coding Agent ExtensionAPI；资源切换也需尊重运行边界。执行适配器独立于研究，保留授权、幂等与不确定结果的处理责任。</aside>
+</section>
+<section class="slide" id="slide-11" data-title="当前范围与后续门槛" hidden>
+<p class="eyebrow">11 / Know the boundary</p><h2 class="title">已有能力，不等于无限承诺。</h2>
+<div class="pillars"><div class="pillar"><span class="mono gold">RESEARCH</span><h3>研究闭环</h3><p>观察组合与比较<br>固定报告与年报<br>结构化恢复</p></div><div class="pillar"><span class="mono gold">ADAPTERS</span><h3>模块接口</h3><p>WhyJ 扩展宿主<br>Alpha / AKQuant<br>执行端口与边界</p></div><div class="pillar"><span class="mono gold">VALIDATION</span><h3>继续核验</h3><p>模型解释质量<br>真实权限与账号<br>实体终端体验</p></div><div class="pillar"><span class="mono gold">EXECUTION</span><h3>执行范围</h3><p>当前先保留接口<br>真实服务另行接入<br>实盘尚未接通</p></div></div>
+<div class="source"><a href="./quant-harness/PRD.md">逐项范围与状态</a><a href="./quant-harness/roadmap.md">实施顺序</a><a href="./quant-harness/execution.md">执行接口与后续门槛</a></div>
+<aside class="notes">不再用旧 P0–P3 计划把已经接入的年报、扩展和 Alpha 写成未来能力。F16 当前完成的是用户选定的接口阶段，不能宣传为交易产品已就绪。更多市场覆盖、真实 OAuth、Skill 外部服务和自然语言解释仍需对应验收；没有新增交付日期或性能保证。</aside>
+</section>
+<section class="slide" id="slide-12" data-title="从一次研究开始" hidden>
+<p class="eyebrow">12 / Start with one question</p><h2 class="hero-title">Research.<br><span class="gold">Then decide.</span></h2>
+<div class="grid"><div><pre class="code">bun install
+bun run src/index.ts</pre><p class="body">在项目根目录启动，再按手册配置连接。</p></div><div><p class="lead">先核对数据，再读取结论。<br>保存这次研究，理解它的边界。</p><p class="body">公开演示不填写真实凭证或账户。<br>真实研究会产生模型与数据服务用量。</p></div></div>
+<div class="source"><a href="./quant-harness/user-guide.md">用户手册 / 本地演示路线</a><a href="./README.md">Docs</a><a href="./blog/index.html">Blog</a><a href="./quant-harness/PRD.md">当前范围</a></div>
+<aside class="notes">本页面是讲解演示，不运行 WhyJ，也不是在线沙盒。按手册在本地执行才会连接实际服务；支持的数据市场和权限取决于所选 provider。N 查看备注，方向键翻页，浏览器打印可查看全部页面。后续产品网站会分别呈现 Docs、Blog、用户手册与 Demo，不把本地证据目录整体公开。</aside>
+</section>
+</main>
+<nav class="nav" aria-label="演示导航"><div class="progress" aria-hidden="true"></div><div class="nav-group"><button id="prev" type="button" aria-label="上一页">←</button><button id="next" type="button" aria-label="下一页">→</button><span class="count" role="status" aria-live="polite"></span></div><select id="jump" aria-label="选择页面"></select><div class="nav-group"><span class="hint">← → 翻页 · N 备注</span><button id="notes" type="button" aria-pressed="false">备注</button></div></nav>
+<script>
+const slides=Array.from(document.querySelectorAll(".slide"));
+const previous=document.getElementById("prev"),next=document.getElementById("next"),jump=document.getElementById("jump"),notes=document.getElementById("notes");
+let current=0;
+slides.forEach((slide,i)=>{const option=document.createElement("option");option.value=String(i);option.textContent=String(i+1).padStart(2,"0")+" / "+slide.dataset.title;jump.append(option);});
+function show(index,updateHash=true){current=Math.max(0,Math.min(slides.length-1,index));slides.forEach((slide,i)=>{slide.hidden=i!==current;slide.classList.toggle("animate",i===current);});previous.disabled=current===0;next.disabled=current===slides.length-1;jump.value=String(current);document.querySelector(".count").textContent=String(current+1).padStart(2,"0")+" / "+slides.length;document.querySelector(".progress").style.width=((current+1)/slides.length*100)+"%";document.title="WhyJ Quant — "+slides[current].dataset.title;if(updateHash)history.replaceState(null,"","#slide-"+(current+1));window.scrollTo(0,0);}
+function fromHash(){const match=location.hash.match(/^#slide-(\d+)$/);show(match?Number(match[1])-1:0,false);}
+function toggleNotes(){const on=document.body.classList.toggle("show-notes");notes.setAttribute("aria-pressed",String(on));}
+previous.addEventListener("click",()=>show(current-1));next.addEventListener("click",()=>show(current+1));jump.addEventListener("change",()=>show(Number(jump.value)));notes.addEventListener("click",toggleNotes);
+document.addEventListener("keydown",event=>{if(event.ctrlKey||event.metaKey||event.altKey||/INPUT|TEXTAREA|SELECT/.test(event.target.tagName))return;const key=event.key;if(["ArrowRight","PageDown","ArrowLeft","PageUp","Home","End"].includes(key)){event.preventDefault();show(key==="Home"?0:key==="End"?slides.length-1:current+(["ArrowRight","PageDown"].includes(key)?1:-1));}else if(key===" "&&!/BUTTON|A/.test(event.target.tagName)){event.preventDefault();show(current+1);}else if(key.toLowerCase()==="n")toggleNotes();});
+window.addEventListener("hashchange",fromHash);fromHash();
+</script>
+</body>
+</html>

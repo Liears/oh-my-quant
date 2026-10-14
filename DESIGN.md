@@ -219,6 +219,37 @@ as brand colors.
 
 Market movement colors are data visualization concerns and not brand identity.
 
+## Market and status semantics
+
+The shared brand gold is `#D4AF37`, focus gold `#E2BE4D`, text `#F5F5F5`, muted text `#A6A6A6`, and hairline `#242424`.
+
+`/config → Market Colors` selects one explicit convention for the workspace, including mixed-market portfolios: `red-up` (default, red up / green down) or `green-up` (green up / red down). Overview, tables, candles and newly generated HTML use the same convention; report versions retain the convention captured when generated.
+
+Movement and outcome use separate tokens. Positive/negative command status, scores and risk amounts do not change when the market convention changes. Rounded zero, flat candles and unavailable values use neutral gray; gains/losses retain signs, and reports include a legend. Brand gold does not imply a positive financial result.
+
+### 色彩规范与实现映射（2026-10-13）
+
+本文件是产品、TUI、报告、文档站与演示的视觉规范。共享实现为 [theme-colors.ts](./src/types/theme-colors.ts)；终端和报告消费同一组语义，不各自发明主题。下表登记已有规范及实现映射，不新增品牌色。
+
+| 用途 | 规范值 / 行为 | 约束 |
+|---|---|---|
+| 品牌主色、选中背景 | `#D4AF37` | 唯一品牌强调色；不表示盈利、买入或成功 |
+| 焦点强调 | `#E2BE4D` | 键盘焦点与活动态，同属金色层级 |
+| 深色背景上的亮金 | `#F0D77A` | 标题或局部强调，不另立 cash gold 主色 |
+| 正文 / 次要文字 | `#F5F5F5` / `#A6A6A6` | 信息层级不依赖颜色；重要限制不能只用极暗灰 |
+| 画布 / 面板 / 细分隔线 | `#0B0B0C` / `#111111` / `#242424` | 终端画布可使用既定纯黑；分隔线不承担文字含义 |
+| 行情 `red-up` | 涨 `#E5494D`、跌 `#1E9F4D` | 默认约定，同一工作区跨市场一致 |
+| 行情 `green-up` | 涨 `#1E9F4D`、跌 `#E5494D` | 由 Market Colors 显式选择，不按单个标的自动反转 |
+| 操作成功 / 失败 | `#1E9F4D` / `#E5494D` | 不随行情约定翻转，必须同时显示状态文字 |
+| 风险量 / 评分 | 独立的 `negative` / `positive` 语义 | 回撤、VaR 等不能因为数值带正号就着盈利色；评分色不证明投资价值 |
+| 平盘、显示精度下的零变化、缺失 | `#A6A6A6` | 仍区分 `0.00%` 与 `N/A` / `--`，缺失不能伪造为零 |
+
+品牌、行情和状态是三种职责，不是三个主题。红绿只用于数据和状态，不进入 Logo、主导航或营销装饰；金色也不用于暗示金融结果的好坏。文字、正负号、箭头、数值、图例共同表达含义，单色下仍应可读。
+
+`/config → Market Colors` 修改工作区偏好后重绘，不额外触发行情请求；新报告捕获生成时约定，历史报告字节不随设置改写。演示中采用合成数字须标注，旧参考截图不可充当默认涨跌约定或运行证明。
+
+旧渲染稿的 amber / `#E8B339` cash gold 和固定 A 股配色不再是并行规范；保留原因与代价见 [终端演进记录](./docs/blog/10-layout-and-visual-language.md#visual-language)。具体语义映射与验证见 [渲染指南](./docs/quant-harness/quant-uiux.md#structured-render)。
+
 ## Layout Principles
 
 Left aligned.

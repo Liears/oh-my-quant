@@ -28,7 +28,7 @@ Show the actual data source, coverage dates, assumptions, and missing inputs.
 
 To save reports, enable **Auto Artifacts** in `/config` before submitting a research request. `/artifact` opens existing reports; `/resume` returns to a saved session.
 
-Provider credentials and optional Python dependencies depend on your data sources. Model and data services may charge for usage. See the [configuration guide](./docs/configuration.md) and [provider reference](./docs/source-data-providers.md).
+Provider credentials and optional Python dependencies depend on your data sources. Model and data services may charge for usage. See the [configuration guide](./docs/quant-harness/configuration.md) and [provider reference](./docs/quant-harness/source-data-providers.md).
 
 <details>
 <summary>Run from source</summary>
@@ -62,12 +62,14 @@ The checkout and npm release may differ. Check `whyj --version` and the [changel
 | `/artifact` | Browse reports and restore their source research |
 | `/resume` | Continue a saved session |
 
-Use `/help` in the terminal or `whyj --help` in your shell. The [command reference](./docs/slash-commands.md) covers the full interface and one-shot usage.
+Use `/help` in the terminal or `whyj --help` in your shell. The [command reference](./docs/quant-harness/slash-commands.md) covers the full interface and one-shot usage.
 
 ## Documentation
 
-- **Use the terminal:** [Configuration](./docs/configuration.md), [data providers](./docs/source-data-providers.md), [reports](./docs/artifacts-design.md), [tools and skills](./docs/trader-skills.md).
-- **Understand the system:** [Architecture](./docs/module-architecture.md), [agent loop](./docs/pi-agent-loop-harness.md), [design](./DESIGN.md).
+- **Use the terminal:** [Configuration](./docs/quant-harness/configuration.md), [data providers](./docs/quant-harness/source-data-providers.md), [reports](./docs/quant-harness/artifacts-design.md), [tools and skills](./docs/quant-harness/trader-skills.md).
+- **Agent Runtime design:** [Runtime, lifecycle, and Pi integration](./docs/agent-runtime/README.md).
+- **Quant Harness design:** [Data, computation, execution, reports, and UI/UX](./docs/quant-harness/README.md).
+- **System and UI:** [Module architecture](./docs/quant-harness/module-architecture.md), [visual design](./DESIGN.md).
 - **Read further:** [Investment notes](./notes/README.md), [changelog](./CHANGELOG.md).
 
 Most technical references are in Chinese. The [website](https://oh-my-quant.vercel.app/en/) supports English and Chinese; articles will appear on the [Blog](https://oh-my-quant.vercel.app/en/blog/).

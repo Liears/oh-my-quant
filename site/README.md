@@ -2,7 +2,7 @@
 
 [正式官网](https://oh-my-quant.vercel.app) · [English](https://oh-my-quant.vercel.app/en/) · [Blog](https://oh-my-quant.vercel.app/blog/)
 
-官网与 CLI 在同一仓库维护，`site/` 是独立的静态部署单元。视觉真源是根目录 [DESIGN.md](../DESIGN.md)，产品文案以 [README](../README.md)、[配置参考](../docs/configuration.md) 和 [Quant UI/UX](../docs/quant-uiux.md) 为依据。
+官网与 CLI 在同一仓库维护，`site/` 是独立的静态部署单元。视觉真源是根目录 [DESIGN.md](../DESIGN.md)，产品文案以 [README](../README.md)、[配置参考](../docs/quant-harness/configuration.md) 和 [Quant UI/UX](../docs/quant-harness/quant-uiux.md) 为依据。
 
 ## 为什么这样维护
 
