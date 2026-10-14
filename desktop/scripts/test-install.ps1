@@ -32,11 +32,14 @@ function Install-App([string[]]$InstallerArguments) {
   if ((Get-InstalledApp).Count -ne 1) { throw 'Per-user uninstall registration missing or duplicated.' }
   if ((Get-InstalledApp)[0].DisplayVersion -ne $version) { throw 'Registered version does not match the installer.' }
   if ((Get-Content -LiteralPath $sentinel -Raw) -ne $marker) { throw 'Research data changed during installation.' }
-  $shell = New-Object -ComObject WScript.Shell
+  # WScript.Shell.TargetPath replaces non-ANSI characters with '?'. Use the
+  # Unicode-aware Windows shell link object to inspect Chinese destinations.
+  $shell = New-Object -ComObject Shell.Application
   foreach ($folder in @([Environment]::GetFolderPath('DesktopDirectory'), [Environment]::GetFolderPath('Programs'))) {
     $link = Join-Path $folder 'WhyJ Quant.lnk'
     if (-not (Test-Path -LiteralPath $link)) { throw "Shortcut missing: $link" }
-    if ($shell.CreateShortcut($link).TargetPath -ne $exe) { throw "Shortcut points outside the selected directory: $link" }
+    $target = $shell.Namespace($folder).ParseName('WhyJ Quant.lnk').GetLink.Path
+    if ($target -ne $exe) { throw "Shortcut target mismatch: $link -> $target (expected $exe)" }
   }
 }
 # NSIS requires /D last, with no quotes around its value, including spaces.
