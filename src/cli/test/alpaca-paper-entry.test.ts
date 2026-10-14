@@ -22,7 +22,7 @@ it("requires the exact explicit action and separate paper credentials before bro
   const missingAction = await cli(["--json", "alpaca-paper"]);
   expect(missingAction.code).toBe(1);
   expect(JSON.parse(missingAction.output)).toMatchObject({ ok: false, command: "alpaca-paper" });
-  const missingCredentials = await cli(["--json", "alpaca-paper", "account", "--root", "C:\\private-paper", "--account", "paper-account"]);
+  const missingCredentials = await cli(["--json", "alpaca-paper", "account", "--root", resolve("private-paper"), "--account", "paper-account"]);
   expect(missingCredentials.code).toBe(1);
   expect(JSON.parse(missingCredentials.output)).toMatchObject({ ok: false, command: "alpaca-paper" });
   expect(missingCredentials.output).toContain("ALPACA_PAPER_KEY_ID");
