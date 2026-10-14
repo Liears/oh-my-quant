@@ -1,5 +1,7 @@
 # Windows 桌面版
 
+维护方向选择 Desktop-first，同时保留 CLI。`apps/desktop`、`apps/cli` 与共享工作区的分阶段改造仍是提案，尚未实施；问题、边界、兼容成本及后续验收见[产品形态博客](../blog/08-research-workbench.md)。本文继续描述现有 `desktop/` PTY 宿主与构建方法，不把计划当作现状。
+
 更新：2026-10-14。CLI 与桌面源码统一为 1.4.0；已发布安装包、构建结果和安装验收分别以对应 Release/工作流记录为准。
 
 桌面版合入 `main` 后与 CLI 在同一分支维护；实现位于 `desktop/`，设计属于 Quant Harness。版本号同时来自根目录和 `desktop/package.json`，构建时必须一致。

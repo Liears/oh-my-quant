@@ -36,14 +36,14 @@ docs/
 
 Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/runtime/quant-harness.ts` 实现其中的任务装配与守卫；Source、Quant、Storage、Execution、Artifact 和 UI/UX 是这一应用体系内职责不同的组成部分。归入同一目录不抹平模块边界，不表示执行能力已经接入默认研究 Agent，也不放宽账户授权。
 
-当前共 **62 个文件**：39 份 Markdown、2 份 HTML、3 个 TypeScript、5 张 PNG、13 张 SVG。23 份原顶层文档已迁入两个目录；桌面宿主设计也归入 Quant Harness。顶层 Markdown 只保留本页。
+当前共 **64 个文件**：39 份 Markdown、2 份 HTML、3 个 TypeScript、7 张 PNG、13 张 SVG。23 份原顶层文档已迁入两个目录；桌面宿主设计也归入 Quant Harness。顶层 Markdown 只保留本页。
 
 | 位置 | 文件数 | 内容 |
 |---|---:|---|
 | `agent-runtime/` | 2 | 通用运行时与扩展契约 |
 | `quant-harness/` | 22 | 完整量化应用的设计、产品与使用文档 |
 | `blog/` | 30 | 12 篇正文、目录与编辑说明、12 张 SVG、构建/检查脚本、私有证据路径规则和离线 HTML |
-| `assets/` | 6 | 共用产品与设计素材 |
+| `assets/` | 8 | 共用产品与设计素材及实际博客阅读视图证据 |
 | 顶层 | 2 | 本页和讲解演示 |
 
 <a id="agent-design"></a>
@@ -130,7 +130,7 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 | [05 · 测试全绿，为什么仍不能交付结论](./blog/05-evaluation-beyond-green.md) | 哪种验证支持哪种声明？ | 工程验证 |
 | [06 · 终端也是一个一致性系统](./blog/06-terminal-consistency.md) | 迟到数据和旧画面由谁负责？ | 技术架构 / UI 状态 |
 | [07 · 报告要固定，设计要演进](./blog/07-artifacts-and-boundaries.md) | 哪些事实要保留，哪些设计可以淘汰？ | 产物 / 演进治理 |
-| [08 · 研究终端不能只是聊天框](./blog/08-research-workbench.md) | 如何支持一次提问之外的完整研究？ | 产品设计 |
+| [08 · 从研究终端到桌面工作台](./blog/08-research-workbench.md) | 两种入口怎样延续同一份研究？ | 产品形态 / apps 改造提案，尚未实施 |
 | [09 · 模块拆开后，为什么还要 Runtime](./blog/09-boundaries-for-change.md) | 变化应当停在哪一个边界？ | 技术架构 |
 | [10 · 80×24 的屏幕里，什么值得留下](./blog/10-layout-and-visual-language.md) | 空间不足时怎样分配注意力？ | UI 布局 / 视觉语义 |
 | [11 · 不知道下一条命令时](./blog/11-discoverable-interactions.md) | 能力如何被发现，又不误执行？ | UX / 功能发现 |
@@ -158,7 +158,7 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 <a id="assets"></a>
 ## 配图素材
 
-### 公共视觉素材（6）
+### 公共视觉素材（8）
 
 这些素材不是独立的设计规范或运行证明。无正文引用只能作为使用情况线索，不能单独作为删除依据。
 
@@ -170,6 +170,8 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 | [assets/image.png](./assets/image.png) | 另一版终端画面参考，含 Portfolio / Watchlist / Market | 保留素材；本轮分类前未在 docs、项目 README、DESIGN 的文本引用中找到入口 |
 | [assets/logo.png](./assets/logo.png) | 羽毛、柱形图与 WhyJ Quant 字标 | 品牌素材，同上范围未发现原入口 |
 | [assets/poste.svg](./assets/poste.svg) | 1200×1700 SVG 版面素材 | 展示素材，同上范围未发现原入口；不从文件名推断其发布或验收状态 |
+| [assets/blog-product-plan-wide-20261015.png](./assets/blog-product-plan-wide-20261015.png) | 第 08 篇离线博客的实际浏览器阅读视图，1440×1000 | 本地 Chromium、2026-10-15；仅文档渲染证据，不是新桌面 UI 截图或网站部署证明 |
+| [assets/blog-product-plan-narrow-20261015.png](./assets/blog-product-plan-narrow-20261015.png) | 同一博客的 390×844 阅读视图 | 同上；正文不溢出，机制图沿用带提示、可键盘横滚的容器 |
 
 ### 博客机制图（12）
 
