@@ -18,7 +18,7 @@ function validSessionDate(value: string): boolean {
 export function validResearchBar(bar: Bar): boolean {
   return validSessionDate(bar.date)
     && [bar.open, bar.high, bar.low, bar.close].every((v) => Number.isFinite(v) && v > 0)
-    && [bar.volume, bar.amount].every((v) => Number.isFinite(v) && v >= 0)
+    && [bar.volume, bar.amount].every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0)
     && bar.high >= Math.max(bar.open, bar.close, bar.low)
     && bar.low <= Math.min(bar.open, bar.close);
 }

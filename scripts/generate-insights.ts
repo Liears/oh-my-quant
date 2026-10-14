@@ -1,6 +1,6 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { generateInsights } from "../src/quant/insight-generator.ts";
+import { generateInsights } from "../src/insight/generator.ts";
 
 const ROOT = resolve(import.meta.dir, "..");
 const entries = generateInsights();

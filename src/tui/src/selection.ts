@@ -1,6 +1,6 @@
 import { strWidth } from "./buffer.ts";
 import type { Style } from "./buffer.ts";
-import type { UIMessage } from "./types.ts";
+import type { UIMessage } from "../../types/ui.ts";
 
 export interface ConversationPoint {
   lineIdx: number;

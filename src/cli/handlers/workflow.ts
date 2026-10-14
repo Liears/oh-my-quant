@@ -1,8 +1,10 @@
 import type { CommandHandler } from "../types.ts";
-import { runComparison, type ComparisonConfig, type ComparisonContext } from "../../quant/comparison.ts";
-import { volatilityRule, drawdownRule, sectorRule, type ClassificationRule } from "../../quant/auto-classify.ts";
+import { runComparison, type ComparisonConfig, type ComparisonContext } from "../../runtime/research/comparison.ts";
+import {
+  volatilityRule, drawdownRule, sectorRule, type ClassificationRule,
+  metrics,
+} from "../../quant/index.ts";
 import { collectPanelPortfolioSymbols, generateComparisonId, loadPanelPortfolio, loadBars as loadBarsFromStorage, saveComparison } from "../../storage/index.ts";
-import { metrics } from "../../quant/risk.ts";
 
 const compareUsage = "Use /compare run --rule volatility|drawdown|sector";
 

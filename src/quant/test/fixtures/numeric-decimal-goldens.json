@@ -1,0 +1,208 @@
+{
+  "precision": 800,
+  "reference": "Python Decimal.from_float inputs, exact decimal central moment formulas",
+  "cases": [
+    {
+      "case": 0,
+      "values": [
+        -1.0,
+        0.0,
+        1.0
+      ],
+      "mean": 0.0,
+      "sampleDeviation": 1.0,
+      "shape": {
+        "skewness": 0.0,
+        "kurtosis": -1.5
+      },
+      "deviationUnsupported": false
+    },
+    {
+      "case": 1,
+      "values": [
+        1e+200,
+        0.0,
+        0.0
+      ],
+      "mean": 3.3333333333333334e+199,
+      "sampleDeviation": 5.773502691896257e+199,
+      "shape": {
+        "skewness": 0.7071067811865476,
+        "kurtosis": -1.5
+      },
+      "deviationUnsupported": false
+    },
+    {
+      "case": 2,
+      "values": [
+        1e-200,
+        -1e-200
+      ],
+      "mean": 0.0,
+      "sampleDeviation": 1.414213562373095e-200,
+      "shape": {
+        "skewness": 0.0,
+        "kurtosis": -2.0
+      },
+      "deviationUnsupported": false
+    },
+    {
+      "case": 3,
+      "values": [
+        1e+308,
+        1e+308
+      ],
+      "mean": 1e+308,
+      "sampleDeviation": 0.0,
+      "shape": {
+        "skewness": 0.0,
+        "kurtosis": 0.0
+      },
+      "deviationUnsupported": false
+    },
+    {
+      "case": 4,
+      "values": [
+        1e+308,
+        1e+308,
+        0.0
+      ],
+      "mean": 6.666666666666666e+307,
+      "sampleDeviation": 5.773502691896257e+307,
+      "shape": {
+        "skewness": -0.7071067811865476,
+        "kurtosis": -1.5
+      },
+      "deviationUnsupported": false
+    },
+    {
+      "case": 5,
+      "values": [
+        1000000000000.0,
+        1000000000000.0001
+      ],
+      "mean": 1000000000000.0,
+      "sampleDeviation": 8.631674575031098e-05,
+      "shape": {
+        "skewness": 0.0,
+        "kurtosis": -2.0
+      },
+      "deviationUnsupported": false
+    },
+    {
+      "case": 6,
+      "values": [
+        -1e+200,
+        1e+200
+      ],
+      "mean": 0.0,
+      "sampleDeviation": 1.414213562373095e+200,
+      "shape": {
+        "skewness": 0.0,
+        "kurtosis": -2.0
+      },
+      "deviationUnsupported": false
+    },
+    {
+      "case": 7,
+      "values": [
+        -1.7976931348623157e+308,
+        1.7976931348623157e+308
+      ],
+      "mean": 0.0,
+      "sampleDeviation": null,
+      "shape": {
+        "skewness": 0.0,
+        "kurtosis": -2.0
+      },
+      "deviationUnsupported": true
+    },
+    {
+      "case": 8,
+      "values": [
+        1.7976931348623157e+308,
+        -1.7976931348623157e+308,
+        1e-200
+      ],
+      "mean": 3.3333333333333335e-201,
+      "sampleDeviation": 1.7976931348623157e+308,
+      "shape": {
+        "skewness": -0.0,
+        "kurtosis": -1.5
+      },
+      "deviationUnsupported": false
+    },
+    {
+      "case": 9,
+      "values": [
+        5e-324,
+        5e-324,
+        5e-324
+      ],
+      "mean": 5e-324,
+      "sampleDeviation": 0.0,
+      "shape": {
+        "skewness": 0.0,
+        "kurtosis": 0.0
+      },
+      "deviationUnsupported": false
+    },
+    {
+      "case": 10,
+      "values": [
+        1e+100,
+        1.000000000000001e+100,
+        9.99999999999999e+99
+      ],
+      "mean": 1e+100,
+      "sampleDeviation": 9.713344461128645e+84,
+      "shape": {
+        "skewness": 0.0,
+        "kurtosis": -1.5
+      },
+      "deviationUnsupported": false
+    },
+    {
+      "case": 11,
+      "values": [
+        1e-100,
+        2e-100,
+        3e-100
+      ],
+      "mean": 2e-100,
+      "sampleDeviation": 1e-100,
+      "shape": {
+        "skewness": 0.0,
+        "kurtosis": -1.5
+      },
+      "deviationUnsupported": false
+    },
+    {
+      "case": 12,
+      "values": [
+        -0.4117647058823529,
+        -0.35294117647058826,
+        -0.29411764705882354,
+        -0.23529411764705882,
+        -0.17647058823529413,
+        -0.11764705882352941,
+        -0.058823529411764705,
+        0.0,
+        0.058823529411764705,
+        0.11764705882352941,
+        0.17647058823529413,
+        0.23529411764705882,
+        0.29411764705882354,
+        0.35294117647058826,
+        0.4117647058823529
+      ],
+      "mean": 0.0,
+      "sampleDeviation": 0.2630668208823282,
+      "shape": {
+        "skewness": 0.0,
+        "kurtosis": -1.2107142857142859
+      },
+      "deviationUnsupported": false
+    }
+  ]
+}

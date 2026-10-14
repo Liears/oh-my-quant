@@ -4,7 +4,7 @@
  */
 
 import { metrics } from "./risk.ts";
-import type { GroupComparisonResult, GroupNav, NavPoint } from "../types/comparison.ts";
+import type { NavPoint } from "../types/comparison.ts";
 import type { RiskMetrics } from "../types/risk.ts";
 export type { GroupComparisonResult, GroupNav, NavPoint } from "../types/comparison.ts";
 

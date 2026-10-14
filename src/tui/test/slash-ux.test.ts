@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { QuantTui } from "../src/tui.ts";
 import { savePanelPortfolio } from "../../storage/index.ts";
-import type { AppState } from "../src/types.ts";
+import type { AppState } from "../../types/ui.ts";
 
 const OHQ = join(process.cwd(), ".ohquant-test-slash-ux");
 
@@ -286,7 +286,7 @@ describe("slash command UX simulation", () => {
       join(cwdDir, `2026-06-20T08-00-00-000Z_${sessionId}.jsonl`),
       [
         JSON.stringify({ type: "session", version: 3, id: sessionId, timestamp: "2026-06-20T08:00:00.000Z", cwd: process.cwd() }),
-        JSON.stringify({ type: "message", id: "m1", timestamp: "2026-06-20T08:03:00.000Z", message: { role: "user", content: "恢复这个会话" } }),
+        JSON.stringify({ type: "message", id: "m1", parentId: null, timestamp: "2026-06-20T08:03:00.000Z", message: { role: "user", content: "恢复这个会话" } }),
       ].join("\n"),
       "utf-8",
     );

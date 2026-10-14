@@ -1,7 +1,7 @@
 import { strWidth, truncate } from "./buffer.ts";
 import { DIVIDER_CHAR, OVERVIEW_ROW_H, OVERVIEW_SECTION_H, S, pctStyle } from "./styles.ts";
 import { fmtPct } from "./format.ts";
-import type { PanelSection, Holding, Quote } from "./types.ts";
+import type { PanelSection, Holding, Quote } from "../../types/ui.ts";
 import type { RenderLine } from "./render-lines.ts";
 import type { ConversationView } from "./selection.ts";
 
@@ -46,7 +46,7 @@ function overviewBlockHeight(block: OverviewBlock): number {
     case "section-header": return OVERVIEW_SECTION_H;
     case "group-header": return OVERVIEW_SECTION_H;
     case "quote":
-    case "holding": return OVERVIEW_ROW_H;
+    case "holding": return Math.max(OVERVIEW_ROW_H, block.row.observation ? 2 : 1);
     case "keyvalue": return 1;
     case "gap": return 1;
   }
@@ -103,13 +103,15 @@ function overviewBlockToLines(block: OverviewBlock, w: number): RenderLine[] {
     case "quote":
       return overviewRowLines(block.row, w);
     case "keyvalue": {
-      const gap = Math.max(1, w - strWidth(block.row.label) - strWidth(block.row.value));
+      const label = truncate(block.row.label, Math.max(0, w - 1));
+      const value = truncate(block.row.value, Math.max(0, w - strWidth(label) - 1));
+      const gap = Math.max(1, w - strWidth(label) - strWidth(value));
       const pad = " ".repeat(gap);
       return [{
-        text: `${block.row.label}${pad}${block.row.value}`,
+        text: `${label}${pad}${value}`,
         segments: [
-          { text: block.row.label, style: S.dim },
-          { text: `${pad}${block.row.value}`, style: S.tableValue },
+          { text: label, style: S.dim },
+          { text: `${pad}${value}`, style: S.tableValue },
         ],
       }];
     }
@@ -120,13 +122,13 @@ function overviewBlockToLines(block: OverviewBlock, w: number): RenderLine[] {
 
 function overviewRowLines(row: Holding, w: number): RenderLine[] {
   const pctTxt = fmtPct(row.pct);
-  const code = row.code.split(".")[0] || row.code;
-  const codePart = code.padEnd(8);
+  const code = truncate(row.observation?.symbol ?? row.code, Math.max(0, w - 8));
+  const codePart = code.padEnd(Math.min(Math.max(8, strWidth(code) + 1), Math.max(0, w - 8)));
   const pctPart = pctTxt.padStart(8);
   const nameW = Math.max(0, w - strWidth(codePart) - strWidth(pctPart));
   const namePart = truncate(row.name, nameW);
   const pad = " ".repeat(Math.max(0, nameW - strWidth(namePart)));
-  return [{
+  const lines: RenderLine[] = [{
     text: `${codePart}${namePart}${pad}${pctPart}`,
     segments: [
       { text: codePart, style: S.code },
@@ -135,6 +137,14 @@ function overviewRowLines(row: Holding, w: number): RenderLine[] {
       { text: pctPart, style: pctStyle(row.pct) },
     ],
   }];
+  if (row.observation) {
+    const observation = row.observation;
+    const status = observation.state === "unavailable" ? "无数据" : observation.state === "outside-window" ? "旧窗口" : "";
+    const text = [status, observation.asOfDate, observation.sourceLabel, observation.fallback && observation.state !== "unavailable" ? "回退" : ""].filter(Boolean).join(" · ");
+    lines.push({ text: truncate(text, w), style: S.tableNote });
+  }
+  while (lines.length < OVERVIEW_ROW_H) lines.push({ text: "" });
+  return lines;
 }
 
 export function buildOverviewLines(sections: PanelSection[], innerW: number): RenderLine[] {

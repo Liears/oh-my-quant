@@ -1,3 +1,5 @@
+import { displayedMovement } from "../../types/metric-semantics.ts";
+
 export function fmtPrice(p: number): string {
   if (!Number.isFinite(p)) return "--";
   if (p >= 10000) return p.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -7,8 +9,7 @@ export function fmtPrice(p: number): string {
 
 export function fmtPct(p: number): string {
   if (!Number.isFinite(p)) return "--";
-  if (Math.abs(p) < 0.001) return "0.00%";
-  return `${p > 0 ? "+" : ""}${p.toFixed(2)}%`;
+  return displayedMovement(p).text;
 }
 
 export function fmtElapsed(ms: number): string {

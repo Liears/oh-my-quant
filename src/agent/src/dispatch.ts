@@ -1,9 +1,9 @@
 /**
  * User-message dispatch — mirrors pi agent-harness steer/followUp/prompt split.
- * Reference: reference/pi/packages/agent/src/harness/agent-harness.ts
+ * Reference: reference/session-runtime/packages/agent/src/harness/agent-harness.ts
  */
-import type { AgentMessage } from "./pi/index.ts";
-import { createDisplayUserMessage } from "./pi/harness/messages.ts";
+import type { AgentMessage } from "./session-runtime/index.ts";
+import { createDisplayUserMessage } from "./session-runtime/harness/messages.ts";
 import type { QuantAgentSession } from "./session.ts";
 
 export type AgentDispatchMode = "prompt" | "steer" | "followUp";
@@ -32,12 +32,14 @@ export async function dispatchUserMessage(
   agent: QuantAgentSession,
   text: string,
   displayText = text,
+  signal?: AbortSignal,
 ): Promise<AgentDispatchMode> {
+  signal?.throwIfAborted();
   if (agent.state.isStreaming) {
     return await enqueueAgentMessage(agent, text, displayText);
   }
   try {
-    await agent.prompt(text, { displayText });
+    await agent.prompt(text, { displayText, signal });
     return "prompt";
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

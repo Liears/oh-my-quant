@@ -49,9 +49,6 @@ function buildNav(monthlyRet: number[]): { date: string; nav: number }[] {
   return series;
 }
 
-// Shared HS300 benchmark
-const allDates = buildNav([0,0,0,0,0,0]).map(s => s.date);
-
 function col(s: string, w: number): string { return String(s).length >= w ? String(s) + "   " : String(s).padEnd(w, " ") + "   "; }
 
 function renderKline(navSeries: { date: string; nav: number }[], navFinal: number): string {

@@ -3,7 +3,7 @@
  * Redacts: api_key, token, secret, password, cookie, authorization,
  *          access_key, private_key, session, auth, and variants.
  */
-import type { TrajectoryEvent, RedactionInfo } from "./types.ts";
+import type { TrajectoryEvent } from "./types.ts";
 
 const SENSITIVE_KEY_PATTERNS = [
   /api[_-]?key/i, /token/i, /secret/i, /password/i, /passwd/i,

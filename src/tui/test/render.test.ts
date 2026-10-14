@@ -3,10 +3,10 @@ import { Buffer, sanitizeTerminalText, strWidth, wrap } from "../src/buffer.ts";
 import { capSections, conversationMaxScrollUp, drawComposer, drawConversation, drawPortfolio, drawStatus, layout, overviewMaxScrollTop, buildOverviewView, buildConversationView } from "../src/render.ts";
 import { buildConversationLines } from "../src/render-lines.ts";
 import { extractConversationSelection } from "../src/selection.ts";
-import { shellDisplayName } from "../../tools/catalog.ts";
+import { shellDisplayName } from "../../runtime/workspace/tool-display.ts";
 import { GOLD, MARKET_DOWN, MARKET_UP, NEGATIVE, POSITIVE, S } from "../src/styles.ts";
-import type { AppState } from "../src/types.ts";
-import type { PanelSection, UIMessage } from "../src/types.ts";
+import type { AppState } from "../../types/ui.ts";
+import type { PanelSection, UIMessage } from "../../types/ui.ts";
 
 describe("layout", () => {
   it("hides overview dock on narrow terminals", () => {
@@ -773,7 +773,7 @@ describe("render lines", () => {
     expect(header?.text.indexOf("value")).toBe(cagr?.text.indexOf("+12.30%"));
     expect(cagr?.text.indexOf("+12.30%")).toBe(drawdown?.text.indexOf("-8.20%"));
     expect(cagr?.segments?.some((seg) => seg.text.includes("+12.30%") && seg.style?.fg === MARKET_UP)).toBe(true);
-    expect(drawdown?.segments?.some((seg) => seg.text.includes("-8.20%") && seg.style?.fg === MARKET_DOWN)).toBe(true);
+    expect(drawdown?.segments?.some((seg) => seg.text.includes("-8.20%") && seg.style?.fg === NEGATIVE && !seg.style.fgRole)).toBe(true);
   });
 
   it("absorbs standalone table header dividers into full-width three-line tables", () => {
@@ -866,11 +866,40 @@ describe("render lines", () => {
     expect(lines.some((line) => line.segments?.some((seg) => seg.text.includes("▥") && seg.style?.fg === GOLD))).toBe(true);
     expect(lines.some((line) => line.segments?.some((seg) => seg.text.includes("████") && seg.style?.fg === GOLD))).toBe(true);
     expect(lines.some((line) => line.segments?.some((seg) => seg.text.includes("+12.30%") && seg.style?.fg === MARKET_UP))).toBe(true);
-    expect(lines.some((line) => line.segments?.some((seg) => seg.text.includes("-8.20%") && seg.style?.fg === MARKET_DOWN))).toBe(true);
+    expect(lines.some((line) => line.segments?.some((seg) => seg.text.includes("-8.20%") && seg.style?.fg === NEGATIVE && !seg.style.fgRole))).toBe(true);
   });
 });
 
 describe("drawStatus", () => {
+  it("keeps narrow HUD fields whole and reserves space after a long model name", () => {
+    const state: AppState = {
+      model: "visual-fixture", modelLabel: "visual-fixture", version: "0", user: "u", activity: "ready",
+      cost: 0, cacheHit: 0, messages: [], panel: [], panelLoading: false, input: "",
+      composerQueue: [], composerStatus: null, activePortfolio: "No portfolios",
+      source: "financial-datasets", showPortfolioPanel: false,
+      hud: { contextUsage: null, turnCount: 2, ttftMs: 250, tpotMs: 25 },
+    };
+    const buf = new Buffer(60, 1);
+    drawStatus(buf, 0, 60, state);
+    const short = buf.toPlain()[0];
+    expect(short).toContain("◆ visual-fixture");
+    expect(short).toContain("Ctx ░░░░░ -");
+    expect(short).toContain("TTFT 250ms");
+    expect(short).toContain("TPOT 25ms/t");
+    expect(short).toContain("T 2");
+    expect(short).not.toContain("financi");
+    expect(short).not.toContain("No p");
+
+    state.model = "custom/very-long-model-name-with-credentials";
+    buf.clear(); drawStatus(buf, 0, 60, state);
+    const long = buf.toPlain()[0];
+    expect(long).toMatch(/^◆ custom\/very-long-model.*…/u);
+    expect(long).toContain("Ctx ░░░░░ -");
+    expect(long).toContain("T 2");
+    expect(long).not.toContain("financi");
+    expect(long).not.toContain("No p");
+  });
+
   it("renders the active model, data sources, and portfolio", () => {
     const buf = new Buffer(140, 4);
     drawStatus(buf, 3, 140, {

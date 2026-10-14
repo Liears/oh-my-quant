@@ -3,14 +3,16 @@
  * Wraps Screen + Buffer; feeds agent events → paint().
  */
 import type * as readline from "node:readline";
-import { Buffer, Screen } from "./buffer.ts";
+import { Screen } from "./buffer.ts";
 import { layout, drawHeader, drawConversation, drawPortfolio, drawComposer, drawStatus, buildConversationView, buildOverviewView, activeConversationStatusRows } from "./render.ts";
-import { CANVAS } from "./styles.ts";
-import type { AppState } from "./types.ts";
+import { CANVAS, marketForegrounds } from "./styles.ts";
+import type { AppState } from "../../types/ui.ts";
+import type { ResearchTaskSnapshot } from "../../types/research-task.ts";
+import type { PrivateAnnualExportRequest } from "../../types/private-annual-export.ts";
 import { loadWatchlistEntries, type CodeEntry } from "./watchlist.ts";
 import { PanelController, type CurrentSessionMeta } from "./panel.ts";
 import { buildSuggestions, hitTestScrollRegion, nextInputAction, type InputAction, type MouseEvent, type ScrollRegion, type SkillEntry } from "./input.ts";
-import { loadRuntimeSkillSuggestions } from "../../runtime/skill-suggestions.ts";
+import { loadRuntimeSkillSuggestions } from "../../runtime/skills/skill-suggestions.ts";
 import { copyToClipboard } from "./clipboard.ts";
 import { resolveCopyText } from "./tui-copy.ts";
 import {
@@ -34,13 +36,21 @@ export class QuantTui {
   private histIdx = -1;
   private submitHandler: ((text: string) => void) | null = null;
   private artifactRestoreHandler: ((reportId: string) => void) | null = null;
+  private privateAnnualExportHandler: ((request: PrivateAnnualExportRequest) => void) | null = null;
   private panelRefreshHandler: (() => void) | null = null;
+  private configurationChangeHandler: (() => void) | null = null;
+  private doctorCloseHandler: (() => void) | null = null;
   private running = false;
   private animTimer: ReturnType<typeof setInterval> | null = null;
   private suggestionIdx = 0;
   private watchlist: CodeEntry[] = [];
   private skills: SkillEntry[] = [];
-  private panel = new PanelController();
+  private skillLoadVersion = 0;
+  private panel = new PanelController(undefined, {
+    onChange: () => { if (this.running) this.paint(); },
+    onDoctorClose: () => this.doctorCloseHandler?.(),
+    onConfigurationChange: () => this.configurationChangeHandler?.(),
+  });
   /** Conversation: lines scrolled up from bottom (0 = latest). */
   private convScrollUp = 0;
   /** Overview panel: lines scrolled from top. */
@@ -70,7 +80,7 @@ export class QuantTui {
       this.watchlist = entries;
       this.paint();
     });
-    void this.loadSkills();
+    void this.refreshSkills();
     process.stdout.on("resize", () => { this.screen.resize(); this.paint(); });
     this.animTimer = setInterval(() => {
       if (this.state.activity !== "ready") this.paint();
@@ -80,6 +90,8 @@ export class QuantTui {
 
   stop(): void {
     this.running = false;
+    this.skillLoadVersion++;
+    this.panel.close();
     if (this.animTimer) { clearInterval(this.animTimer); this.animTimer = null; }
     if (process.stdin.isTTY) process.stdin.setRawMode(false);
     process.stdin.removeAllListeners("data");
@@ -96,7 +108,10 @@ export class QuantTui {
 
   onSubmit(handler: (text: string) => void): void { this.submitHandler = handler; }
   onArtifactRestore(handler: (reportId: string) => void): void { this.artifactRestoreHandler = handler; }
+  onPrivateAnnualExport(handler: (request: PrivateAnnualExportRequest) => void): void { this.privateAnnualExportHandler = handler; }
   onPanelRefresh(handler: () => void): void { this.panelRefreshHandler = handler; }
+  onConfigurationChange(handler: () => void): void { this.configurationChangeHandler = handler; }
+  onDoctorClose(handler: () => void): void { this.doctorCloseHandler = handler; }
   openConfig(): void { this.panel.open("config"); this.paint(); }
   openDoctor(doctor?: unknown): void {
     if (!this.panel.isDoctorMode()) this.panel.open("doctor");
@@ -104,6 +119,7 @@ export class QuantTui {
     this.paint();
   }
   openResume(meta?: CurrentSessionMeta): void { if (meta) this.panel.setCurrentSessionMeta(meta); this.panel.open("resume"); this.paint(); }
+  openResearch(snapshot: ResearchTaskSnapshot): void { this.panel.open("research"); this.panel.setResearchSnapshot(snapshot); this.paint(); }
   syncCurrentSessionMeta(meta?: CurrentSessionMeta): void { if (meta) this.panel.setCurrentSessionMeta(meta); this.paint(); }
   openPortfolio(): void { this.panel.open("portfolio"); this.paint(); }
   openArtifact(): void { this.panel.open("artifact"); this.paint(); }
@@ -114,6 +130,7 @@ export class QuantTui {
     this.clampScroll(L);
     const st = { ...this.state, input: this.inputBuf };
     this.screen.buf.clear();
+    this.screen.buf.foregrounds = marketForegrounds(this.state.marketColorScheme);
     for (let y = 0; y < this.screen.buf.h; y++)
       for (let x = 0; x < this.screen.buf.w; x++)
         this.screen.buf.set(x, y, " ", { fg: CANVAS });
@@ -356,10 +373,10 @@ export class QuantTui {
 
     if (this.panel.isOpen()) {
       const result = this.panel.handleKey(ch, key);
-      if (result?.command) this.submitHandler?.(result.command);
-      if (result?.restoreArtifact) this.artifactRestoreHandler?.(result.restoreArtifact);
       if (result?.refreshPanel) this.panelRefreshHandler?.();
       this.state.source = this.panel.activeDataSource();
+      this.state.marketColorScheme = this.panel.marketColorScheme();
+      this.state.hudMode = this.panel.hudMode();
       if (result?.close) {
         const name = this.panel.activePortfolioName();
         const showPanel = this.panel.showPortfolioPanel();
@@ -367,11 +384,14 @@ export class QuantTui {
         this.state.activePortfolio = name;
         this.state.showPortfolioPanel = showPanel;
         if (result.refreshPanel) {
-          this.flashPortfolioStatus(`已切换至 ${name}`);
+          this.flashPortfolioStatus("设置已保存，正在更新行情");
         }
       } else {
         this.state.activePortfolio = this.panel.selectedPortfolioName();
       }
+      if (result?.command) this.submitHandler?.(result.command);
+      if (result?.restoreArtifact) this.artifactRestoreHandler?.(result.restoreArtifact);
+      if (result?.privateAnnualExport) this.privateAnnualExportHandler?.(result.privateAnnualExport);
       return;
     }
 
@@ -445,9 +465,9 @@ export class QuantTui {
       void this.copyConversationSelection();
     } else if (key.ctrl && key.name === "c") {
       if (this.inputBuf) { this.inputBuf = ""; this.suggestionIdx = 0; }
-      else { this.stop(); process.exit(0); }
+      else this.requestExit();
     } else if (key.ctrl && key.name === "d") {
-      this.stop(); process.exit(0);
+      this.requestExit();
     } else if (key.ctrl && key.name === "p") {
       this.openConfig();
     } else if (key.name === "tab") {
@@ -457,7 +477,7 @@ export class QuantTui {
       }
     } else if (key.name === "escape") {
       if (this.inputBuf) { this.inputBuf = ""; this.suggestionIdx = 0; }
-      else { this.stop(); process.exit(0); }
+      else this.requestExit();
     } else if (action.char && !key.ctrl && !key.meta) {
       this.scrollRegion = "composer";
       this.suggestionIdx = 0;
@@ -465,10 +485,20 @@ export class QuantTui {
     }
   }
 
-  private async loadSkills(): Promise<void> {
+  async refreshSkills(load: () => Promise<SkillEntry[]> = loadRuntimeSkillSuggestions): Promise<void> {
+    const version = ++this.skillLoadVersion;
     try {
-      this.skills = await loadRuntimeSkillSuggestions();
+      const skills = await load();
+      if (version !== this.skillLoadVersion) return;
+      this.skills = skills;
+      this.suggestionIdx = 0;
+      if (this.running) this.paint();
     } catch { /* skills are optional */ }
+  }
+
+  private requestExit(): void {
+    if (this.submitHandler) this.submitHandler("/exit");
+    else { this.stop(); process.exit(0); }
   }
 
   private currentSuggestions() {

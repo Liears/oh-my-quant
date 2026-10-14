@@ -30,6 +30,14 @@ export function resolveCacheDir(): string {
   return join(resolveOhquantDir(), "cache");
 }
 
+export function resolveAlphaRunsDir(): string {
+  return join(resolveOhquantDir(), "alpha", "runs");
+}
+
+export function resolveAnnualReportsDir(): string {
+  return join(resolveOhquantDir(), "reports", "annual");
+}
+
 export function resolveWatchlistPath(): string {
   return join(resolveOhquantDir(), "watchlist.json");
 }

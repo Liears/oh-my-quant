@@ -1,5 +1,5 @@
 import { activeConversationStatusRows, conversationMaxScrollUp, overviewMaxScrollTop } from "./render.ts";
-import type { Layout, PanelSection, UIMessage } from "./types.ts";
+import type { Layout, PanelSection, UIMessage } from "../../types/ui.ts";
 import type { ScrollRegion } from "./input.ts";
 
 export interface ScrollState {

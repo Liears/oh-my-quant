@@ -6,5 +6,6 @@ export function ok(text: string, details?: unknown): AgentToolResult<unknown> {
 }
 
 export function err(code: ErrorCode, detail?: string): AgentToolResult<unknown> {
-  return { content: [{ type: "text" as const, text: formatError(ERRORS[code], detail) }], details: {} };
+  const message = formatError(ERRORS[code], detail);
+  return { content: [{ type: "text" as const, text: message }], details: { error: { code, message } } };
 }

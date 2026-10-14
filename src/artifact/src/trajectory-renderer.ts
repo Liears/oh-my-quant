@@ -1,5 +1,6 @@
 /** Turn-oriented audit renderer for persisted user, assistant and tool events. */
 import { esc } from "./template.ts";
+import { highlight } from "./renderers.ts";
 import type { TrajectoryDocument, TrajectoryEvent, TrajectorySummary } from "./types.ts";
 
 export function renderTrajectoryDocument(traj: TrajectoryDocument): string {
@@ -185,10 +186,10 @@ function highlightUserCommands(text: string): string {
 function highlightKeyResults(text: string): string {
   return text.split(/\r?\n/).map((line) => {
     const important = /\b(composite|score|total return|annual return|sharpe|drawdown|exposure|signal|risk|result|status|success|failed|error|warning|price|change)\b|收益|回撤|风险|得分|评分|信号|结论|建议|涨跌|价格|(?:^|\s)[+-]?\d+(?:\.\d+)?%/i.test(line);
-    const polarity = /(error|failed|warning|risk|drawdown|回撤|风险|失败|错误)/i.test(line)
+    const polarity = /^\s*(?:(?:status|result|状态|结果)\s*[:：]?\s*)?(?:error|failed|warning|失败|错误)\b/i.test(line)
       ? " negative"
-      : /(success|healthy|positive|buy|上涨|成功|健康|买入)/i.test(line) ? " positive" : "";
-    return important ? `<span class="traj-key-result${polarity}">${esc(line)}</span>` : esc(line);
+      : /^\s*(?:(?:status|result|状态|结果)\s*[:：]?\s*)?(?:success|healthy|ready|ok|成功|就绪)\b/i.test(line) ? " positive" : "";
+    return important ? `<span class="traj-key-result${polarity}">${highlight(esc(line))}</span>` : esc(line);
   }).join("\n");
 }
 

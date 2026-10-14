@@ -7,6 +7,7 @@ type PythonCandidate = { command: string; args: string[] };
 
 export interface RunPythonOptions {
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 export function runPython(
@@ -20,16 +21,21 @@ export function runPython(
     let index = 0;
 
     const attempt = () => {
+      if (options.signal?.aborted) { reject(options.signal.reason); return; }
       const candidate = candidates[index++];
       if (!candidate) {
         reject(new Error(`AKShare failed (python unavailable): ${pythonAvailabilityMessage()}`));
         return;
       }
 
+      let failedToSpawn = false;
       let stdout = "";
       let stderr = "";
       const proc = spawn(candidate.command, [...candidate.args, "-c", script, ...args], {
         stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+        signal: options.signal,
+        env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" },
         timeout: timeoutMs,
       });
 
@@ -37,6 +43,7 @@ export function runPython(
       proc.stderr.on("data", (d: Buffer) => (stderr += d.toString()));
 
       proc.on("close", (code) => {
+        if (failedToSpawn) return;
         if (code === 0) {
           resolvePromise({ stdout, stderr });
           return;
@@ -46,6 +53,7 @@ export function runPython(
       });
 
       proc.on("error", (err: NodeJS.ErrnoException) => {
+        failedToSpawn = true;
         if (err.code === "ENOENT" && index < candidates.length) {
           attempt();
           return;
@@ -59,7 +67,7 @@ export function runPython(
 }
 
 function getPythonCandidates(): PythonCandidate[] {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+  const root = packageRoot();
   const venvCandidates = process.platform === "win32"
     ? [
       resolve(root, ".venv/Scripts/python.exe"),
@@ -90,7 +98,7 @@ function getPythonCandidates(): PythonCandidate[] {
 }
 
 function pythonAvailabilityMessage(): string {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+  const root = packageRoot();
   return [
     resolve(root, ".venv/Scripts/python.exe"),
     resolve(root, ".venv/Scripts/python"),
@@ -100,4 +108,15 @@ function pythonAvailabilityMessage(): string {
     "python3",
     "python",
   ].join(", ");
+}
+
+// Resolve the same package in both src/source/src and the bundled dist entry.
+function packageRoot(): string {
+  let current = dirname(fileURLToPath(import.meta.url));
+  while (!existsSync(resolve(current, "package.json"))) {
+    const parent = dirname(current);
+    if (parent === current) return process.cwd();
+    current = parent;
+  }
+  return current;
 }

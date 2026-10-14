@@ -3,7 +3,6 @@
  * Fund: 华夏中证机器人ETF发起式联接C (018345)
  * Real data from https://danjuanfunds.com/funding/018345
  */
-import { ROBOT_INDEX_MONTHLY, HS300_MONTHLY, buildBenchmarkSeries } from "./benchmarks.ts";
 import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { generateArtifact } from "../src/generator.ts";
 import { saveArtifact } from "../../storage/src/artifacts.ts";

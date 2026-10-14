@@ -8,7 +8,7 @@
 import { assertPortfolioCacheDisabled } from "./policy.ts";
 import { emitFileEvent } from "./fs-events.ts";
 import { listLocalPortfolios, type LocalPortfolioSummary } from "./local-portfolios.ts";
-import { isValidPanelSymbol, loadPanelPortfolio, savePanelPortfolio, type PanelPortfolioFile } from "./panel-portfolio.ts";
+import { createGroup, isValidPanelSymbol, loadPanelPortfolio, savePanelPortfolio, type PanelPortfolioFile } from "./panel-portfolio.ts";
 import type { DailyFile, HoldingsFile } from "../../types/data.ts";
 
 export interface PortfolioSymbol {
@@ -82,12 +82,13 @@ export function syncPanelPortfolioFromLocalPortfolio(identifier: string): Synced
       added: today,
       instrument: portfolio.instrument,
     }));
-  const codes = symbols.map((symbol) => symbol.code);
-  savePanelPortfolio({
-    updated: today,
-    symbols,
-    groups: codes.length > 0 ? [{ id: "default", name: portfolio.name || "Default", symbolCodes: codes }] : [],
-  });
+  const existing = loadPanelPortfolio();
+  const byCode = new Map(existing.symbols.map(entry => [entry.code, entry]));
+  for (const entry of symbols) if (!byCode.has(entry.code)) byCode.set(entry.code, entry);
+  const codes = symbols.map(symbol => symbol.code);
+  let name = portfolio.name || "Imported portfolio";
+  for (let n = 2; existing.groups.some(group => group.name === name); n++) name = `${portfolio.name || "Imported portfolio"} (${n})`;
+  savePanelPortfolio(createGroup({ ...existing, symbols: [...byCode.values()] }, name, codes).data);
   return {
     portfolio,
     symbols: symbols.map((symbol) => ({ code: symbol.code, name: symbol.name })),

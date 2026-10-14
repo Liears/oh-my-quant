@@ -45,6 +45,8 @@ export const ansi = {
 
 export interface Style {
   fg?: string;
+  /** Resolved by this buffer at paint time; fg is the standalone fallback. */
+  fgRole?: string;
   bg?: string;
   bold?: boolean;
   dim?: boolean;
@@ -108,6 +110,7 @@ export class Buffer {
   w: number;
   h: number;
   cells: Cell[] = [];
+  foregrounds: Readonly<Record<string, string>> = {};
 
   constructor(w: number, h: number) {
     this.w = Math.max(1, w);
@@ -130,7 +133,8 @@ export class Buffer {
     if (!this.inb(x, y)) return;
     const cw = charWidth(ch);
     if (x + cw > xMax) return;
-    this.cells[this.idx(x, y)] = { ch, fg: st.fg, bg: st.bg, bold: st.bold, dim: st.dim };
+    const fg = st.fgRole ? this.foregrounds[st.fgRole] ?? st.fg : st.fg;
+    this.cells[this.idx(x, y)] = { ch, fg, bg: st.bg, bold: st.bold, dim: st.dim };
     if (cw === 2 && this.inb(x + 1, y) && x + 2 <= xMax) {
       this.cells[this.idx(x + 1, y)] = { ch: "", cont: true };
     }
@@ -344,6 +348,14 @@ export function wrap(text: string, width: number): string[] {
 export class Screen {
   out: NodeJS.WriteStream;
   buf: Buffer;
+  private blocked = false;
+  private pendingFrame = false;
+  private drainOutput = () => {
+    this.blocked = false;
+    if (!this.pendingFrame) return;
+    this.pendingFrame = false;
+    this.flush();
+  };
 
   constructor(out: NodeJS.WriteStream = process.stdout) {
     this.out = out;
@@ -352,10 +364,22 @@ export class Screen {
   get cols() { return (this.out as any).columns ?? 80; }
   get rows() { return (this.out as any).rows ?? 24; }
   enter(): void {
-    this.out.write(ansi.altOn + ansi.hideCursor + ansi.mouseOn + ansi.clear);
+    if (!this.out.write(ansi.altOn + ansi.hideCursor + ansi.mouseOn + ansi.clear)) this.waitForDrain();
     this.resize();
   }
-  exit(): void { this.out.write(ansi.reset + ansi.showCursor + ansi.mouseOff + ansi.altOff); }
+  exit(): void {
+    if (this.blocked) this.out.off("drain", this.drainOutput);
+    this.blocked = false;
+    this.pendingFrame = false;
+    this.out.write(ansi.reset + ansi.showCursor + ansi.mouseOff + ansi.altOff);
+  }
   resize(): void { this.buf = new Buffer(this.cols, this.rows); }
-  flush(): void { this.out.write(ansi.syncOn + this.buf.render() + ansi.syncOff); }
+  flush(): void {
+    if (this.blocked) { this.pendingFrame = true; return; }
+    if (!this.out.write(ansi.syncOn + this.buf.render() + ansi.syncOff)) this.waitForDrain();
+  }
+  private waitForDrain(): void {
+    this.blocked = true;
+    this.out.once("drain", this.drainOutput);
+  }
 }

@@ -1,5 +1,5 @@
 import { statSync } from "node:fs";
-import { generateInsights, getNotePaths } from "../quant/insight-generator.ts";
+import { generateInsights, getNotePaths } from "./generator.ts";
 import { insightCacheMtimeMs, loadInsightCache, saveInsightCache } from "../storage/index.ts";
 
 // ── Types ──

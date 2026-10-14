@@ -23,6 +23,7 @@ interface AkshareFundEndpointSpec {
 export interface AkshareFundEndpointToolRegistration {
   name: string;
   label: string;
+  endpoint: AksharePublicFundEndpoint;
 }
 
 const COMMON_ENDPOINT_OPTIONS: EndpointParameterSchemas = {
@@ -121,8 +122,14 @@ const AKSHARE_FUND_ENDPOINT_SPECS: AkshareFundEndpointSpec[] = [
 
 export const AKSHARE_FUND_ENDPOINT_TOOLS: AgentTool[] = AKSHARE_FUND_ENDPOINT_SPECS.map(makeAkshareEndpointTool);
 
+/** The diagnostic uses the same endpoint arguments, excluding tool-only output filters. */
+export function akshareFundEndpointParameters(endpoint: string): TSchema | undefined {
+  const spec = AKSHARE_FUND_ENDPOINT_SPECS.find(item => item.endpoint === endpoint);
+  return spec ? Type.Object(spec.params, { additionalProperties: false }) : undefined;
+}
+
 export const AKSHARE_FUND_ENDPOINT_TOOL_REGISTRATIONS: AkshareFundEndpointToolRegistration[] = AKSHARE_FUND_ENDPOINT_SPECS
-  .map((spec) => ({ name: endpointToolName(spec.endpoint), label: endpointToolLabel(spec.endpoint) }));
+  .map((spec) => ({ name: endpointToolName(spec.endpoint), label: endpointToolLabel(spec.endpoint), endpoint: spec.endpoint }));
 
 export const AKSHARE_FUND_PREVIEW_FIELD_PRIORITY = [
   "基金代码",
@@ -182,10 +189,12 @@ function makeAkshareEndpointTool(spec: AkshareFundEndpointSpec): AgentTool {
     label: endpointToolLabel(spec.endpoint),
     parameters,
     executionMode: "sequential",
-    async execute(_id: string, rawArgs: unknown): Promise<AgentToolResult<unknown>> {
+    async execute(_id: string, rawArgs: unknown, signal?: AbortSignal): Promise<AgentToolResult<unknown>> {
+      signal?.throwIfAborted();
       const args = isRecord(rawArgs) ? rawArgs : {};
       const endpointParams = endpointArgs(spec, args);
-      const data = await fetchAkshareRows(spec.endpoint, endpointParams);
+      const data = await fetchAkshareRows(spec.endpoint, endpointParams, signal);
+      signal?.throwIfAborted();
       const filteredRows = filterAkshareFundRows(data.rows, args);
       const limit = outputLimit(args.limit, 12, 100);
       const rows = filteredRows.slice(0, limit);

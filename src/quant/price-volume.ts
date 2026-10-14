@@ -6,7 +6,7 @@ function checkPeriod(period: number): void {
   if (!Number.isInteger(period) || period < 1) throw new Error("Period must be a positive integer");
 }
 
-function checkBars(bars: readonly Bar[]): void {
+function checkBars(bars: readonly Bar[]): asserts bars is readonly (Bar & { amount: number })[] {
   if (bars.some((bar, i) => !validResearchBar(bar) || (i > 0 && bar.date <= bars[i - 1].date))) {
     throw new Error("Bars must be valid, unique and ascending");
   }

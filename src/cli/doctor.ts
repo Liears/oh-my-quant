@@ -1,17 +1,26 @@
 import type { OhQuantSettings } from "../types/config.ts";
-import { describeEndpointMode } from "../runtime/doctor-contract.ts";
-import type { DoctorMode, DoctorOverall, DoctorPhase, DoctorResult } from "../runtime/doctor-contract.ts";
+import { describeEndpointMode, describeModelProtocol } from "../runtime/workspace/doctor-contract.ts";
+import { defaultDataProbeRequest, probeDataConnection, type DataProbeOptions } from "../runtime/data/data-readiness.ts";
+import { inspectToolReadiness, toolReadinessSummary } from "../runtime/data/tool-readiness.ts";
+import type { DataProbeRequest, DataReadiness, PythonReadiness } from "../types/data-readiness.ts";
+import type { DoctorMode, DoctorOverall, DoctorPhase, DoctorResult } from "../types/doctor.ts";
 import { resolveOhquantDir, resolveSettingsPath } from "../storage/index.ts";
 import { resolveModelId } from "../agent/src/session.ts";
+import { resolveConfiguredModel, resolveConfiguredAuth } from "../agent/src/model-config.ts";
+import { completeSimple } from "../agent/src/kernel/llm.ts";
 import { Compile } from "typebox/compile";
-import { spawnSync } from "node:child_process";
+import { checkAkshareDependency } from "../source/index.ts";
+import * as source from "../source/index.ts";
+import { listBuiltinToolRegistrations } from "../tools/registry.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export { describeEndpointMode };
-export type { AuthSource, DoctorMode, DoctorOverall, DoctorPhase, DoctorResult, PhaseStatus } from "../runtime/doctor-contract.ts";
+export type { AuthSource, DoctorMode, DoctorOverall, DoctorPhase, DoctorResult, PhaseStatus } from "../types/doctor.ts";
 
 export interface DoctorOptions {
+  signal?: AbortSignal;
+  dataRequest?: DataProbeRequest;
   now?: () => number;
   probeTimeoutMs?: number;
   skipNetwork?: boolean;
@@ -19,6 +28,7 @@ export interface DoctorOptions {
   onState?: (state: DoctorResult) => void;
   modelProbe?: DoctorProbe;
   dataProbe?: DoctorProbe;
+  checkDependency?: DataProbeOptions["checkDependency"];
   phases?: DoctorPhase["phase"][];
   seedState?: DoctorResult;
 }
@@ -28,17 +38,22 @@ export interface DoctorProbeContext {
   settings: OhQuantSettings;
   processEnv: Record<string, string | undefined>;
   timeoutMs: number;
+  signal?: AbortSignal;
+  dataRequest?: DataProbeRequest;
 }
 
 export interface DoctorProbeResult {
   ok: boolean;
   detail: string;
   raw?: unknown;
+  data?: DataReadiness;
+  dependency?: PythonReadiness;
 }
 
 export type DoctorProbe = (ctx: DoctorProbeContext) => Promise<DoctorProbeResult>;
 
 const AUTH_KEYS = [
+  "MODEL_CREDENTIAL",
   "WHYJ_QUANT_API_KEY",
   "WHYJ_QUANT_AUTH_TOKEN",
   "WHYJ_QUANT_BASE_URL",
@@ -55,29 +70,55 @@ export async function* runDoctor(
   processEnv: Record<string, string | undefined>,
   options: DoctorOptions = {},
 ): AsyncIterable<DoctorResult> {
+  settings = structuredClone(settings);
+  processEnv = { ...processEnv };
   const effectiveOptions = withEnvOptions(options, processEnv);
   const initial = createInitialState(settings, processEnv);
+  if (effectiveOptions.dataRequest) {
+    initial.config.dataRequest = { ...effectiveOptions.dataRequest };
+    initial.config.dataSource = effectiveOptions.dataRequest.source;
+  }
+  try {
+    const model = resolveConfiguredModel(settings);
+    const resolved = await resolveConfiguredAuth(settings, model, processEnv, effectiveOptions.signal);
+    const connection = settings.providers?.[model.provider];
+    const savedAuth = connection?.apiKey || Object.keys(connection?.env ?? {}).length
+      || (resolved?.source && settings.env[resolved.source])
+      || (!settings.provider && (settings.env.WHYJ_QUANT_API_KEY || settings.env.WHYJ_QUANT_AUTH_TOKEN));
+    initial.auth.MODEL_CREDENTIAL = resolved
+      ? { available: true, source: savedAuth ? "config" : "env", value: resolved.auth.apiKey ? redact(resolved.auth.apiKey) : resolved.source ?? "Provider auth" }
+      : { available: false, source: "missing", value: "-" };
+    if (resolved) initial.mode = "diagnostic";
+  } catch { /* checkModelPhase reports configuration errors */ }
   const reusableSeed = isReusableSeedState(effectiveOptions.seedState, initial)
     ? effectiveOptions.seedState
     : undefined;
-  const requestedPhases = reusableSeed
-    ? normalizeRequestedPhases(effectiveOptions.phases)
-    : [...PHASE_ORDER];
+  const requestedPhases = normalizeRequestedPhases(effectiveOptions.phases);
   let state = createRunState(initial, reusableSeed, requestedPhases);
+  const withCapabilities = (current: DoctorResult): DoctorResult => ({ ...current,
+    capabilities: inspectToolReadiness(settings, { market: current.config.dataRequest!.market,
+      data: current.phases.find(phase => phase.phase === "data")?.data,
+      python: current.phases.find(phase => phase.phase === "tools")?.dependency }, processEnv),
+  });
   const phaseChecks: Record<DoctorPhase["phase"], (state: DoctorResult) => Promise<DoctorPhase>> = {
     model: (current) => checkModelPhase(current, settings, processEnv, effectiveOptions),
-    tools: (current) => checkToolsPhase(current, settings, effectiveOptions),
+    tools: (current) => checkToolsPhase(current, settings, processEnv, effectiveOptions),
     data: (current) => checkDataPhase(current, settings, processEnv, effectiveOptions),
   };
 
   for (const phaseName of requestedPhases) {
     const index = PHASE_ORDER.indexOf(phaseName);
     if (index < 0) continue;
+    if (effectiveOptions.signal?.aborted) {
+      yield withCapabilities(replacePhase(state, index, failPhase(phaseName, titleCase(phaseName), "Doctor check cancelled", "Retry when ready.", timestamp(effectiveOptions), effectiveOptions)));
+      break;
+    }
     state = markPhaseChecking(state, index, effectiveOptions);
-    yield state;
+    yield withCapabilities(state);
     const checked = await phaseChecks[phaseName](state);
     state = replacePhase(state, index, checked);
-    yield state;
+    yield withCapabilities(state);
+    if (effectiveOptions.signal?.aborted) break;
   }
 }
 
@@ -120,6 +161,7 @@ export function formatDoctorText(doctor: DoctorResult): string {
     "WhyJ Doctor",
     "",
     `  status        ${doctor.overall}`,
+    `  checked        ${(doctor.requestedPhases ?? PHASE_ORDER).join(", ")}`,
     `  command        whyj doctor`,
     `  mode           ${doctor.mode}`,
     `  model          ${doctor.config.model}`,
@@ -127,10 +169,14 @@ export function formatDoctorText(doctor: DoctorResult): string {
       ? `  base url       ${doctor.config.baseUrl} · ${doctor.config.endpointMode}`
       : "  base url       (not set)",
     `  data source    ${doctor.config.dataSource}`,
+    ...(doctor.config.dataRequest ? [`  data sample    ${doctor.config.dataRequest.market} · ${doctor.config.dataRequest.symbol} · ${doctor.config.dataRequest.start} → ${doctor.config.dataRequest.end}`] : []),
     `  settings       ${doctor.config.settingsPath}`,
     "",
     "Phases",
     ...buildAlignedTable(["phase", "status", "detail", "action"], phaseRows).map((line) => `  ${line}`),
+    ...(doctor.capabilities ? ["", "Tool capabilities", `  ${toolReadinessSummary(doctor.capabilities)}`,
+      "  Sample-verified means input access only; no tool computation was tested.",
+      ...doctor.capabilities.map(tool => `  ${tool.name}  ${tool.status}  ${tool.routes.map(route => `${route.provider}: ${route.reason}`).join("; ")}`)] : []),
     "",
     "Credentials",
     ...buildAlignedTable(["key", "status", "source", "value"], credentialRows).map((line) => `  ${line}`),
@@ -153,23 +199,21 @@ export function formatDoctorText(doctor: DoctorResult): string {
 export function formatDoctorFirstSetupText(doctor: DoctorResult): string {
   const source = doctor.config.dataSource;
   const tokenKey = sourceTokenEnvKey(source);
-  const envBlock = [
-    '  "WHYJ_QUANT_API_KEY": "sk-your-key-here",',
-    '  "WHYJ_QUANT_BASE_URL": "https://api.deepseek.com/anthropic",',
-    tokenKey
-      ? `  "${tokenKey}": "your-${source.replace(/[^a-z0-9]+/gi, "-")}-key"`
-      : undefined,
-  ].filter(Boolean).join("\n");
+  const provider = doctor.config.provider || "deepseek";
+  const example = {
+    provider,
+    model: doctor.config.model || "deepseek-v4-pro",
+    providers: { [provider]: { apiKey: "your-provider-key", baseUrl: doctor.config.baseUrl || undefined } },
+    thinkingLevel: "off",
+    env: tokenKey ? { [tokenKey]: `your-${source}-key` } : {},
+  };
   return [
     "No credentials configured.",
+    "Open /config → Model to select a provider, model and credentials.",
     "",
     "Add this to .ohquant/settings.json:",
     "",
-    "{",
-    '  "env": {',
-    envBlock,
-    "  }",
-    "}",
+    JSON.stringify(example, null, 2),
     "",
     "Then: whyj doctor",
   ].join("\n");
@@ -218,8 +262,10 @@ function createInitialState(
 ): DoctorResult {
   const auth = resolveAuth(settings, processEnv);
   const dataSource = settings.preferences?.source ?? "llmquant-data";
-  const baseUrl = resolvedValue(settings, processEnv, "WHYJ_QUANT_BASE_URL");
-  const resolvedModel = stripAnsi(resolveDoctorRequestModel(settings, processEnv));
+  let model;
+  try { model = resolveConfiguredModel(settings); } catch { /* incomplete setup remains editable */ }
+  const baseUrl = model?.baseUrl ?? resolvedValue(settings, processEnv, "WHYJ_QUANT_BASE_URL");
+  const resolvedModel = stripAnsi(model?.id ?? (settings.provider ? settings.model : resolveDoctorRequestModel(settings, processEnv)));
   const hasModelCredential = (auth.WHYJ_QUANT_API_KEY?.available ?? false)
     || (auth.WHYJ_QUANT_AUTH_TOKEN?.available ?? false);
   const sourceTokenKey = sourceTokenEnvKey(dataSource);
@@ -240,9 +286,11 @@ function createInitialState(
     config: {
       settingsPath: resolveSettingsPath(),
       model: resolvedModel,
+      provider: settings.provider ?? model?.provider,
       baseUrl,
-      endpointMode: baseUrl ? describeEndpointMode(baseUrl) : "",
+      endpointMode: model ? describeModelProtocol(model.api) : (baseUrl ? describeEndpointMode(baseUrl) : ""),
       dataSource,
+      dataRequest: defaultDataProbeRequest(settings),
     },
     hints: [],
   });
@@ -253,9 +301,8 @@ function createRunState(
   seedState: DoctorResult | undefined,
   requestedPhases: DoctorPhase["phase"][],
 ): DoctorResult {
-  if (!seedState) return initial;
-
-  const next = cloneState(initial);
+  const next = { ...cloneState(initial), requestedPhases: [...requestedPhases] };
+  if (!seedState) return finalizeState(next);
   for (const phaseName of PHASE_ORDER) {
     const index = PHASE_ORDER.indexOf(phaseName);
     const previous = seedState.phases[index];
@@ -277,10 +324,10 @@ function resolveAuth(
   for (const key of AUTH_KEYS) {
     const fromEnv = typeof processEnv[key] === "string" && processEnv[key]!.trim();
     const fromConfig = typeof env[key] === "string" && env[key].trim();
-    if (fromEnv) {
-      auth[key] = { available: true, source: "env", value: redact(fromEnv as string) };
-    } else if (fromConfig) {
+    if (fromConfig) {
       auth[key] = { available: true, source: "config", value: redact(fromConfig as string) };
+    } else if (fromEnv) {
+      auth[key] = { available: true, source: "env", value: redact(fromEnv as string) };
     } else {
       auth[key] = { available: false, source: "missing", value: "-" };
     }
@@ -296,14 +343,12 @@ async function checkModelPhase(
   options: DoctorOptions,
 ): Promise<DoctorPhase> {
   const start = timestamp(options);
+  try { resolveConfiguredModel(settings); }
+  catch (error) { return failPhase("model", "Model", errorMessage(error), "Open /config → Model and check the connection.", start, options); }
   const modelCredential = resolveModelCredential(state);
   const hasModelCredential = Boolean(modelCredential);
-  const hasBaseUrl = state.auth.WHYJ_QUANT_BASE_URL?.available ?? false;
   if (!hasModelCredential) {
-    return failPhase("model", "Model", "Missing WHYJ_QUANT_API_KEY", "Open /doctor Configure and set WHYJ_QUANT_API_KEY.", start, options);
-  }
-  if (!hasBaseUrl) {
-    return failPhase("model", "Model", "Missing WHYJ_QUANT_BASE_URL", "Open /doctor Configure and set WHYJ_QUANT_BASE_URL.", start, options);
+    return failPhase("model", "Model", "Missing model credentials", "Open /config → Model and set the provider API key or environment credentials.", start, options);
   }
 
   if (options.skipNetwork) {
@@ -318,9 +363,9 @@ async function checkModelPhase(
   }
 
   const probe = options.modelProbe ?? defaultModelProbe;
-  const result = await runProbe(probe, { state, settings, processEnv, timeoutMs: probeTimeoutMs(options) });
+  const result = await runProbe(probe, { state, settings, processEnv, timeoutMs: probeTimeoutMs(options), signal: options.signal });
   if (!result.ok) {
-    return failPhase("model", `Model · ${state.config.model}`, result.detail, "Check WHYJ_QUANT_API_KEY, WHYJ_QUANT_BASE_URL, model, and network/proxy, then run whyj doctor again.", start, options);
+    return failPhase("model", `Model · ${state.config.model}`, result.detail, "Open /config → Model; check credentials, endpoint, protocol and network, then retry.", start, options);
   }
   return passPhase("model", `Model · ${state.config.model}`, `${modelCredential!.entry.value} · ${result.detail}`, start, options);
 }
@@ -328,15 +373,14 @@ async function checkModelPhase(
 async function checkToolsPhase(
   state: DoctorResult,
   settings: OhQuantSettings,
+  processEnv: Record<string, string | undefined>,
   options: DoctorOptions,
 ): Promise<DoctorPhase> {
   const start = timestamp(options);
   try {
-    const registry = await import("../tools/registry.ts");
-    const source = await import("../source/index.ts");
-    const registrations = registry.listBuiltinToolRegistrations();
+    const registrations = listBuiltinToolRegistrations();
     if (registrations.length === 0) {
-      return failPhase("tools", "Tools", "No built-in tools are registered", "Run bun test src/tools/registry.test.ts.", start, options);
+      return failPhase("tools", "Tools", "No built-in tools are registered", "Run bun test src/tools/test/registry.test.ts.", start, options);
     }
     const schemaSummary = validateToolSchemas(registrations);
     if (!schemaSummary.ok) {
@@ -346,20 +390,25 @@ async function checkToolsPhase(
     if (!adapterSummary.ok) {
       return failPhase("tools", "Tools", adapterSummary.detail, "Check source adapter exports and rerun doctor.", start, options);
     }
-    if (settings.preferences?.source === "akshare") {
-      const python = checkPython();
-      if (!python.ok) {
-        return failPhase("tools", "Tools", "Python is not available for AKShare", pythonInstallAction(), start, options);
+    if (registrations.some(entry => entry.requirements.routes.some(route => route.dependencies.includes("akshare")))) {
+      const checked = await runProbe(async ctx => {
+        const dependency = await (options.checkDependency ?? checkAkshareDependency)({ timeoutMs: ctx.timeoutMs, signal: ctx.signal! });
+        return { ok: true, detail: "Python dependency inspected", dependency };
+      }, { state, settings, processEnv, timeoutMs: probeTimeoutMs(options), signal: options.signal });
+      if (!checked.ok || !checked.dependency) return failPhase("tools", "Tools", checked.detail, "Retry Tools checks; Python / akshare status is unverified.", start, options);
+      const dependency = checked.dependency;
+      if (dependency.status === "missing-python") {
+        return { ...failPhase("tools", "Tools", "Python is not available for AKShare tools", pythonInstallAction(), start, options), dependency };
       }
-      const akshare = checkAksharePackage(probeTimeoutMs(options));
-      if (!akshare.ok) {
-        return failPhase("tools", "Tools", akshare.detail, akshareInstallAction(), start, options);
+      if (dependency.status === "missing-package") {
+        return { ...failPhase("tools", "Tools", "Python package akshare is not importable", akshareInstallAction(), start, options), dependency };
       }
-      return passPhase("tools", "Tools", `schemas loaded · adapters ok · ${python.label} · ${akshare.detail}`, start, options);
+      return { ...passPhase("tools", "Tools", `schemas loaded · adapters ok · Python ${dependency.python} · akshare ${dependency.akshare}`, start, options,
+        ["Dependency checks only; per-endpoint permissions remain unverified."]), dependency };
     }
     return passPhase("tools", "Tools", `schemas loaded · adapters ok · ${registrations.length} built-in tools`, start, options);
   } catch (error) {
-    return failPhase("tools", "Tools", `Tool registry failed: ${errorMessage(error)}`, "Run bun test src/tools/registry.test.ts.", start, options);
+    return failPhase("tools", "Tools", `Tool registry failed: ${errorMessage(error)}`, "Run bun test src/tools/test/registry.test.ts.", start, options);
   }
 }
 
@@ -370,52 +419,27 @@ async function checkDataPhase(
   options: DoctorOptions,
 ): Promise<DoctorPhase> {
   const start = timestamp(options);
-  const source = state.config.dataSource;
-  if (source === "akshare") {
-    if (options.skipNetwork) {
-      return passPhase(
-        "data",
-        "Data · AKShare",
-        "AKShare requires no data key",
-        start,
-        options,
-        ["Network probe skipped by WHYJ_DOCTOR_SKIP_NETWORK."],
-      );
-    }
-    const probe = options.dataProbe ?? defaultDataProbe;
-    const result = await runProbe(probe, { state, settings, processEnv, timeoutMs: probeTimeoutMs(options) });
-    if (!result.ok) {
-      return failPhase("data", "Data · AKShare", result.detail, "Install Python and akshare, then run whyj doctor again.", start, options);
-    }
-    return passPhase("data", "Data · AKShare", result.detail, start, options);
-  }
-
+  const source = options.dataRequest?.source ?? state.config.dataSource;
   const tokenKey = sourceTokenEnvKey(source);
-  if (!tokenKey) {
-    return failPhase("data", "Data", `Unsupported data source: ${source}`, "Choose akshare, tushare, llmquant-data, or financial-datasets in /config.", start, options);
+  const token = tokenKey ? state.auth[tokenKey] : undefined;
+  if (source !== "akshare" && !tokenKey) {
+    return failPhase("data", "Data", "Unsupported data source", "Choose a supported source in /config.", start, options);
   }
-  const token = state.auth[tokenKey];
-  if (!token?.available) {
-    return failPhase("data", `Data · ${source}`, `Missing ${tokenKey}`, `Open /doctor Configure and set ${tokenKey}.`, start, options);
-  }
-
+  if (options.signal?.aborted) return failPhase("data", "Data", "Data check cancelled", "Retry when ready.", start, options);
   if (options.skipNetwork) {
-    return passPhase(
-      "data",
-      `Data · ${source}`,
-      `${tokenKey} ${token.value}`,
-      start,
-      options,
-      ["Network probe skipped by WHYJ_DOCTOR_SKIP_NETWORK."],
-    );
+    if (tokenKey && !token?.available) return failPhase("data", "Data", "Missing " + tokenKey, "Open /config and set " + tokenKey + ".", start, options);
+    return passPhase("data", "Data · " + source, source === "akshare" ? "AKShare requires no data key" : tokenKey + " " + token?.value,
+      start, options, ["Network probe skipped by WHYJ_DOCTOR_SKIP_NETWORK."]);
   }
-
-  const probe = options.dataProbe ?? defaultDataProbe;
-  const result = await runProbe(probe, { state, settings, processEnv, timeoutMs: probeTimeoutMs(options) });
-  if (!result.ok) {
-    return failPhase("data", `Data · ${source}`, result.detail, `Check ${tokenKey}, data source coverage, and network/proxy, then run whyj doctor again.`, start, options);
-  }
-  return passPhase("data", `Data · ${source}`, `${tokenKey} ${token.value} · ${result.detail}`, start, options);
+  // Injected probes retain the same credential guard; production probes also return structured failure evidence.
+  if (options.dataProbe && tokenKey && !token?.available) return failPhase("data", "Data · " + source, "Missing " + tokenKey,
+    "Open /config and set " + tokenKey + ".", start, options);
+  const context = { state, settings, processEnv, timeoutMs: probeTimeoutMs(options), signal: options.signal, dataRequest: state.config.dataRequest };
+  const result = options.dataProbe ? await runProbe(options.dataProbe, context) : await defaultDataProbe(context);
+  const phase = result.ok
+    ? passPhase("data", "Data · " + source, result.detail, start, options, result.data ? [result.data.action] : [])
+    : failPhase("data", "Data · " + source, result.detail, result.data?.action ?? "Check data credentials, coverage and connectivity in /config.", start, options);
+  return { ...phase, ...(result.data ? { data: result.data } : {}) };
 }
 
 function markPhaseChecking(state: DoctorResult, index: number, options: DoctorOptions): DoctorResult {
@@ -437,8 +461,9 @@ function replacePhase(state: DoctorResult, index: number, phase: DoctorPhase): D
 }
 
 function finalizeState(state: DoctorResult): DoctorResult {
-  const completed = state.phases.every((phase) => phase.status === "pass" || phase.status === "fail");
-  const failed = state.phases.some((phase) => phase.status === "fail");
+  const selected = state.phases.filter(phase => !state.requestedPhases || state.requestedPhases.includes(phase.phase) || phase.status === "pass" || phase.status === "fail");
+  const completed = selected.every((phase) => phase.status === "pass" || phase.status === "fail");
+  const failed = selected.some((phase) => phase.status === "fail");
   const sourceTokenKey = sourceTokenEnvKey(state.config.dataSource);
   const modelUnconfigured = !resolveModelCredential(state);
   const dataUnconfigured = state.config.dataSource === "akshare"
@@ -452,7 +477,7 @@ function finalizeState(state: DoctorResult): DoctorResult {
       : failed
         ? "partial_fail"
         : "all_pass";
-  const hints = state.phases
+  const hints = selected
     .filter((phase) => phase.status === "fail" && phase.action)
     .map((phase) => phase.action!)
     .filter((hint, index, all) => all.indexOf(hint) === index);
@@ -510,9 +535,11 @@ function failPhase(
 function cloneState(state: DoctorResult): DoctorResult {
   return {
     ...state,
-    phases: state.phases.map((phase) => ({ ...phase, warnings: phase.warnings ? [...phase.warnings] : undefined })) as DoctorResult["phases"],
+    phases: state.phases.map((phase) => ({ ...phase, warnings: phase.warnings ? [...phase.warnings] : undefined,
+      ...(phase.data ? { data: structuredClone(phase.data) } : {}), ...(phase.dependency ? { dependency: { ...phase.dependency } } : {}) })) as DoctorResult["phases"],
+    ...(state.capabilities ? { capabilities: structuredClone(state.capabilities) } : {}),
     auth: Object.fromEntries(Object.entries(state.auth).map(([key, value]) => [key, { ...value }])),
-    config: { ...state.config },
+    config: structuredClone(state.config),
     hints: [...state.hints],
   };
 }
@@ -529,6 +556,7 @@ function isReusableSeedState(seedState: DoctorResult | undefined, initial: Docto
   if (seedState.config.baseUrl !== initial.config.baseUrl) return false;
   if (seedState.config.endpointMode !== initial.config.endpointMode) return false;
   if (seedState.config.dataSource !== initial.config.dataSource) return false;
+  if (JSON.stringify(seedState.config.dataRequest) !== JSON.stringify(initial.config.dataRequest)) return false;
   for (const key of AUTH_KEYS) {
     const previous = seedState.auth[key];
     const current = initial.auth[key];
@@ -569,40 +597,13 @@ function sourceTokenEnvKey(source: string): AuthKey | null {
 }
 
 function resolveModelCredential(state: DoctorResult): { key: AuthKey; entry: DoctorResult["auth"][AuthKey] } | null {
+  if (state.auth.MODEL_CREDENTIAL?.available) return { key: "MODEL_CREDENTIAL", entry: state.auth.MODEL_CREDENTIAL };
+  if (state.config.provider) return null;
   const apiKey = state.auth.WHYJ_QUANT_API_KEY;
   if (apiKey?.available) return { key: "WHYJ_QUANT_API_KEY", entry: apiKey };
   const legacyToken = state.auth.WHYJ_QUANT_AUTH_TOKEN;
   if (legacyToken?.available) return { key: "WHYJ_QUANT_AUTH_TOKEN", entry: legacyToken };
   return null;
-}
-
-function checkPython(): { ok: boolean; label: string } {
-  for (const command of ["python3", "python"]) {
-    try {
-      const result = spawnSync(command, ["--version"], { encoding: "utf8" });
-      const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
-      if (result.status === 0) return { ok: true, label: output || command };
-    } catch {
-      // Try the next command.
-    }
-  }
-  return { ok: false, label: "missing" };
-}
-
-function checkAksharePackage(timeoutMs: number): { ok: boolean; detail: string } {
-  for (const command of ["python3", "python"]) {
-    try {
-      const result = spawnSync(command, ["-c", "import akshare as ak; print(getattr(ak, '__version__', 'unknown'))"], {
-        encoding: "utf8",
-        timeout: timeoutMs,
-      });
-      const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
-      if (result.status === 0) return { ok: true, detail: `akshare ${output || "available"}` };
-    } catch {
-      // Try the next command.
-    }
-  }
-  return { ok: false, detail: "Python package akshare is not importable" };
 }
 
 function validateToolSchemas(
@@ -670,198 +671,69 @@ function numberFromEnv(value: string | undefined): number | undefined {
 }
 
 async function runProbe(probe: DoctorProbe, ctx: DoctorProbeContext): Promise<DoctorProbeResult> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  const controller = new AbortController();
+  const signal = ctx.signal ? AbortSignal.any([ctx.signal, controller.signal]) : controller.signal;
+  const timer = setTimeout(() => controller.abort(), ctx.timeoutMs);
+  let onAbort: (() => void) | undefined;
   try {
+    signal.throwIfAborted();
     return await Promise.race([
-      probe(ctx),
-      new Promise<DoctorProbeResult>((resolve) => {
-        timer = setTimeout(() => resolve({ ok: false, detail: `Timed out after ${ctx.timeoutMs}ms` }), ctx.timeoutMs);
+      probe({ ...ctx, signal }),
+      new Promise<DoctorProbeResult>(resolve => {
+        onAbort = () => resolve({ ok: false, detail: ctx.signal?.aborted ? "Doctor check cancelled" : "Timed out after " + ctx.timeoutMs + "ms" });
+        if (signal.aborted) onAbort(); else signal.addEventListener("abort", onAbort, { once: true });
       }),
     ]);
   } catch (error) {
-    return { ok: false, detail: errorMessage(error), raw: error };
+    return { ok: false, detail: ctx.signal?.aborted ? "Doctor check cancelled" : errorMessage(error), raw: error };
   } finally {
-    if (timer) clearTimeout(timer);
+    clearTimeout(timer);
+    if (onAbort) signal.removeEventListener("abort", onAbort);
   }
 }
 
 async function defaultModelProbe(ctx: DoctorProbeContext): Promise<DoctorProbeResult> {
-  const baseUrl = rawEnvValue(ctx.settings, ctx.processEnv, "WHYJ_QUANT_BASE_URL");
-  const apiKey = rawModelCredential(ctx.settings, ctx.processEnv);
-  const model = resolveDoctorRequestModel(ctx.settings, ctx.processEnv);
-  if (!baseUrl || !apiKey) return { ok: false, detail: "Missing model provider credentials" };
-
-  const endpointMode = ctx.state.config.endpointMode;
-  const anthropic = endpointMode === "Anthropic Messages";
-  const url = anthropic ? appendUrlPath(baseUrl, "v1/messages") : openAiChatCompletionsUrl(baseUrl);
-  const response = await fetchWithTimeout(url, {
-    method: "POST",
-    headers: anthropic
-      ? {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      }
-      : {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
-      },
-    body: JSON.stringify(anthropic
-      ? { model, max_tokens: 1, messages: [{ role: "user", content: "ping" }] }
-      : { model, max_tokens: 1, messages: [{ role: "user", content: "ping" }], stream: false }),
-  }, ctx.timeoutMs);
-
-  return responseToProbeResult(response, endpointMode);
+  const deadline = AbortSignal.timeout(ctx.timeoutMs);
+  const signal = ctx.signal ? AbortSignal.any([ctx.signal, deadline]) : deadline;
+  const model = resolveConfiguredModel(ctx.settings);
+  const auth = await resolveConfiguredAuth(ctx.settings, model, ctx.processEnv, signal);
+  if (!auth) return { ok: false, detail: "Missing model provider credentials" };
+  const requestModel = auth.auth.baseUrl ? { ...model, baseUrl: auth.auth.baseUrl } : model;
+  try {
+    const response = await completeSimple(requestModel, {
+      messages: [{ role: "user", content: "Reply with only OK.", timestamp: Date.now() }],
+    }, { ...auth.auth, env: auth.env, maxTokens: Math.min(32, model.maxTokens), maxRetries: 0, timeoutMs: ctx.timeoutMs, signal });
+    const text = response.content.filter(part => part.type === "text").map(part => part.text).join("").trim();
+    if (response.stopReason === "error" || response.stopReason === "aborted" || !text) {
+      throw new Error(response.errorMessage || (signal.aborted ? "Model request timed out" : "Model returned no text"));
+    }
+  } catch (error) {
+    // Some Pi providers authenticate entirely through headers (e.g. Cloudflare).
+    const secrets = [auth.auth.apiKey, ctx.settings.providers?.[model.provider]?.apiKey,
+      ...Object.values(auth.auth.headers ?? {}).flatMap(value => value ? [value, value.replace(/^Bearer\s+/i, "")] : [])];
+    let detail = errorMessage(error);
+    for (const secret of secrets) if (secret) detail = detail.split(secret).join("[redacted]");
+    return { ok: false, detail };
+  }
+  return { ok: true, detail: `${model.provider} · ${model.api} · response received` };
 }
 
 export function resolveDoctorRequestModel(
   settings: OhQuantSettings,
   processEnv: Record<string, string | undefined>,
 ): string {
+  if (settings.provider) return resolveConfiguredModel(settings).id;
   const modelEnv: Record<string, string> = {
-    ...settings.env,
     ...definedStringEnv(processEnv),
+    ...settings.env,
   };
   return resolveModelId(settings.model || "sonnet", modelEnv).trim();
 }
 
 async function defaultDataProbe(ctx: DoctorProbeContext): Promise<DoctorProbeResult> {
-  switch (ctx.state.config.dataSource) {
-    case "akshare":
-      return probeAkshare(ctx);
-    case "tushare":
-      return probeTushare(ctx);
-    case "llmquant-data":
-      return probeLlmQuant(ctx);
-    case "financial-datasets":
-      return probeFinancialDatasets(ctx);
-    default:
-      return { ok: false, detail: `Unsupported data source: ${ctx.state.config.dataSource}` };
-  }
-}
-
-async function probeLlmQuant(ctx: DoctorProbeContext): Promise<DoctorProbeResult> {
-  const apiKey = rawEnvValue(ctx.settings, ctx.processEnv, "WHYJ_QUANT_LLMQUANT_API_KEY");
-  if (!apiKey) return { ok: false, detail: "Missing WHYJ_QUANT_LLMQUANT_API_KEY" };
-  const baseUrl = ctx.processEnv.LLMQUANT_BASE_URL || "https://api.llmquantdata.com";
-  const url = `${appendUrlPath(baseUrl, "api/equity/historical")}?${new URLSearchParams({ ticker: "AAPL", limit: "1" })}`;
-  const response = await fetchWithTimeout(url, { headers: { authorization: `Bearer ${apiKey}` } }, ctx.timeoutMs);
-  return responseToProbeResult(response, "llmquant-data");
-}
-
-async function probeFinancialDatasets(ctx: DoctorProbeContext): Promise<DoctorProbeResult> {
-  const apiKey = rawEnvValue(ctx.settings, ctx.processEnv, "WHYJ_QUANT_FINANCIAL_DATASETS_KEY");
-  if (!apiKey) return { ok: false, detail: "Missing WHYJ_QUANT_FINANCIAL_DATASETS_KEY" };
-  const baseUrl = ctx.processEnv.FINANCIAL_DATASETS_BASE_URL || "https://api.financialdatasets.ai";
-  const url = `${appendUrlPath(baseUrl, "prices/snapshot")}?${new URLSearchParams({ ticker: "AAPL" })}`;
-  const response = await fetchWithTimeout(url, { headers: { "X-API-KEY": apiKey } }, ctx.timeoutMs);
-  return responseToProbeResult(response, "financial-datasets");
-}
-
-async function probeTushare(ctx: DoctorProbeContext): Promise<DoctorProbeResult> {
-  const token = rawEnvValue(ctx.settings, ctx.processEnv, "WHYJ_QUANT_TUSHARE_TOKEN");
-  if (!token) return { ok: false, detail: "Missing WHYJ_QUANT_TUSHARE_TOKEN" };
-  const url = ctx.processEnv.TUSHARE_BASE_URL || "https://api.tushare.pro";
-  const response = await fetchWithTimeout(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      api_name: "daily",
-      token,
-      params: { ts_code: "000001.SZ", start_date: "20240102", end_date: "20240105" },
-      fields: "ts_code,trade_date,close",
-    }),
-  }, ctx.timeoutMs);
-  if (!response.ok) return responseToProbeResult(response, "tushare");
-  const payload = await safeJson(response);
-  const code = typeof payload === "object" && payload && "code" in payload ? Number((payload as { code?: unknown }).code) : 0;
-  if (code !== 0) {
-    const msg = typeof payload === "object" && payload && "msg" in payload ? String((payload as { msg?: unknown }).msg || "") : "";
-    return { ok: false, detail: `tushare code ${code}${msg ? `: ${msg}` : ""}`, raw: payload };
-  }
-  return { ok: true, detail: "tushare probe passed", raw: payload };
-}
-
-async function probeAkshare(ctx: DoctorProbeContext): Promise<DoctorProbeResult> {
-  for (const command of ["python3", "python"]) {
-    const result = spawnSync(command, ["-c", "import akshare as ak; print(getattr(ak, '__version__', 'unknown'))"], {
-      encoding: "utf8",
-      timeout: ctx.timeoutMs,
-    });
-    const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
-    if (result.status === 0) return { ok: true, detail: `akshare ${output || "available"}` };
-    if (result.error) continue;
-  }
-  return { ok: false, detail: "Python package akshare is not importable" };
-}
-
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function responseToProbeResult(response: Response, label: string): Promise<DoctorProbeResult> {
-  if (response.ok) {
-    const text = await safeText(response);
-    return { ok: true, detail: `${label} HTTP ${response.status}`, raw: text ? clip(text, 1_000) : undefined };
-  }
-  const text = await safeText(response);
-  return {
-    ok: false,
-    detail: `${label} HTTP ${response.status} ${response.statusText}${text ? `: ${clip(text, 300)}` : ""}`,
-    raw: text ? clip(text, 1_000) : undefined,
-  };
-}
-
-async function safeText(response: Response): Promise<string> {
-  try {
-    return await response.text();
-  } catch {
-    return "";
-  }
-}
-
-async function safeJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
-
-function rawEnvValue(
-  settings: OhQuantSettings,
-  processEnv: Record<string, string | undefined>,
-  key: AuthKey,
-): string {
-  const fromEnv = typeof processEnv[key] === "string" ? processEnv[key]!.trim() : "";
-  if (fromEnv) return fromEnv;
-  const fromConfig = typeof settings.env?.[key] === "string" ? settings.env[key]!.trim() : "";
-  return fromConfig;
-}
-
-function rawModelCredential(
-  settings: OhQuantSettings,
-  processEnv: Record<string, string | undefined>,
-): string {
-  return rawEnvValue(settings, processEnv, "WHYJ_QUANT_API_KEY")
-    || rawEnvValue(settings, processEnv, "WHYJ_QUANT_AUTH_TOKEN");
-}
-
-function appendUrlPath(baseUrl: string, path: string): string {
-  const cleanBase = baseUrl.replace(/\/+$/, "");
-  const cleanPath = path.replace(/^\/+/, "");
-  return `${cleanBase}/${cleanPath}`;
-}
-
-function openAiChatCompletionsUrl(baseUrl: string): string {
-  const clean = baseUrl.replace(/\/+$/, "");
-  return clean.endsWith("/chat/completions") ? clean : `${clean}/chat/completions`;
+  const data = await probeDataConnection(ctx.settings, ctx.dataRequest ?? defaultDataProbeRequest(ctx.settings),
+    { processEnv: ctx.processEnv, timeoutMs: ctx.timeoutMs, signal: ctx.signal });
+  return { ok: data.status === "ready", detail: data.detail, data };
 }
 
 function writeDoctorLog(state: DoctorResult, options: DoctorOptions): DoctorResult {
@@ -876,6 +748,7 @@ function writeDoctorLog(state: DoctorResult, options: DoctorOptions): DoctorResu
     mode: stateWithLog.mode,
     config: stateWithLog.config,
     phases: stateWithLog.phases,
+    capabilities: stateWithLog.capabilities,
     auth: stateWithLog.auth,
     hints: stateWithLog.hints,
   }, null, 2));
@@ -890,11 +763,6 @@ function redactSensitiveText(value: string): string {
     .replace(/(api[_-]?key["']?\s*[:=]\s*["']?)[^"',\s}]+/gi, "$1[redacted]")
     .replace(/(token["']?\s*[:=]\s*["']?)[^"',\s}]+/gi, "$1[redacted]")
     .replace(/\bsk-[A-Za-z0-9._-]{6,}\b/g, "sk-[redacted]");
-}
-
-function clip(value: string, max: number): string {
-  const compact = value.replace(/\s+/g, " ").trim();
-  return compact.length <= max ? compact : `${compact.slice(0, max - 3)}...`;
 }
 
 function buildAlignedTable(headers: string[], rows: string[][]): string[] {
@@ -915,7 +783,7 @@ function compactText(text: string, max = 80): string {
 
 function redact(value: string): string {
   const stripped = stripAnsi(value);
-  if (stripped.length <= 8) return `${stripped.slice(0, 4)}...${stripped.slice(-4)}`;
+  if (stripped.length <= 8) return "[hidden]";
   const fp = simpleFingerprint(stripped);
   return `${stripped.slice(0, 4)}...${stripped.slice(-4)} · fp:${fp}`;
 }

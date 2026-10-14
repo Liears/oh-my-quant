@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { generateArtifact } from "../src/generator.ts";
 import { WHYJ_THEME } from "../../types/theme-colors.ts";
-import { escapeHtml, renderArtifactTemplate, type ArtifactTemplateInput } from "../src/template.ts";
+import { escapeHtml, renderArtifactTemplate } from "../src/template.ts";
 
 const OHQ = join(process.cwd(), ".ohquant-test-artifact-gen");
 
@@ -72,6 +72,26 @@ afterEach(() => {
 // ── Generator tests ──
 
 describe("generateArtifact", () => {
+  it("annualizes displayed returns by the actual dates and omits an undefined Sharpe", () => {
+    const path = writeSessionFile("calendar-metrics", [userMsg("查看净值"), assistantMsg([
+      "日期        净值    基准    沪深300",
+      "2024-01-01  1.0000  1.0000  1.0000",
+      "2024-07-01  1.0000  1.0000  1.0000",
+      "2025-01-01  1.1000  1.0000  1.0000",
+    ].join("\n"))]);
+    const html = generateArtifact({ sessionPath: path })!.html;
+    const annual = ((1.1 ** (365.25 / 366) - 1) * 100).toFixed(2);
+    expect(html).toContain("年化收益率");
+    expect(html).toContain(`+${annual}%`);
+    const flatPath = writeSessionFile("flat-metrics", [userMsg("查看净值"), assistantMsg([
+      "日期        净值    基准    沪深300",
+      "2024-01-01  1.0000  1.0000  1.0000",
+      "2024-07-01  1.0000  1.0000  1.0000",
+      "2025-01-01  1.0000  1.0000  1.0000",
+    ].join("\n"))]);
+    expect(generateArtifact({ sessionPath: flatPath })!.html).not.toContain("<span>夏普比率</span>");
+  });
+
   it("generates valid HTML from a session file", () => {
     const sessionId = "test-session-001";
     const path = writeSessionFile(sessionId, [
@@ -300,7 +320,7 @@ describe("generateArtifact", () => {
     expect(result!.html).toContain("VaR (95%)");
     expect(result!.html).toContain("最大回撤");
     expect(result!.html).not.toContain("NO QUANT METRICS");
-    expect(result!.html).toContain(`var up='${WHYJ_THEME.marketUp}',dn='${WHYJ_THEME.marketDown}'`);
+    expect(result!.html).toContain(`--up:${WHYJ_THEME.marketUp};--down:${WHYJ_THEME.marketDown}`);
     expect(result!.html).toContain(`gold='${WHYJ_THEME.gold}'`);
     expect(result!.html).toContain(`hairline='${WHYJ_THEME.hairline}'`);
   });

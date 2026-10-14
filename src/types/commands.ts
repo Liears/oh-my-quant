@@ -1,10 +1,15 @@
-import type { DoctorResult } from "../runtime/doctor-contract.ts";
+import type { DoctorResult } from "./doctor.ts";
+import type { ReportProvenance } from "./research-evidence.ts";
+import type { ResearchTaskSnapshot } from "./research-task.ts";
+import type { SkillReadiness } from "./skills.ts";
+import type { ImageContent } from "@earendil-works/pi-ai";
 
 export interface ParsedCommand {
   command: string;
   raw: string;
   flags: Record<string, string | number | boolean>;
   positional: string[];
+  argumentError?: string;
 }
 
 export type CommandEffect =
@@ -22,11 +27,12 @@ export type CommandEffect =
   | { type: "portfolioChanged" };
 
 export interface CommandSkill {
+  readiness?: SkillReadiness;
   name: string;
   description: string;
   filePath: string;
   scope: "project" | "user";
-  source: "agents" | "claude" | "codex" | "pi";
+  source: "agents" | "claude" | "codex" | "pi" | "extension";
   disableModelInvocation?: boolean;
 }
 
@@ -58,10 +64,11 @@ export interface CommandAgentSession {
   compact(customInstructions?: string): Promise<CommandCompactResult>;
   listSessions(): Promise<CommandSessionMetadata[]>;
   getSessionMetadata(): Promise<CommandSessionMetadata | null>;
-  resumeSession(sessionId: string): Promise<CommandSessionMetadata>;
+  getResearchState?(): Promise<ResearchTaskSnapshot>;
+  resumeSession(sessionId: string, options?: { report?: ReportProvenance }): Promise<CommandSessionMetadata>;
   getContextUsage(): CommandContextUsage | undefined;
   getSkills(): Promise<CommandSkill[]>;
-  skill(name: string, additionalInstructions?: string): Promise<void>;
+  skill(name: string, additionalInstructions?: string, options?: { images?: readonly ImageContent[]; signal?: AbortSignal }): Promise<void>;
   subscribe?: unknown;
   prompt?: unknown;
   steer?: unknown;
@@ -69,21 +76,28 @@ export interface CommandAgentSession {
   navigateTree?: unknown;
   getSessionEntries?: unknown;
   getSessionBranch?: unknown;
-  getLeafId?: unknown;
+  getLeafId?(): Promise<string | null>;
   abort?: unknown;
   clearAllQueues?: unknown;
   reset?: unknown;
 }
 
 export interface CommandContext {
+  manageExtensions?: (action: ExtensionAction, id?: string, signal?: AbortSignal) => Promise<CommandResult>;
   /** When set, /config opens the settings panel. */
   openConfig?: () => void;
   /** When set, /doctor opens the doctor panel. */
   openDoctor?: (doctor?: unknown) => void;
   /** Current doctor snapshot for partial retries inside TUI. */
   currentDoctor?: DoctorResult | null;
+  /** Lifetime of this diagnostic run, owned by the invoking runtime. */
+  doctorSignal?: AbortSignal;
+  /** Lifetime of local asynchronous work, owned by the invoking runtime. */
+  commandSignal?: AbortSignal;
   /** When set, /resume opens the resume panel. */
   openResume?: () => void;
+  /** Inspect the current-branch research snapshot without a model call. */
+  openResearch?: (snapshot: ResearchTaskSnapshot) => void;
   /** When set, /portfolio opens the portfolio panel. */
   openPortfolio?: () => void;
   /** When set, /help opens the help panel. */
@@ -96,6 +110,8 @@ export interface CommandContext {
   /** Overrides local file opening for tests or non-desktop runtimes. */
   openFile?: (path: string) => void;
 }
+
+export type ExtensionAction = "list" | "enable" | "disable" | "reload";
 
 export interface CommandResult {
   success: boolean;

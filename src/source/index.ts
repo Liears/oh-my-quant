@@ -37,7 +37,14 @@ export type {
 } from "./src/akshare.ts";
 
 export { fetchFromFinancialDatasets, fetchFinancialDatasetsSnapshot } from "./src/financial-datasets.ts";
+export { fetchFromAKShareGlobal, fetchFromAKShareGlobalDetailed } from "./src/akshare-global-bars.ts";
 export { fetchFromLlmQuant } from "./src/llmquant.ts";
+export { fetchComparisonFx } from "./src/frankfurter.ts";
+export { checkAkshareDependency } from "./src/akshare-dependency.ts";
+export { runPython } from "./src/akshare-python.ts";
+export { fetchNews, normalizeNewsScope } from "./src/news.ts";
+export { readNewsDocument } from "./src/news-document.ts";
+export { fetchSinaAIndexSpotQuotes } from "./src/sina-index-client.ts";
 export {
   SOURCE_LABELS,
   fetchBars,
@@ -46,13 +53,16 @@ export {
   formatRefreshMinute,
   formatSourceLabels,
   normalizeBarSeries,
+  providerOrderFor,
   pullBarsFromProviders,
   searchSymbols,
 } from "./src/sources.ts";
 export type {
+  BarsFetchResult,
   BarProviderAdapter,
   DataSource,
   LiveFetchResult,
+  LiveBarsFetchResult,
   ProviderAttempt,
   PullBarsResult,
   PullSource,
@@ -61,5 +71,5 @@ export type {
   SourceProviderOptions,
   SourceRuntimeDeps,
 } from "./src/sources.ts";
-export { fetchFromTushare, fetchTushareSnapshot, searchTushareSymbols } from "./src/tushare.ts";
+export { DEFAULT_TUSHARE_BASE_URL, fetchFromTushare, fetchTushareSnapshot, searchTushareSymbols } from "./src/tushare.ts";
 export { fetchResearchBars } from "./src/source-providers.ts";

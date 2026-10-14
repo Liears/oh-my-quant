@@ -1,8 +1,9 @@
 import { charWidth, sanitizeTerminalText, strWidth, truncate, wrap } from "./buffer.ts";
 import type { Style } from "./buffer.ts";
 import { S } from "./styles.ts";
-import type { UIMessage } from "./types.ts";
-import { formatToolLine } from "../../runtime/tool-display.ts";
+import { metricTone } from "../../types/metric-semantics.ts";
+import type { UIMessage } from "../../types/ui.ts";
+import { formatToolLine } from "../../runtime/workspace/tool-display.ts";
 
 export interface RenderLine {
   text: string;
@@ -35,13 +36,13 @@ function renderMsg(msg: UIMessage, width: number): RenderLine[] {
         lines.push({ text: `${bodyPrefix}${line}`, style: S.thinking });
       }
     }
-  } else if (msg.role === "tool") {
-    const t = msg.tool!;
-    const status = t.status === "running" ? "●" : t.status === "done" ? "●" : "✗";
-    const lineLabel = t.label || formatToolLine(t.name, t.args);
+  } else if (msg.role === "tool" || msg.role === "skill") {
+    const item = msg.role === "tool" ? msg.tool! : msg.skill!;
+    const status = item.status === "error" ? "✗" : "●";
+    const label = item.label || (msg.role === "tool" ? formatToolLine(item.name, msg.tool!.args) : `SKILL.${item.name}`);
+    const suffix = msg.role === "skill" && item.status === "running" ? " ..." : "";
     const prefix = `${status} `;
-    const body = lineLabel;
-    const wrapped = wrap(body, Math.max(1, w - strWidth(prefix)));
+    const wrapped = wrap(`${label}${suffix}`, Math.max(1, w - strWidth(prefix)));
     if (wrapped.length > 0) {
       lines.push({ text: `${prefix}${wrapped[0]}`, style: S.gold });
       for (let i = 1; i < wrapped.length; i++) {
@@ -50,26 +51,7 @@ function renderMsg(msg: UIMessage, width: number): RenderLine[] {
     } else {
       lines.push({ text: prefix.trimEnd(), style: S.gold });
     }
-    if (t.result) {
-      lines.push(...renderToolResultPreview(t.result, w));
-    }
-  } else if (msg.role === "skill") {
-    const sk = msg.skill!;
-    const status = sk.status === "running" ? "●" : sk.status === "done" ? "●" : "✗";
-    const running = sk.status === "running";
-    const lineLabel = sk.label || `SKILL.${sk.name}`;
-    const suffix = running ? " ..." : "";
-    const prefix = `${status} `;
-    const body = `${lineLabel}${suffix}`;
-    const wrapped = wrap(body, Math.max(1, w - strWidth(prefix)));
-    if (wrapped.length > 0) {
-      lines.push({ text: `${prefix}${wrapped[0]}`, style: S.gold });
-      for (let i = 1; i < wrapped.length; i++) {
-        lines.push({ text: `${" ".repeat(strWidth(prefix))}${wrapped[i]}`, style: S.gold });
-      }
-    } else {
-      lines.push({ text: prefix.trimEnd(), style: S.gold });
-    }
+    if (msg.role === "tool" && msg.tool!.result) lines.push(...renderToolResultPreview(msg.tool!.result, w));
   } else if (msg.role === "error") {
     const prefix = "▏ ERR ";
     for (const line of wrap(msg.text ?? "", Math.max(1, w - strWidth(prefix)))) {
@@ -104,15 +86,7 @@ function renderDoctorReport(text: string, width: number): RenderLine[] {
     if (rawLine === "Credentials") mode = "credentials";
     else if (rawLine === "Hints") mode = "hints";
     const rendered = renderDoctorReportLine(rawLine, mode);
-    for (const row of wrapRenderLine(rendered, bodyWidth)) {
-      lines.push({
-        text: `${prefix}${row.text}`,
-        segments: [
-          { text: prefix, style: S.cream },
-          ...(row.segments ?? [{ text: row.text, style: row.style ?? S.cream }]),
-        ],
-      });
-    }
+    pushPrefixedRenderLine(lines, prefix, rendered, bodyWidth);
   }
   return lines;
 }
@@ -344,29 +318,19 @@ function renderTableContentRow(
 ): RenderLine {
   const columns = widths.map((width, colIndex) => {
     const raw = row.cells[colIndex] ?? "";
+    const header = headerCells[colIndex] ?? "";
+    const label = colIndex === 1 && /^(value|值|数值)?$/i.test(header) ? row.cells[0] ?? "" : header;
     return {
       text: padDisplayRight(truncate(raw, width), width),
-      style: tableCellStyle(raw, headerCells[colIndex] ?? "", colIndex, isHeader),
+      style: tableCellStyle(raw, label, colIndex, isHeader),
     };
   });
-  return joinStyledColumnsWithExactSpacing(columns);
+  return joinStyledColumns(columns);
 }
 
 function padDisplayRight(value: string, width: number): string {
   const pad = Math.max(0, width - strWidth(value));
   return `${value}${" ".repeat(pad)}`;
-}
-
-function joinStyledColumnsWithExactSpacing(columns: { text: string; style?: Style }[]): RenderLine {
-  const segments: { text: string; style?: Style }[] = [];
-  columns.forEach((column, idx) => {
-    segments.push({ text: column.text, style: column.style });
-    if (idx < columns.length - 1) segments.push({ text: "  ", style: S.tableSpacing });
-  });
-  return {
-    text: columns.map((column) => column.text).join("  "),
-    segments,
-  };
 }
 
 function tableCellStyle(cell: string, header: string, colIndex: number, isHeader: boolean): Style {
@@ -380,23 +344,10 @@ function tableCellStyle(cell: string, header: string, colIndex: number, isHeader
 }
 
 function semanticCellStyle(cell: string, header: string): Style | null {
-  const text = cell.trim();
-  if (!text) return S.tableNote;
-  const lower = text.toLowerCase();
-  const headerLower = header.toLowerCase();
-  if (/^(ok|ready|kept|pass|passed|healthy|valid|buy|long|up)$/.test(lower)) return S.tablePositive;
-  if (/^(missing|error|failed|fail|invalid|breach|risk|sell|short|down)$/.test(lower)) return S.tableNegative;
-  if (/[▲↑]/.test(text) || /^\+\d/.test(text)) return S.tableGain;
-  if (/[▼↓]/.test(text) || /^-\d/.test(text)) return S.tableLoss;
-  if (/(dd|drawdown|var|cvar|loss|breach|risk|回撤|风险)/i.test(headerLower) && /^-?\d/.test(text)) return S.tableLoss;
-  if (/(score|grade|sharpe|cagr|return|收益|评分|夏普)/i.test(headerLower) && /^[-+]?\d/.test(text)) {
-    if (/(score|grade|sharpe|评分|夏普)/i.test(headerLower)) {
-      return /^-/.test(text) ? S.tableNegative : S.tablePositive;
-    }
-    return /^-/.test(text) ? S.tableLoss : S.tableGain;
-  }
-  if (/^(n\/a|-)$/.test(lower)) return S.tableNote;
-  return null;
+  const tone = metricTone(cell, header);
+  if (!tone) return null;
+  return { up: S.tableGain, down: S.tableLoss, positive: S.tablePositive,
+    negative: S.tableNegative, neutral: S.tableNeutral }[tone];
 }
 
 const SPARK_CHARS = "▁▂▃▄▅▆▇█";
@@ -409,6 +360,8 @@ function containsChartGlyph(text: string): boolean {
 }
 
 function chartGlyphStyle(text: string): Style {
+  const semantic = semanticCellStyle(text, "");
+  if (semantic) return semantic;
   if (/[▼▽↓]/.test(text) || /^-\d/.test(text.trim())) return S.chartDown;
   if (/[▲△↑]/.test(text) || /^\+\d/.test(text.trim())) return S.chartUp;
   return S.chartLine;
@@ -417,14 +370,17 @@ function chartGlyphStyle(text: string): Style {
 function renderChartGlyphLine(rawLine: string): RenderLine {
   const segments: { text: string; style?: Style }[] = [];
   const parts = rawLine.match(/\s+|\S+/g) ?? [];
+  const label = rawLine.trim().split(/\s{2,}/)[0] ?? "";
   for (const part of parts) {
-    segments.push({ text: part, style: chartTokenStyle(part) });
+    segments.push({ text: part, style: chartTokenStyle(part, label) });
   }
   return { text: rawLine, segments };
 }
 
-function chartTokenStyle(token: string): Style {
+function chartTokenStyle(token: string, label: string): Style {
   if (/^\s+$/.test(token)) return S.tableSpacing;
+  const semantic = semanticCellStyle(token, label);
+  if (semantic) return semantic;
   if ([...token].some((ch) => SPARK_CHARS.includes(ch))) return S.chartLine;
   if ([...token].some((ch) => BAR_CHARS.includes(ch))) return S.chartLine;
   if (/[▲△↑]/.test(token) || /^\+\d/.test(token)) return S.chartUp;
@@ -497,27 +453,6 @@ function sliceSegmentsByWidth(
 function renderHeaderTableLine(line: string): RenderLine {
   const parts = line.split(/\s{2,}/);
   return joinStyledColumns(parts.map((part) => ({ text: part, style: S.tableHeader })));
-}
-
-function renderMetricTableLine(line: string): RenderLine {
-  const parts = line.split(/\s{2,}/);
-  const [label = "", value = "", note = ""] = parts;
-  return joinStyledColumns([
-    { text: label, style: S.tableKey },
-    { text: value, style: /K|M|\d+\/\d+/.test(value) ? S.tableStrong : S.tableValue },
-    { text: note, style: S.tableNote },
-  ]);
-}
-
-function renderQuantTableLine(line: string): RenderLine {
-  const parts = line.split(/\s{2,}/);
-  const [field = "", status = "", detail = ""] = parts;
-  const statusStyle = status.trim() === "kept" ? S.tablePositive : S.tableNegative;
-  return joinStyledColumns([
-    { text: field, style: S.tableKey },
-    { text: status, style: statusStyle },
-    { text: detail, style: S.tableValue },
-  ]);
 }
 
 function renderRetentionMapLine(line: string): RenderLine {

@@ -1,10 +1,16 @@
 import { buildCommandHelpText } from "../catalog.ts";
 import { buildDoctorErrorResult, collectDoctor, formatDoctorText } from "../doctor.ts";
-import type { CommandContext, CommandHandler, CommandResult } from "../types.ts";
-import type { CompactResult } from "../../agent/src/pi/index.ts";
-import { hasWhyjEnvValue } from "../../storage/index.ts";
-import { describeEndpointMode } from "../doctor.ts";
+import type { CommandHandler, CommandResult } from "../types.ts";
+import type { CompactResult } from "../../agent/src/session-runtime/index.ts";
+import { hasWhyjEnvValue, loadPanelPortfolio, loadSettings, resolveSettingsPath } from "../../storage/index.ts";
+import { describeModelProtocol } from "../../runtime/workspace/doctor-contract.ts";
+import { resolveConfiguredModel, resolveConfiguredAuth, configuredThinking } from "../../agent/src/model-config.ts";
 import { DEFAULT_SETTINGS } from "../../types/config.ts";
+import { toolProbeDoctor } from "./tool-probe.ts";
+import { researchTaskLines } from "../../runtime/workspace/research-task-view.ts";
+import { extensionsHandler } from "./extensions.ts";
+import { piConfigHandler } from "./pi-config.ts";
+import { parseDoctorPhases } from "../../runtime/workspace/doctor-phases.ts";
 
 function mark(ok: boolean): string {
   return ok ? "✓" : "○";
@@ -216,55 +222,83 @@ export const compactHandler: CommandHandler = async (_flags, positional, ctx) =>
 };
 
 export const configHandler: CommandHandler = async (_flags, _positional, ctx) => {
+  if (_flags.pi !== undefined) return piConfigHandler(_flags, _positional, ctx);
+  if (_flags.extensions !== undefined) return extensionsHandler(_flags, _positional, ctx);
   if (ctx.openConfig) {
     return { success: true, message: "", effects: [{ type: "openConfig" }] };
   }
-  const { loadPanelPortfolio, loadSettings, resolveSettingsPath } = await import("../../storage/index.ts");
   const cfg = loadSettings();
-  const activeFile = cfg.preferences.currentPortfolioFile;
   const panelPortfolio = loadPanelPortfolio();
   const activeName = panelPortfolio.groups.length === 1 && panelPortfolio.groups[0]?.name
     ? panelPortfolio.groups[0].name
-    : activeFile;
-  const providerUrl = cfg.env.WHYJ_QUANT_BASE_URL;
-  const providerSummary = providerUrl
-    ? `${providerUrl}  ·  ${describeEndpointMode(providerUrl)}`
-    : "(provider default URL)";
+    : panelPortfolio.groups.length ? `${panelPortfolio.groups.length} portfolios` : "No portfolios";
+  let modelSummary: string;
+  let providerSummary: string;
+  try {
+    const model = resolveConfiguredModel(cfg);
+    const auth = await resolveConfiguredAuth(cfg, model);
+    modelSummary = `${model.id}  ·  thinking ${configuredThinking(cfg)}`;
+    providerSummary = `${model.provider}  ·  credentials ${mark(Boolean(auth))}  ·  ${model.baseUrl || "SDK default endpoint"}  ·  ${describeModelProtocol(model.api)}`;
+  } catch (error) {
+    modelSummary = cfg.model;
+    providerSummary = error instanceof Error ? error.message : "Check model configuration";
+  }
   return {
     success: true,
     message: [
       "Settings",
-      `  Agent       ${cfg.model}  ·  thinking ${cfg.thinkingLevel}`,
-      `  Provider    key ${mark(hasWhyjEnvValue(cfg.env, "apiKey"))}  ·  ${providerSummary}`,
+      `  Agent       ${modelSummary}`,
+      `  Provider    ${providerSummary}`,
       `  Research    ${cfg.preferences.source}  ·  portfolio ${activeName}`,
       `  Data keys   ${mark(hasWhyjEnvValue(cfg.env, "tushareToken"))} Tushare  ${mark(hasWhyjEnvValue(cfg.env, "financialDatasetsKey"))} Financial Datasets  ${mark(hasWhyjEnvValue(cfg.env, "llmquantApiKey"))} LLMQuant`,
       `  Workspace   external skills ${cfg.skillIntegrations.external ? "on" : "off"}  ·  overview ${cfg.showPortfolioPanel ? "on" : "off"}  ·  auto artifacts ${cfg.artifactGeneration.auto ? "on" : "off"}`,
       `  Path        ${resolveSettingsPath()}`,
       "  Open /config or press Ctrl+P to change these settings.",
+      "  Manage plugins with /config --extensions list.",
+      "  Inspect Pi connections with /config --pi list.",
     ].join("\n"),
   };
 };
 
-export const doctorHandler: CommandHandler = async (_flags, _positional, ctx) => {
+export function createDoctorHandler(collect: typeof collectDoctor = collectDoctor): CommandHandler {
+  return (...args) => runDoctorHandler(...args, collect);
+}
+
+export const doctorHandler: CommandHandler = createDoctorHandler();
+
+async function runDoctorHandler(
+  _flags: Parameters<CommandHandler>[0],
+  _positional: Parameters<CommandHandler>[1],
+  ctx: Parameters<CommandHandler>[2],
+  collect: typeof collectDoctor,
+): Promise<CommandResult> {
+  const cancelled = { success: true, message: "" };
+  if (ctx.doctorSignal?.aborted) return cancelled;
   const requestedPhases = parseDoctorPhases(_flags.phase);
-  const { loadSettings } = await import("../../storage/index.ts");
   let settings = DEFAULT_SETTINGS;
   try {
     settings = loadSettings();
   } catch {
     settings = DEFAULT_SETTINGS;
   }
+  if (_flags.tool !== undefined) {
+    if (_positional.length) return { success: false, message: "Endpoint arguments must use --name value. Use the parameter editor for values containing spaces." };
+    return toolProbeDoctor(settings, _flags, ctx.doctorSignal);
+  }
   if (ctx.openDoctor) {
     ctx.openDoctor();
     try {
-      const doctor = await collectDoctor(settings, process.env, {
+      const doctor = await collect(settings, process.env, {
+        signal: ctx.doctorSignal,
         phases: requestedPhases,
         seedState: ctx.currentDoctor ?? undefined,
-        onState: (state) => ctx.openDoctor?.(state),
+        onState: (state) => { if (!ctx.doctorSignal?.aborted) ctx.openDoctor?.(state); },
       });
+      if (ctx.doctorSignal?.aborted) return cancelled;
       ctx.openDoctor(doctor);
       return { success: true, message: "", data: doctor };
     } catch (error) {
+      if (ctx.doctorSignal?.aborted) return cancelled;
       const doctor = buildDoctorErrorResult(settings, process.env, error, requestedPhases);
       ctx.openDoctor(doctor);
       return {
@@ -275,7 +309,8 @@ export const doctorHandler: CommandHandler = async (_flags, _positional, ctx) =>
     }
   }
   try {
-    const doctor = await collectDoctor(settings, process.env, { phases: requestedPhases });
+    const doctor = await collect(settings, process.env, { phases: requestedPhases, signal: ctx.doctorSignal });
+    if (ctx.doctorSignal?.aborted) return cancelled;
     return {
       success: true,
       message: formatDoctorText(doctor),
@@ -283,6 +318,7 @@ export const doctorHandler: CommandHandler = async (_flags, _positional, ctx) =>
       renderAs: "text",
     };
   } catch (error) {
+    if (ctx.doctorSignal?.aborted) return cancelled;
     const doctor = buildDoctorErrorResult(settings, process.env, error, requestedPhases);
     return {
       success: false,
@@ -291,73 +327,19 @@ export const doctorHandler: CommandHandler = async (_flags, _positional, ctx) =>
       renderAs: "text",
     };
   }
-};
-
-function parseDoctorPhases(value: string | number | boolean | undefined): ("model" | "tools" | "data")[] | undefined {
-  if (typeof value !== "string") return undefined;
-  const parts = value
-    .split(/[,\s]+/)
-    .map((part) => part.trim().toLowerCase())
-    .filter(Boolean);
-  const phases = parts.filter((part): part is "model" | "tools" | "data" =>
-    part === "model" || part === "tools" || part === "data");
-  return phases.length > 0 ? phases : undefined;
 }
 
-export const portfolioHandler: CommandHandler = async (_flags, positional, ctx) => {
-  if (positional.length === 0 && ctx.openPortfolio) {
-    return { success: true, message: "", effects: [{ type: "openPortfolio" }] };
-  }
-  if (positional[0] === "use" || positional[0] === "select") {
-    const identifier = positional.slice(1).join(" ").trim();
-    if (!identifier) return { success: false, message: "Choose a portfolio with /portfolio use <name|file|index>." };
-    const { loadSettings, saveSettings } = await import("../../storage/index.ts");
-    const { syncPanelPortfolioFromLocalPortfolio } = await import("../../storage/index.ts");
-    const synced = syncPanelPortfolioFromLocalPortfolio(identifier);
-    if (!synced) return { success: false, message: `Could not find a local portfolio matching "${identifier}". Run /portfolio to list available portfolios.` };
-    const cfg = loadSettings();
-    cfg.preferences.currentPortfolioFile = synced.portfolio.fileName;
-    saveSettings(cfg);
-    return {
-      success: true,
-      message: [
-        "Portfolio selected",
-        `  name     ${synced.portfolio.name}`,
-        `  file     ${synced.portfolio.fileName}`,
-        `  symbols  ${synced.symbols.length}`,
-      ].join("\n"),
-      effects: [{ type: "portfolioChanged" }],
-    };
-  }
-  if (positional.length > 0) {
-    return {
-      success: false,
-      message: "This panel is read-only. Use /portfolio use <name|file|index> to switch portfolios.",
-    };
-  }
-  const { listLocalPortfolios } = await import("../../storage/index.ts");
-  const portfolios = listLocalPortfolios();
-  if (portfolios.length === 0) {
-    return { success: true, message: "No local portfolio files found yet. Add portfolio JSON files under .ohquant/portfolio/ first." };
-  }
-  const lines = portfolios.map((portfolio, index) =>
-    `  ${index + 1}. ${portfolio.name}  ·  ${portfolio.count} funds  ·  ${portfolio.updated || "-"}`,
-  );
-  return {
-    success: true,
-    message: ["Local portfolios", ...lines].join("\n"),
-  };
-};
-
-export const marketHandler: CommandHandler = async (_flags, positional) => {
-  const action = positional[0] || "refresh";
-  if (action !== "refresh") {
-    return { success: false, message: "Use /market refresh to reload the overview data." };
-  }
-  return { success: true, message: "Overview refreshed." };
-};
+export { portfolioHandler } from "./portfolio.ts";
 
 export const resumeHandler: CommandHandler = async (_flags, positional, ctx) => {
+  if (_flags.task !== undefined) {
+    if (_flags.task !== true || positional.length || Object.keys(_flags).length !== 1) return { success: false, message: "Use /resume --task by itself to inspect the active research task." };
+    if (!ctx.agentSession?.getResearchState) return { success: false, message: "Task inspection needs an active Quant session. Start whyj, then use /resume --task." };
+    const state = await ctx.agentSession.getResearchState();
+    const snapshot = { leafId: state.leafId, task: state.task, taskErrors: state.taskErrors, unresolved: state.unresolved };
+    if (ctx.openResearch) { ctx.openResearch(snapshot); return { success: true, message: "", data: snapshot }; }
+    return { success: true, message: researchTaskLines(snapshot).join("\n"), data: snapshot, renderAs: "text" };
+  }
   const action = positional[0]?.trim();
   if (!action) {
     if (ctx.openResume) {

@@ -12,7 +12,7 @@ export interface FileEvent {
   timestamp: number;
 }
 
-type Listener = (event: FileEvent) => void;
+type Listener = (event: FileEvent) => void | Promise<void>;
 
 const listeners = new Set<Listener>();
 
@@ -28,7 +28,13 @@ export function emitFileEvent(event: Omit<FileEvent, "id" | "label" | "timestamp
     label: displayPath(event.path),
     timestamp: Date.now(),
   };
-  for (const listener of listeners) listener(fullEvent);
+  // Observers do not participate in the transaction or its acknowledgement.
+  for (const listener of listeners) {
+    try {
+      const pending = listener({ ...fullEvent });
+      pending?.catch(() => {});
+    } catch { /* Keep delivering to the remaining observers. */ }
+  }
 }
 
 export function displayPath(path: string): string {

@@ -1,5 +1,5 @@
 import { extractConversationSelection, lastAssistantPlainText, type ConversationSelection, type ConversationView } from "./selection.ts";
-import type { UIMessage } from "./types.ts";
+import type { UIMessage } from "../../types/ui.ts";
 
 export function resolveCopyText(
   panel: "conversation" | "overview",

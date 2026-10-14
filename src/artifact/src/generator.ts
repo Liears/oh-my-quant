@@ -4,13 +4,15 @@
  * Dashboard (left): conversation timeline, structured data detection,
  *   K-line charts, metric cards, score tables, factor performance.
  * Trajectory (right tab): structured agent execution trace with
- *   Compact/Audit/Raw view modes (per docs/artifacts-design.md).
+ *   Compact/Audit/Raw view modes (per docs/quant-harness/artifacts-design.md).
  *
  * Detection: paragraph-level (split by \n\n), first match wins:
  *   K-line (OHLC) > Compare factors > Factor bars > Metrics > Score table > Data table > Plain text
  */
 
-import { readFileSync } from "node:fs";
+import { loadReportSession, renderReportEvidence } from "./report-input.ts";
+import { buildResearchReport } from "../../research/input.ts";
+import { renderResearchResults, renderShareReport } from "./research-renderer.ts";
 import { esc, renderArtifactTemplate, type ArtifactTemplateInput } from "./template.ts";
 import { readWhyjEnvValue } from "../../storage/src/env-keys.ts";
 import type { GenerateArtifactInput, GenerateArtifactResult, GenCtx, RawEntry, ContentBlock } from "./types.ts";
@@ -21,8 +23,12 @@ import { renderDock } from "./dock.ts";
 import { buildTrajectoryFromSession } from "./trajectory.ts";
 import { renderTrajectoryDocument } from "./trajectory-renderer.ts";
 import { renderDashboardOverview } from "./dashboard.ts";
-import { metrics as computeRiskMetrics } from "../../quant/risk.ts";
-import { momentum, rsi, smaDeviation, volatility, volumeRatio } from "../../quant/factor.ts";
+import { instrumentLookupUrls } from "./source-links.ts";
+import {
+  metrics as computeRiskMetrics, annualReturn as computeAnnualReturn, calendarYears, sharpe as computeSharpe,
+  momentum, rsi, smaDeviation, volatility,
+  volumeRatio,
+} from "../../quant/index.ts";
 
 export { extractText } from "./message-text.ts";
 export type { GenerateArtifactInput, GenerateArtifactResult } from "./types.ts";
@@ -32,7 +38,7 @@ function resolveQuantModel(): string {
 }
 
 export function generateArtifact(input: GenerateArtifactInput): GenerateArtifactResult | null {
-  const raw = readSessionFile(input.sessionPath);
+  const raw = loadReportSession(input.sessionPath, input.leafId);
   if (!raw) return null;
   const entries = raw.lines;
   const messageCount = entries.filter((e) => e.type === "message").length;
@@ -47,23 +53,28 @@ export function generateArtifact(input: GenerateArtifactInput): GenerateArtifact
     `run_${Date.now()}`,
   );
 
-  // Auto-detect source URLs from final title + session content
-  const finalTitle = input.title || ctx.title;
-  const sourceUrls = detectSourceUrls(finalTitle, entries);
+  const evidenceHtml = renderReportEvidence(raw, input.resolveDataset, input.resolveFundDataset);
+  const research = buildResearchReport(raw, input.resolveDataset, input.resolveFundDataset, input.resolveComparison);
+  const sourceUrls = instrumentLookupUrls(research.datasets);
+  const hasTextData = ctx.klines.length || ctx.navCharts.length || ctx.metrics.length || ctx.factors.length || ctx.compareFactors.length || ctx.scores;
+  const textDashboard = !evidenceHtml || hasTextData
+    ? (evidenceHtml ? "<div class=\"board-head\"><div><h2>Session interpretation</h2><p>Values below were extracted from session text. Their interpretation is separate from the archived price observations above.</p></div></div>" : "") + renderDashboardOverview(ctx)
+    : "";
 
   const templateInput: ArtifactTemplateInput = {
+    marketColorScheme: input.marketColorScheme,
     title: input.title || ctx.title,
     sessionId: String(raw.header.id ?? "unknown"),
     model: ctx.model,
     quantModel,
     messageCount,
     createdAt: String(raw.header.timestamp ?? new Date().toISOString()),
-    dashboardHtml: renderDashboardOverview(ctx),
+    dashboardHtml: renderResearchResults(research) + evidenceHtml + textDashboard,
     bodyHtml: ctx.dashBody.join("\n"),
     dockHtml: renderDock(ctx, quantModel, sourceUrls),
     trajectoryHtml: renderTrajectoryDocument(trajDoc),
     generatedAt: new Date().toISOString(),
-    sourceUrls,
+    shareHtml: renderShareReport(research),
   };
 
   return {
@@ -71,20 +82,8 @@ export function generateArtifact(input: GenerateArtifactInput): GenerateArtifact
     title: templateInput.title,
     sessionId: templateInput.sessionId,
     messageCount,
+    provenance: raw.provenance,
   };
-}
-
-// ── JSONL ──
-
-function readSessionFile(path: string): { header: Record<string, unknown>; lines: RawEntry[] } | null {
-  try {
-    const raw = readFileSync(path, "utf-8");
-    const lines = raw.split(/\r?\n/).filter(Boolean);
-    if (lines.length === 0) return null;
-    const h = JSON.parse(lines[0]!) as Record<string, unknown>;
-    if (h.type !== "session" || h.version !== 3) return null;
-    return { header: h, lines: lines.slice(1).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean) as RawEntry[] };
-  } catch { return null; }
 }
 
 // ── Context building ──
@@ -129,38 +128,37 @@ function enrichQuantMetrics(ctx: GenCtx): void {
 
   const returns = values.slice(1).map((value, index) => value / values[index]! - 1);
   const periodReturn = values[values.length - 1]! / values[0]! - 1;
-  const annualReturn = Math.pow(1 + periodReturn, 252 / Math.max(1, returns.length)) - 1;
-  const mean = returns.reduce((sum, value) => sum + value, 0) / returns.length;
-  const variance = returns.length > 1
-    ? returns.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (returns.length - 1)
-    : 0;
-  const annualVol = Math.sqrt(variance) * Math.sqrt(252);
-  const sharpe = annualVol > 0 ? (mean * 252 - .02) / annualVol : 0;
-
   addMetric(ctx, "累计收益", formatPercent(periodReturn), periodReturn * 100);
-  addMetric(ctx, "年化收益率", formatPercent(annualReturn), annualReturn * 100);
-  addMetric(ctx, "夏普比率", sharpe.toFixed(2), sharpe);
+  const dates = (klineRows ?? navRows ?? []).map(row => row.date);
+  try {
+    const annualReturn = computeAnnualReturn(returns, { elapsedYears: calendarYears(dates) });
+    addMetric(ctx, "年化收益率", formatPercent(annualReturn), annualReturn * 100);
+  } catch { /* Text tables without valid dates do not establish an annualization span. */ }
+  const periodsPerYear = ({ "周K": 52, "月K": 12, "季K": 4, "年K": 1 } as Record<string, number>)[ctx.klines[0]?.timeframe ?? ""] ?? 252;
+  const sharpe = computeSharpe(returns, 0.02, periodsPerYear);
+  if (sharpe !== null) addMetric(ctx, "夏普比率", sharpe.toFixed(2), sharpe);
 
   try {
-    const risk = computeRiskMetrics(returns);
+    const risk = computeRiskMetrics(returns, periodsPerYear);
     addMetric(ctx, "年化波动率", formatPercent(risk.annualVol), risk.annualVol * 100);
     addMetric(ctx, "下行波动率", formatPercent(risk.downsideVol), risk.downsideVol * 100);
     addMetric(ctx, "VaR (95%)", formatPercent(risk.var95), risk.var95 * 100);
     addMetric(ctx, "CVaR (95%)", formatPercent(risk.cvar95), risk.cvar95 * 100);
     addMetric(ctx, "最大回撤", formatPercent(risk.maxDrawdown), risk.maxDrawdown * 100);
-    addMetric(ctx, "最大回撤周期", `${risk.maxDdDays} days`, risk.maxDdDays);
+    addMetric(ctx, "最大回撤周期", `${risk.maxDdDays} periods`, risk.maxDdDays);
     addMetric(ctx, "偏度", risk.skewness.toFixed(3), risk.skewness);
     addMetric(ctx, "超额峰度", risk.kurtosis.toFixed(3), risk.kurtosis);
   } catch { /* insufficient valid returns: keep return metrics only */ }
 
   if (!klineRows) return;
   const closes = klineRows.map((row) => row.close);
-  addLatestSeriesMetric(ctx, "20日动量", momentum(closes, 20), true);
+  const periodLabel = ({ "周K": "周", "月K": "月", "季K": "季", "年K": "年" } as Record<string, string>)[ctx.klines[0]?.timeframe ?? ""] ?? "日";
+  addLatestSeriesMetric(ctx, `20${periodLabel}动量`, momentum(closes, 20), true);
   addLatestSeriesMetric(ctx, "RSI (14)", rsi(closes, 14), false);
   addLatestSeriesMetric(ctx, "SMA5/20 偏离", smaDeviation(closes, 5, 20), true);
-  addLatestSeriesMetric(ctx, "20日实现波动", volatility(closes, 20), true);
+  addLatestSeriesMetric(ctx, `20${periodLabel}实现波动`, volatility(closes, 20).map(value => value === null ? null : value * Math.sqrt(periodsPerYear / 252)), true);
   if (klineRows.every((row) => typeof row.vol === "number")) {
-    addLatestSeriesMetric(ctx, "20日量比", volumeRatio(klineRows.map((row) => row.vol!), 20), false);
+    addLatestSeriesMetric(ctx, `20${periodLabel}量比`, volumeRatio(klineRows.map((row) => row.vol!), 20), false);
   }
 }
 
@@ -420,43 +418,4 @@ export function normalizeRole(r: string): "user" | "assistant" | "tool" | null {
   if (r === "assistant") return "assistant";
   if (r === "toolResult") return "tool";
   return null;
-}
-
-function detectSourceUrls(title: string, entries: RawEntry[]): { label: string; url: string }[] {
-  const urls: { label: string; url: string }[] = [];
-  // Search title and all user messages for codes
-  const texts = [title];
-  for (const e of entries) {
-    if (e.type !== "message") continue;
-    const msg = e.message as Record<string, unknown> | undefined;
-    if (msg?.role === "user" || msg?.role === "displayUser") {
-      texts.push(extractText(msg.content));
-    }
-  }
-  const combined = texts.join(" ");
-
-  // Detect any 6-digit code (fund/ETF or stock)
-  const anyCode = combined.match(/\b(\d{6})\b/)?.[1];
-  const isFund = anyCode && /ETF|基金|联接|指数/.test(combined);
-  const isStock = anyCode && !isFund && /^[36]/.test(anyCode);
-
-  if (anyCode) {
-    if (isFund || (!isStock && /^[0158]/.test(anyCode))) {
-      urls.push({ label: "雪球", url: `https://danjuanfunds.com/funding/${anyCode}` });
-      urls.push({ label: "同花顺", url: `https://fund.10jqka.com.cn/${anyCode}/` });
-    } else if (isStock) {
-      urls.push({ label: "雪球", url: `https://xueqiu.com/S/${anyCode}` });
-      urls.push({ label: "同花顺", url: `https://stockpage.10jqka.com.cn/${anyCode}/` });
-    }
-  }
-  return urls;
-}
-
-function cleanPreview(text: string): string {
-  let clean = text.replace(/<skill\s[\s\S]*?\/skill>/g, "");
-  const commentIdx = clean.indexOf("<!--");
-  if (commentIdx > 0) clean = clean.slice(0, commentIdx);
-  clean = clean.replace(/\s+/g, " ").trim();
-  if (!clean) return "Untitled";
-  return clean.length > 80 ? clean.slice(0, 80) + "…" : clean;
 }

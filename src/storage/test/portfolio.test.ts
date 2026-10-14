@@ -132,14 +132,13 @@ describe("panel-portfolio storage", () => {
 
 describe("panel-portfolio groups", () => {
   it("migrates old format (symbols-only) to new format with default group", () => {
-    savePanelPortfolio({
+    writeFileSync(join(OHQ, "panel-portfolio.json"), JSON.stringify({
       updated: "2026-06-08",
       symbols: [
         { code: "510300.SH", name: "沪深300ETF", added: "2026-06-08" },
         { code: "159915.SZ", name: "创业板ETF", added: "2026-06-08" },
       ],
-      groups: [],
-    });
+    }));
     const loaded = loadPanelPortfolio();
     expect(loaded.groups).toBeDefined();
     expect(loaded.groups.length).toBe(1);
@@ -224,26 +223,27 @@ describe("panel-portfolio groups", () => {
         { code: "510300.SH", name: "沪深300ETF", added: "2026-06-08" },
       ],
       groups: [
-        { id: "group-1", name: "测试组", symbolCodes: ["510300.SH", "invalid", "99"] },
+        { id: "group-1", name: "测试组", symbolCodes: ["510300.SH", "bad/code", "99"] },
       ],
     });
     const loaded = loadPanelPortfolio();
     expect(loaded.groups[0].symbolCodes).toEqual(["510300.SH"]);
   });
 
-  it("filters out empty groups after validation", () => {
+  it("preserves empty groups after validation", () => {
     savePanelPortfolio({
       updated: "2026-06-08",
       symbols: [],
       groups: [
-        { id: "group-1", name: "空组", symbolCodes: ["invalid1", "invalid2"] },
+        { id: "group-1", name: "空组", symbolCodes: ["bad/code", "../bad"] },
         { id: "group-2", name: "有效组", symbolCodes: ["510300.SH"] },
       ],
     });
     const loaded = loadPanelPortfolio();
-    expect(loaded.groups.length).toBe(1);
-    expect(loaded.groups[0].id).toBe("group-2");
-    expect(loaded.groups[0].symbolCodes).toEqual(["510300.SH"]);
+    expect(loaded.groups.length).toBe(2);
+    expect(loaded.groups[0].symbolCodes).toEqual([]);
+    expect(loaded.groups[1].id).toBe("group-2");
+    expect(loaded.groups[1].symbolCodes).toEqual(["510300.SH"]);
   });
 
   it("persists and loads groups correctly", () => {

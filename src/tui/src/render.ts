@@ -1,13 +1,13 @@
 /**
  * Region renderers for the r2 full-screen docked TUI.
- * Each function is pure: (Buffer, Rect, AppState) → void.
+ * Insight loading is deferred until an active conversation actually displays it.
  */
 import { Buffer, truncate, sanitizeTerminalText, charWidth } from "./buffer.ts";
 import type { Style } from "./buffer.ts";
-import { S, HEADER_H, COMPOSER_H, STATUS_H, DIVIDER_CHAR, CANVAS } from "./styles.ts";
+import { S, HEADER_H, COMPOSER_H, STATUS_H, CANVAS } from "./styles.ts";
 import { fmtElapsed } from "./format.ts";
 import { drawHeader as drawHeaderChrome, drawComposer as drawComposerChrome, drawStatus as drawStatusChrome } from "./chrome.ts";
-import type { AppState, Layout, UIMessage, PanelSection } from "./types.ts";
+import type { Layout, UIMessage, PanelSection } from "../../types/ui.ts";
 import { getQuotes } from "../../insight/index.ts";
 import { buildConversationLines, type RenderLine } from "./render-lines.ts";
 import { buildOverviewLines, buildOverviewView, overviewContentHeight, overviewMaxScrollTop } from "./overview-render.ts";
@@ -114,20 +114,6 @@ function drawSelectableLine(
   }
 }
 
-function drawConversationLine(
-  buf: Buffer,
-  x: number,
-  y: number,
-  text: string,
-  style: Style,
-  maxW: number,
-  clipEnd: number,
-  lineIdx: number,
-  selection?: ConversationSelection | null,
-): void {
-  drawSelectableLine(buf, x, y, { text, style }, maxW, clipEnd, lineIdx, selection);
-}
-
 export function drawConversation(
   buf: Buffer,
   r: { x: number; y: number; w: number; h: number },
@@ -153,7 +139,7 @@ export function drawConversation(
   });
 
   if (msgs.length === 0 && activity !== "ready" && activity !== "compacting") {
-    drawLoadingOverlay(buf, inner, activity, clipEnd, LOADING_INSIGHTS, activityVerb);
+    drawLoadingOverlay(buf, inner, activity, clipEnd, loadingInsights ??= getQuotes(), activityVerb);
     return;
   }
 
@@ -187,7 +173,7 @@ export function activeConversationStatusRows(activity: string, msgs: UIMessage[]
   return activity !== "ready" && msgs.length > 0 ? Math.min(2, innerH) : 0;
 }
 
-const LOADING_INSIGHTS = getQuotes();
+let loadingInsights: ReturnType<typeof getQuotes> | undefined;
 const ORA_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 function oraFrame(): string {
@@ -195,8 +181,9 @@ function oraFrame(): string {
 }
 
 function thinkingQuote(): string {
-  const idx = Math.floor(Date.now() / 5000) % LOADING_INSIGHTS.length;
-  const q = LOADING_INSIGHTS[idx];
+  const quotes = loadingInsights ??= getQuotes();
+  const idx = Math.floor(Date.now() / 5000) % quotes.length;
+  const q = quotes[idx];
   return `"${q.quote}" — ${q.author}`;
 }
 

@@ -6,9 +6,9 @@ import { Type } from "typebox";
 import type { Static } from "typebox";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import type { AgentTool, AgentToolResult } from "../agent/src/pi/index.ts";
-import { executeShellWithCapture } from "../agent/src/pi/index.ts";
-import { NodeExecutionEnv } from "../agent/src/pi/node.ts";
+import type { AgentTool, AgentToolResult } from "../agent/src/session-runtime/index.ts";
+import { executeShellWithCapture } from "../agent/src/session-runtime/index.ts";
+import { NodeExecutionEnv } from "../agent/src/session-runtime/node.ts";
 import { shellDisplayName } from "./shell.ts";
 
 const DEFAULT_TIMEOUT_MS = 120_000;

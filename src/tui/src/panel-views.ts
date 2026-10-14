@@ -31,100 +31,21 @@ export function renderConfigPanelView(
   }
 
   buf.text(inner.x, frame.footerY, truncate(footer, inner.w), S.dim);
+  buf.text(inner.x, frame.footerY - 1, truncate(editorActive ? "Enter save · Esc cancel" : "Up/Down select · Enter change · Esc close", inner.w), S.gold);
   if (editorLine) {
     const lines = wrap(editorLine, inner.w).slice(0, 2);
-    const startY = frame.footerY - lines.length;
+    const startY = frame.footerY - 1 - lines.length;
     for (const [index, line] of lines.entries()) {
       buf.text(inner.x, startY + index, truncate(line, inner.w), editorActive ? { fg: GOLD_HIGHLIGHT } : S.dim);
     }
   }
 }
 
-export interface DoctorPhaseView {
-  phase: string;
-  status: string;
-  detail: string;
-  action?: string;
-  warnings?: string[];
-}
-
-export interface DoctorPanelView {
-  title: string;
-  status: string;
-  mode: string;
-  model: string;
-  baseUrl: string;
-  endpointMode: string;
-  dataSource: string;
-  settingsPath: string;
-  phases: DoctorPhaseView[];
-  actions?: string[];
-  hints: string[];
-  logPath?: string;
-}
-
-export function renderDoctorPanelView(
-  buf: Buffer,
-  frame: PanelFrame,
-  data: DoctorPanelView,
-): void {
-  const { inner } = frame;
-  let y = inner.y;
-  buf.text(inner.x, y, truncate(data.title, inner.w), S.code);
-  y++;
-  buf.text(inner.x, y, truncate(`status  ${data.status}  ·  mode  ${data.mode}`, inner.w), S.cream);
-  y++;
-  buf.text(inner.x, y, truncate(`model   ${data.model}`, inner.w), S.dim);
-  y++;
-  buf.text(inner.x, y, truncate(`base    ${data.baseUrl || "(not set)"}${data.endpointMode ? ` · ${data.endpointMode}` : ""}`, inner.w), S.dim);
-  y++;
-  buf.text(inner.x, y, truncate(`data    ${data.dataSource}`, inner.w), S.dim);
-  y++;
-  buf.text(inner.x, y, truncate(`path    ${data.settingsPath}`, inner.w), S.dim);
-  y += 2;
-
-  for (const [index, phase] of data.phases.entries()) {
-    if (y >= frame.footerY) break;
-    const prefix = phase.status === "pass" ? "✓" : phase.status === "fail" ? "✗" : phase.status === "checking" ? "⟳" : "○";
-    buf.text(inner.x, y, truncate(`${prefix} ${phase.phase}`, inner.w), phase.status === "fail" ? S.negative : phase.status === "pass" ? S.positive : S.cream);
-    y++;
-    if (phase.detail && y < frame.footerY) {
-      buf.text(inner.x + 2, y, truncate(phase.detail, inner.w - 2), S.dim);
-      y++;
-    }
-    if (phase.warnings && phase.warnings.length > 0) {
-      for (const warning of phase.warnings) {
-        if (y >= frame.footerY) break;
-        buf.text(inner.x + 2, y, truncate(`Warn · ${warning}`, inner.w - 2), S.gold);
-        y++;
-      }
-    }
-    if (phase.action && y < frame.footerY) {
-      buf.text(inner.x + 2, y, truncate(`Fix · ${phase.action}`, inner.w - 2), S.gold);
-      y++;
-    }
-    if (index < data.phases.length - 1 && y < frame.footerY) y++;
+function renderEmptyPanelView(buf: Buffer, frame: PanelFrame, message: string, footer: string): void {
+  for (const [index, line] of wrap(message, frame.inner.w).slice(0, frame.contentH).entries()) {
+    buf.text(frame.inner.x, frame.contentY + index, line, index === 0 ? S.cream : S.dim);
   }
-
-  if (data.actions && data.actions.length > 0 && y < frame.footerY) {
-    for (const action of data.actions) {
-      if (y >= frame.footerY) break;
-      buf.text(inner.x, y++, truncate(action, inner.w), S.gold);
-    }
-    if (y < frame.footerY) y++;
-  }
-
-  if (data.logPath && y < frame.footerY) {
-    buf.text(inner.x, y++, truncate(`Logs  ·  ${data.logPath}`, inner.w), S.dim);
-  }
-
-  if (data.hints.length > 0 && y < frame.footerY) {
-    buf.text(inner.x, y++, "Hints", S.creamB);
-    for (const hint of data.hints) {
-      if (y >= frame.footerY) break;
-      buf.text(inner.x, y++, truncate(`- ${hint}`, inner.w), S.dim);
-    }
-  }
+  buf.text(frame.inner.x, frame.footerY, truncate(footer, frame.inner.w), S.dim);
 }
 
 export interface ResumeListItemView {
@@ -150,41 +71,39 @@ export function renderResumePanelView(
     meta?: ResumeMetaView;
     items: ResumeListItemView[];
     footer: string;
+    emptyMessage?: string;
   },
 ): void {
   const { inner } = frame;
   let y = inner.y;
-  let metaRows = 0;
 
   if (data.meta) {
     buf.text(inner.x, y, truncate(data.meta.title, inner.w), S.code);
-    y++; metaRows++;
+    y++;
     if (data.meta.usageBar) {
-      buf.text(inner.x, y, data.meta.usageBar, data.meta.usageCritical ? S.goldB : S.cream);
-      y++; metaRows++;
+      buf.text(inner.x, y, truncate(data.meta.usageBar, inner.w), data.meta.usageCritical ? S.goldB : S.cream);
+      y++;
     }
     if (data.meta.stats) {
       buf.text(inner.x, y, truncate(data.meta.stats, inner.w), S.dim);
-      y++; metaRows++;
+      y++;
     }
     for (const line of data.meta.previewLines.slice(0, 3)) {
       buf.text(inner.x, y, truncate(line, inner.w), S.dim);
-      y++; metaRows++;
+      y++;
     }
     y++;
-    metaRows++;
   }
 
   if (data.items.length === 0) {
-    buf.text(inner.x, frame.contentY, "No saved sessions yet.", S.dim);
-    buf.text(inner.x, frame.footerY, truncate(data.footer, inner.w), S.dim);
+    renderEmptyPanelView(buf, frame, data.emptyMessage ?? "No saved sessions yet.", data.footer);
     return;
   }
 
-  const listHeight = Math.max(1, frame.contentH - metaRows);
+  y = Math.max(frame.contentY, y);
+  const listHeight = Math.max(1, frame.contentY + frame.contentH - y);
   const selectedIndex = Math.max(0, data.items.findIndex((item) => item.selected));
   const start = Math.max(0, Math.min(selectedIndex - Math.floor(listHeight / 2), data.items.length - listHeight));
-  y = Math.max(frame.contentY, y);
   for (const item of data.items.slice(start, start + listHeight)) {
     const prefix = item.selected ? "❯ " : "  ";
     const divider = " ─ ";
@@ -196,64 +115,6 @@ export function renderResumePanelView(
 
   buf.text(inner.x, frame.footerY, truncate(data.footer, inner.w), S.dim);
 }
-
-export interface PortfolioItemView {
-  age: string;
-  name: string;
-  selected: boolean;
-  active: boolean;
-}
-
-export interface PortfolioMetaView {
-  title: string;
-  details: string;
-  subdetails: string;
-}
-
-export function renderPortfolioPanelView(
-  buf: Buffer,
-  frame: PanelFrame,
-  data: {
-    meta?: PortfolioMetaView;
-    items: PortfolioItemView[];
-    footer: string;
-  },
-): void {
-  const { inner } = frame;
-  let y = inner.y;
-  let metaRows = 0;
-
-  if (data.meta) {
-    buf.text(inner.x, y, truncate(data.meta.title, inner.w), S.code);
-    y++; metaRows++;
-    buf.text(inner.x, y, truncate(data.meta.details, inner.w), S.dim);
-    y++; metaRows++;
-    buf.text(inner.x, y, truncate(data.meta.subdetails, inner.w), S.dim);
-    y++; metaRows++;
-    y++;
-    metaRows++;
-  }
-
-  if (data.items.length === 0) {
-    buf.text(inner.x, frame.contentY, "No local portfolios yet.", S.dim);
-    buf.text(inner.x, frame.footerY, truncate(data.footer, inner.w), S.dim);
-    return;
-  }
-
-  const listHeight = Math.max(1, frame.contentH - metaRows);
-  const selectedIndex = Math.max(0, data.items.findIndex((item) => item.selected));
-  const start = Math.max(0, Math.min(selectedIndex - Math.floor(listHeight / 2), data.items.length - listHeight));
-  y = Math.max(frame.contentY, y);
-  for (const item of data.items.slice(start, start + listHeight)) {
-    const prefix = item.selected ? "❯ " : "  ";
-    const marker = item.active ? " ●" : "  ";
-    const text = `${prefix}${item.age}${marker}  ${item.name}`;
-    buf.text(inner.x, y++, truncate(text, inner.w), item.selected ? S.goldB : S.cream);
-  }
-
-  buf.text(inner.x, frame.footerY, truncate(data.footer, inner.w), S.dim);
-}
-
 
 export interface ArtifactItemView {
   age: string;
@@ -275,33 +136,31 @@ export function renderArtifactPanelView(
     meta?: ArtifactMetaView;
     items: ArtifactItemView[];
     footer: string;
+    emptyMessage?: string;
   },
 ): void {
   const { inner } = frame;
   let y = inner.y;
-  let metaRows = 0;
 
   if (data.meta) {
     buf.text(inner.x, y, truncate(data.meta.title, inner.w), S.code);
-    y++; metaRows++;
-    buf.text(inner.x, y, truncate(data.meta.details, inner.w), S.dim);
-    y++; metaRows++;
-    buf.text(inner.x, y, truncate(data.meta.subdetails, inner.w), S.dim);
-    y++; metaRows++;
     y++;
-    metaRows++;
+    buf.text(inner.x, y, truncate(data.meta.details, inner.w), S.dim);
+    y++;
+    buf.text(inner.x, y, truncate(data.meta.subdetails, inner.w), S.dim);
+    y++;
+    y++;
   }
 
   if (data.items.length === 0) {
-    buf.text(inner.x, frame.contentY, "No artifacts yet.", S.dim);
-    buf.text(inner.x, frame.footerY, truncate(data.footer, inner.w), S.dim);
+    renderEmptyPanelView(buf, frame, data.emptyMessage ?? "No artifacts yet.", data.footer);
     return;
   }
 
-  const listHeight = Math.max(1, frame.contentH - metaRows);
+  y = Math.max(frame.contentY, y);
+  const listHeight = Math.max(1, frame.contentY + frame.contentH - y);
   const selectedIndex = Math.max(0, data.items.findIndex((item) => item.selected));
   const start = Math.max(0, Math.min(selectedIndex - Math.floor(listHeight / 2), data.items.length - listHeight));
-  y = Math.max(frame.contentY, y);
   for (const item of data.items.slice(start, start + listHeight)) {
     const prefix = item.selected ? "❯ " : "  ";
     const left = `${prefix}${item.age}  ${item.title}`;
@@ -319,36 +178,28 @@ export function renderHelpPanelView(
     commands: { name: string; desc: string; selected: boolean }[];
     hotkeys: { key: string; desc: string }[];
     footer: string;
+    section?: "commands" | "hotkeys";
+    hotkeySelection?: number;
+    controls?: string;
+    actionHint?: string;
   },
 ): void {
   const { inner } = frame;
-  // Command descriptions carry the primary navigation meaning; give them
-  // enough room to remain useful at the default panel width.
-  const midX = inner.x + Math.floor(inner.w * 0.56);
-  const leftW = midX - inner.x - 1;
-  const rightW = inner.x + inner.w - midX - 1;
-
-  buf.text(inner.x, inner.y, "Commands", S.creamB);
-  let y = inner.y + 1;
-  for (const cmd of data.commands) {
-    if (y >= frame.footerY) break;
-    const prefix = cmd.selected ? "▶" : " ";
-    buf.text(inner.x, y, `${prefix}${truncate(cmd.name, 11)}`, S.goldB);
-    buf.text(inner.x + 13, y, truncate(cmd.desc, leftW - 13), cmd.selected ? S.creamB : S.cream);
-    y++;
+  const hotkeys = data.section === "hotkeys";
+  const items = hotkeys ? data.hotkeys.map(item => ({ name: item.key, desc: item.desc })) : data.commands;
+  const selected = hotkeys ? data.hotkeySelection ?? 0 : Math.max(0, data.commands.findIndex(item => item.selected));
+  // One full-width list leaves both command meanings and shortcut labels readable.
+  const count = Math.max(1, frame.footerY - inner.y - 3);
+  const start = Math.max(0, Math.min(selected - Math.floor(count / 2), items.length - count));
+  const labelWidth = hotkeys ? 18 : 13;
+  buf.text(inner.x, inner.y, truncate(hotkeys ? "Commands / [Hotkeys]" : "[Commands] / Hotkeys", inner.w), S.creamB);
+  for (const [offset, item] of items.slice(start, start + count).entries()) {
+    const active = start + offset === selected;
+    const y = inner.y + 1 + offset;
+    buf.text(inner.x, y, truncate(`${active ? ">" : " "} ${item.name}`, labelWidth), active ? S.goldB : S.gold);
+    buf.text(inner.x + labelWidth, y, truncate(item.desc, inner.w - labelWidth), active ? S.creamB : S.cream);
   }
-
-  for (let r = inner.y; r < frame.footerY; r++) {
-    buf.set(midX, r, "│", S.rule);
-  }
-
-  buf.text(midX + 1, inner.y, "Hotkeys", S.creamB);
-  y = inner.y + 1;
-  for (const item of data.hotkeys) {
-    if (y >= frame.footerY) break;
-    buf.text(midX + 1, y, truncate(item.key, 16), S.goldB);
-    buf.text(midX + 18, y, truncate(item.desc, rightW - 18), S.cream);
-    y++;
-  }
+  buf.text(inner.x, frame.footerY - 2, truncate(data.actionHint ?? "Enter run · ? usage", inner.w), S.gold);
+  buf.text(inner.x, frame.footerY - 1, truncate(data.controls ?? "Up/Down select · Tab switch · Esc close", inner.w), S.dim);
   buf.text(inner.x, frame.footerY, truncate(data.footer, inner.w), S.dim);
 }

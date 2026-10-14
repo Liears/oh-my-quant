@@ -3,8 +3,11 @@
  * Ported from benchmark/scripts/score.py
  */
 
-const TRADING_DAYS = 252;
-const RF = 0.02;
+import { annualReturn, calendarYears, maxDrawdown, sharpe, validateReturns } from "./performance.ts";
+
+export const BENCHMARK_PRICE_BASIS = "Each series uses its provider close without FX conversion; excess CAGR is a quoted-price return spread, not a common-currency investor return.";
+export const BENCHMARK_PRICE_BASIS_ID = "provider-close-no-fx";
+export const DEFAULT_BENCHMARK_SYMBOL = "000300.SH";
 
 export interface BenchmarkScores {
   totalScore: number;
@@ -19,14 +22,22 @@ export interface BenchmarkScores {
 export interface BenchmarkDetails {
   cagr: number;
   excessReturn: number;
-  sharpe: number;
+  sharpe: number | null;
   maxDrawdown: number;
-  calmar: number;
+  calmar: number | null;
   cvar95: number;
 }
 
 interface DailyReturnLike {
   returns: number[];
+  /** N + 1 valuation dates for N period returns. */
+  dates?: string[];
+}
+
+function annualized(series: DailyReturnLike): number {
+  if (series.dates && series.dates.length !== series.returns.length + 1)
+    throw new Error("Valuation dates must bracket every return.");
+  return annualReturn(series.returns, series.dates ? { elapsedYears: calendarYears(series.dates) } : {});
 }
 
 /**
@@ -38,16 +49,22 @@ export function evaluate(
   train?: DailyReturnLike,
   test?: DailyReturnLike,
 ): BenchmarkScores {
-  const stratReturns = strategy.returns.filter((r) => !isNaN(r));
-  const benchReturns = benchmark.returns.filter((r) => !isNaN(r));
+  const stratReturns = strategy.returns;
+  const benchReturns = benchmark.returns;
+  validateReturns(stratReturns);
+  validateReturns(benchReturns);
+  if (stratReturns.length !== benchReturns.length ||
+      Boolean(strategy.dates) !== Boolean(benchmark.dates) ||
+      strategy.dates?.some((date, i) => date !== benchmark.dates?.[i]))
+    throw new Error("Strategy and benchmark must have identical valuation periods.");
 
-  const cagr = computeCAGR(stratReturns);
-  const benchCagr = computeCAGR(benchReturns);
+  const cagr = annualized(strategy);
+  const benchCagr = annualized(benchmark);
   const excess = cagr - benchCagr;
 
-  const sharpeVal = computeSharpe(stratReturns);
-  const maxDD = computeMaxDrawdown(stratReturns);
-  const calmarVal = maxDD !== 0 ? cagr / Math.abs(maxDD) : 0;
+  const sharpeVal = sharpe(stratReturns);
+  const maxDD = maxDrawdown(stratReturns);
+  const calmarVal = maxDD !== 0 ? cagr / Math.abs(maxDD) : null;
 
   const sorted = [...stratReturns].sort((a, b) => a - b);
   const cvar95 = sorted
@@ -70,18 +87,20 @@ export function evaluate(
   else if (excess > 0) returnScore += 5;
 
   // Positive month ratio (10 max, scaled)
-  const posMonths = positiveMonthRatio(stratReturns);
+  const posMonths = positiveMonthRatio(stratReturns, strategy.dates);
   returnScore += Math.min(posMonths * 10, 10);
 
   // --- Risk Score (40) ---
   let riskScore = 0;
 
   // Sharpe (15 max)
-  if (sharpeVal > 2) riskScore += 15;
-  else if (sharpeVal > 1.5) riskScore += 12;
-  else if (sharpeVal > 1) riskScore += 8;
-  else if (sharpeVal > 0.5) riskScore += 4;
-  else if (sharpeVal > 0) riskScore += 2;
+  if (sharpeVal !== null) {
+    if (sharpeVal > 2) riskScore += 15;
+    else if (sharpeVal > 1.5) riskScore += 12;
+    else if (sharpeVal > 1) riskScore += 8;
+    else if (sharpeVal > 0.5) riskScore += 4;
+    else if (sharpeVal > 0) riskScore += 2;
+  }
 
   // Max drawdown (15 max)
   if (maxDD > -0.05) riskScore += 15;
@@ -90,9 +109,11 @@ export function evaluate(
   else if (maxDD > -0.35) riskScore += 4;
 
   // Calmar (5 max)
-  if (calmarVal > 2) riskScore += 5;
-  else if (calmarVal > 1) riskScore += 3;
-  else if (calmarVal > 0.5) riskScore += 1;
+  if (calmarVal !== null) {
+    if (calmarVal > 2) riskScore += 5;
+    else if (calmarVal > 1) riskScore += 3;
+    else if (calmarVal > 0.5) riskScore += 1;
+  }
 
   // CVaR (5 max)
   if (cvar95 > -0.03) riskScore += 5;
@@ -101,12 +122,10 @@ export function evaluate(
   // --- Robustness Score (20) ---
   let robustnessScore = 0;
 
+  if (Boolean(train) !== Boolean(test)) throw new Error("Training and test returns must be provided together.");
   if (train && test) {
-    const trainReturns = train.returns.filter((r) => !isNaN(r));
-    const testReturns = test.returns.filter((r) => !isNaN(r));
-
-    const trainCagr = computeCAGR(trainReturns);
-    const testCagr = computeCAGR(testReturns);
+    const trainCagr = annualized(train);
+    const testCagr = annualized(test);
 
     if (trainCagr > 0 && testCagr > 0) {
       const ratio = testCagr / trainCagr;
@@ -114,9 +133,9 @@ export function evaluate(
       else if (ratio > 0.3) robustnessScore += 5;
     }
 
-    const testSharpe = computeSharpe(testReturns);
-    const trainSharpe = computeSharpe(trainReturns);
-    const sharpeDecay = trainSharpe > 0 ? 1 - testSharpe / trainSharpe : 1;
+    const testSharpe = sharpe(test.returns);
+    const trainSharpe = sharpe(train.returns);
+    const sharpeDecay = trainSharpe !== null && trainSharpe > 0 && testSharpe !== null ? 1 - testSharpe / trainSharpe : 1;
     if (sharpeDecay < 0.3) robustnessScore += 10;
     else if (sharpeDecay < 0.5) robustnessScore += 5;
   } else {
@@ -147,9 +166,9 @@ export function evaluate(
     details: {
       cagr: Math.round(cagr * 10000) / 10000,
       excessReturn: Math.round(excess * 10000) / 10000,
-      sharpe: Math.round(sharpeVal * 100) / 100,
+      sharpe: sharpeVal === null ? null : Math.round(sharpeVal * 100) / 100,
       maxDrawdown: Math.round(maxDD * 10000) / 10000,
-      calmar: Math.round(calmarVal * 100) / 100,
+      calmar: calmarVal === null ? null : Math.round(calmarVal * 100) / 100,
       cvar95: Math.round(cvar95 * 10000) / 10000,
     },
   };
@@ -157,46 +176,26 @@ export function evaluate(
 
 // --- Helpers ---
 
-function computeCAGR(returns: number[]): number {
-  if (returns.length === 0) return 0;
-  const growth = returns.reduce((a, r) => a * (1 + r), 1);
-  return growth ** (TRADING_DAYS / returns.length) - 1;
-}
-
-function computeSharpe(returns: number[]): number {
-  if (returns.length < 2) return 0;
-  const excess = returns.map((r) => r - RF / TRADING_DAYS);
-  const mean = excess.reduce((a, b) => a + b, 0) / excess.length;
-  const variance = excess.reduce((s, v) => s + (v - mean) ** 2, 0) / (excess.length - 1);
-  const std = Math.sqrt(variance);
-  return std > 0 ? (mean / std) * Math.sqrt(TRADING_DAYS) : 0;
-}
-
-function computeMaxDrawdown(returns: number[]): number {
-  let cum = 1;
-  let peak = 1;
-  let maxDD = 0;
-  for (const r of returns) {
-    cum *= 1 + r;
-    if (cum > peak) peak = cum;
-    const dd = (cum - peak) / peak;
-    if (dd < maxDD) maxDD = dd;
-  }
-  return maxDD;
-}
-
 function percentile(sorted: number[], p: number): number {
   const idx = Math.max(0, Math.ceil(p * sorted.length) - 1);
   return sorted[idx];
 }
 
-function positiveMonthRatio(returns: number[]): number {
-  // Approximate monthly returns from daily (rough split into months)
+function positiveMonthRatio(returns: number[], dates?: string[]): number {
+  if (dates) {
+    const months = new Map<string, number>();
+    for (let i = 0; i < returns.length; i++) {
+      const month = dates[i + 1].slice(0, 7);
+      months.set(month, (months.get(month) ?? 1) * (1 + returns[i]));
+    }
+    return [...months.values()].filter(growth => growth > 1).length / months.size;
+  }
+  // Undated input: explicitly approximate each month as 21 observations.
   if (returns.length < 21) return 0;
   const monthSize = 21;
   let posMonths = 0;
   let totalMonths = 0;
-  for (let i = monthSize; i < returns.length; i += monthSize) {
+  for (let i = monthSize; i <= returns.length; i += monthSize) {
     const slice = returns.slice(i - monthSize, i);
     const monthReturn = slice.reduce((a, b) => a * (1 + b), 1) - 1;
     if (monthReturn > 0) posMonths++;

@@ -3,6 +3,10 @@
  * Ported from skills/factor/scripts/compute.py
  */
 
+import { rsi } from "./rsi.ts";
+import { mean as arithmeticMean, sampleDeviation, standardScores } from "./statistics.ts";
+export { rsi } from "./rsi.ts";
+
 /** N-period cumulative return */
 export function momentum(close: number[], n = 20): (number | null)[] {
   const result: (number | null)[] = new Array(close.length).fill(null);
@@ -31,38 +35,8 @@ export function volumeRatio(volume: number[], n = 20): (number | null)[] {
   const result: (number | null)[] = new Array(volume.length).fill(null);
   for (let i = n - 1; i < volume.length; i++) {
     const slice = volume.slice(i - n + 1, i + 1);
-    const mean = slice.reduce((a, b) => a + b, 0) / n;
+    const mean = arithmeticMean(slice);
     result[i] = mean > 0 ? volume[i] / mean : null;
-  }
-  return result;
-}
-
-/** Relative Strength Index */
-export function rsi(close: number[], n = 14): (number | null)[] {
-  const result: (number | null)[] = new Array(close.length).fill(null);
-  if (close.length < n + 1) return result;
-
-  const deltas: number[] = [];
-  for (let i = 1; i < close.length; i++) {
-    deltas.push(close[i] - close[i - 1]);
-  }
-
-  const gains: number[] = deltas.map((d) => (d > 0 ? d : 0));
-  const losses: number[] = deltas.map((d) => (d < 0 ? -d : 0));
-
-  let avgGain = gains.slice(0, n).reduce((a, b) => a + b, 0) / n;
-  let avgLoss = losses.slice(0, n).reduce((a, b) => a + b, 0) / n;
-
-  for (let i = n; i < close.length; i++) {
-    if (avgLoss === 0) {
-      result[i] = 100;
-    } else {
-      const rs = avgGain / avgLoss;
-      result[i] = 100 - 100 / (1 + rs);
-    }
-    // Wilder's smoothing
-    avgGain = (avgGain * (n - 1) + gains[i - 1]) / n;
-    avgLoss = (avgLoss * (n - 1) + losses[i - 1]) / n;
   }
   return result;
 }
@@ -72,7 +46,7 @@ export function smaDeviation(close: number[], short = 5, long = 20): (number | n
   const shortMA = rollingMean(close, short);
   const longMA = rollingMean(close, long);
   const result: (number | null)[] = new Array(close.length).fill(null);
-  for (let i = long - 1; i < close.length; i++) {
+  for (let i = Math.max(short, long) - 1; i < close.length; i++) {
     if (longMA[i] && longMA[i] !== 0) {
       result[i] = (shortMA[i]! - longMA[i]!) / longMA[i]!;
     }
@@ -104,12 +78,9 @@ export function standardize(series: (number | null)[]): (number | null)[] {
   const valid = series.filter((v): v is number => v !== null);
   if (valid.length < 2) return [...series];
 
-  const mean = valid.reduce((a, b) => a + b, 0) / valid.length;
-  const variance = valid.reduce((s, v) => s + (v - mean) ** 2, 0) / (valid.length - 1);
-  const std = Math.sqrt(variance);
-  if (std === 0) return series.map(() => 0);
-
-  return series.map((v) => (v !== null ? (v - mean) / std : null));
+  const scores = standardScores(valid);
+  let index = 0;
+  return series.map(value => value === null ? null : scores[index++]!);
 }
 
 // --- Utilities ---
@@ -117,13 +88,13 @@ export function standardize(series: (number | null)[]): (number | null)[] {
 function rollingMean(values: (number | null)[], n: number): (number | null)[] {
   const result: (number | null)[] = new Array(values.length).fill(null);
   for (let i = n - 1; i < values.length; i++) {
-    let sum = 0;
+    const window: number[] = [];
     let ok = true;
     for (let j = i - n + 1; j <= i; j++) {
       if (values[j] === null) { ok = false; break; }
-      sum += values[j]!;
+      window.push(values[j]!);
     }
-    if (ok) result[i] = sum / n;
+    if (ok) result[i] = arithmeticMean(window);
   }
   return result;
 }
@@ -138,9 +109,7 @@ function rollingStd(values: (number | null)[], n: number): (number | null)[] {
       window.push(values[j]!);
     }
     if (!ok || window.length < 2) continue;
-    const mean = window.reduce((a, b) => a + b, 0) / window.length;
-    const variance = window.reduce((s, v) => s + (v - mean) ** 2, 0) / (window.length - 1);
-    result[i] = Math.sqrt(variance);
+    result[i] = sampleDeviation(window);
   }
   return result;
 }
@@ -156,6 +125,20 @@ export const FACTOR_NAMES = [
 ] as const;
 
 export type FactorName = (typeof FACTOR_NAMES)[number];
+
+/** Shared preparation/verification minimum, including the fixed SMA(5) window. */
+export function factorRequiredBars(factor: FactorName, period: number): number {
+  return Math.max(period + 1, factor === "sma_deviation" ? 5 : 0);
+}
+
+/** Latest observation compared with preceding valid observations. */
+export function summarizeFactor(values: Array<number | null>): { last: number | undefined; mean: number | null; percentile: number | null } {
+  const previous = values.filter((value): value is number => value !== null);
+  const last = previous.pop();
+  const mean = previous.length ? arithmeticMean(previous) : null;
+  const percentile = last !== undefined && previous.length ? previous.filter(value => value <= last).length / previous.length : null;
+  return { last, mean, percentile };
+}
 
 /** Compute a factor by name */
 export function computeFactor(

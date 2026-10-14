@@ -11,6 +11,7 @@ export const WHYJ_ENV_KEY_ALIASES = {
   tushareToken: ["WHYJ_QUANT_TUSHARE_TOKEN", "TUSHARE_TOKEN"],
   financialDatasetsKey: ["WHYJ_QUANT_FINANCIAL_DATASETS_KEY", "FINANCIAL_DATASETS_KEY"],
   llmquantApiKey: ["WHYJ_QUANT_LLMQUANT_API_KEY", "LLMQUANT_API_KEY"],
+  akquantPython: ["WHYJ_QUANT_AKQUANT_PYTHON"],
 } as const;
 
 const WHYJ_ENV_KEY_NAMES = new Set<string>(

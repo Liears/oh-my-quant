@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { resolveCopyText } from "../src/tui-copy.ts";
 import type { ConversationView } from "../src/selection.ts";
-import type { UIMessage } from "../src/types.ts";
+import type { UIMessage } from "../../types/ui.ts";
 
 const view: ConversationView = {
   inner: { x: 0, y: 0, w: 20, h: 3 },

@@ -1,12 +1,9 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import manifest from "../package.json";
 import { AppRuntime, createInitialAppState } from "./app-runtime.ts";
 import { QuantTui } from "./tui/src/tui.ts";
-import { ensureDefaultSkills } from "./skill/index.ts";
 
 export async function startApp(): Promise<void> {
-  ensureDefaultSkills();
-  const initial = createInitialAppState(getPkgVersion());
+  const initial = createInitialAppState(manifest.version);
   let tui: QuantTui | null = null;
 
   const runtime = new AppRuntime({
@@ -18,19 +15,25 @@ export async function startApp(): Promise<void> {
     onConfigRequest: () => tui?.openConfig(),
     onDoctorRequest: (doctor) => tui?.openDoctor(doctor),
     onResumeRequest: (meta) => tui?.openResume(meta),
+    onResearchRequest: snapshot => tui?.openResearch(snapshot),
     onPortfolioRequest: () => tui?.openPortfolio(),
     onArtifactRequest: () => tui?.openArtifact(),
     onHelpRequest: () => tui?.openHelp(),
     onSessionRequest: (meta) => tui?.syncCurrentSessionMeta(meta),
     onPanel: (panel, panelLoading = false) => tui?.update({ panel, panelLoading }),
     onHud: (hud) => tui?.update({ hud }),
+    onModel: (model) => tui?.update(model),
+    onSkillsChanged: () => { void tui?.refreshSkills(() => runtime.getSkillSuggestions()); },
   });
 
   tui = new QuantTui(initial);
+  tui.onDoctorClose(() => runtime.cancelDoctor());
+  tui.onConfigurationChange(() => runtime.refreshConfiguration());
   tui.start();
 
   try {
     const snapshot = await runtime.bootstrap();
+    await tui.refreshSkills(() => runtime.getSkillSuggestions());
     tui.update({
       model: snapshot.model,
       modelLabel: snapshot.modelLabel,
@@ -53,14 +56,19 @@ export async function startApp(): Promise<void> {
   tui.onSubmit(async (input: string) => {
     const result = await runtime.submit(input);
     if (result === "exit") {
-      runtime.dispose();
+      await runtime.shutdown();
       tui!.stop();
       process.exit(0);
     }
   });
 
+  void runtime.startSkillInstallation();
+
   tui.onArtifactRestore((reportId) => {
     void runtime.restoreArtifact(reportId);
+  });
+  tui.onPrivateAnnualExport((request) => {
+    void runtime.exportPrivateAnnual(request);
   });
 
   tui.onPanelRefresh(() => {
@@ -72,13 +80,3 @@ export async function startApp(): Promise<void> {
     tui?.stop();
   });
 }
-
-function getPkgVersion(): string {
-  try {
-    const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8"));
-    return pkg.version || "1.2.0";
-  } catch {
-    return "1.2.0";
-  }
-}
-

@@ -7,7 +7,21 @@ export interface MarketSymbol {
 
 export function baseCode(symbol: string): string {
   const text = symbol.trim();
-  return text.split(".")[0] || text;
+  return text.replace(/\.(SH|SZ|BJ|OF|HK)$/i, "");
+}
+
+export function isMarketSymbol(symbol: string): boolean {
+  return /^(?:\d{6}(?:\.(?:SH|SZ|BJ|OF))?|\d{4,5}\.HK|[A-Z][A-Z0-9]*(?:[.-][A-Z0-9]+)*)$/i.test(symbol);
+}
+
+/** Keep exchange and instrument identity intact across provider and cache keys. */
+export function normalizeSymbol(symbol: string, market: Market = inferMarket(symbol)): string {
+  const text = symbol.trim().toUpperCase();
+  if (!isMarketSymbol(text)) throw new Error(`Invalid market symbol: ${symbol}`);
+  const normalized = market !== "A" || !/^\d{6}$/.test(text) ? text
+    : /^[56]/.test(text) ? `${text}.SH` : /^[48]/.test(text) ? `${text}.BJ` : `${text}.SZ`;
+  if (inferMarket(normalized) !== market) throw new Error(`Symbol ${normalized} does not match market ${market}.`);
+  return normalized;
 }
 
 export function inferMarket(symbol: string): Market {
@@ -18,5 +32,5 @@ export function inferMarket(symbol: string): Market {
 }
 
 export function isAIndexSymbol(symbol: string): boolean {
-  return /^\d{6}(\.(SH|SZ|BJ))?$/i.test(symbol.trim());
+  return /^(?:000\d{3}\.SH|399\d{3}(?:\.SZ)?|000300)$/i.test(symbol.trim());
 }

@@ -11,8 +11,10 @@ import {
   type FundRiskAnalysisRow,
 } from "../source/index.ts";
 import { ok } from "./shared/results.ts";
+import { archiveFundNav } from "../storage/index.ts";
+import { normalizeFundNav, normalizeFundSymbol } from "../market/fund-nav.ts";
+import type { FundNavEndpoint } from "../types/fund-data.ts";
 import {
-  formatCell,
   formatRecordPreview,
   textValue,
 } from "./shared/row-preview.ts";
@@ -46,16 +48,17 @@ type FundFeeRequestArgs = Static<typeof FundFeeRequest>;
 export interface AkshareFundToolRegistration {
   name: string;
   label: string;
+  endpoint?: string;
 }
 
-function profileSourceCandidates(): SourceCandidate<Record<string, unknown>>[] {
+function profileSourceCandidates(signal?: AbortSignal): SourceCandidate<Record<string, unknown>>[] {
   return [
     {
       id: "eastmoney",
       provider: "eastmoney",
       endpoint: "fund_overview_em",
       fetch: async (symbol) => {
-        const data = await fetchAkshareRows("fund_overview_em", { symbol });
+        const data = await fetchAkshareRows("fund_overview_em", { symbol }, signal);
         return data.rows[0] ? { ...data.rows[0] } : {};
       },
       isHit: (value) => Object.keys(value).length > 0,
@@ -64,26 +67,32 @@ function profileSourceCandidates(): SourceCandidate<Record<string, unknown>>[] {
       id: "ths",
       provider: "ths",
       endpoint: "fund_info_ths",
-      fetch: async (symbol) => keyValueRows(await fetchAkshareRows("fund_info_ths", { symbol }), "字段", "值"),
+      fetch: async (symbol) => keyValueRows(await fetchAkshareRows("fund_info_ths", { symbol }, signal), "字段", "值"),
       isHit: (value) => Object.keys(value).length > 0,
     },
     {
       id: "xq",
       provider: "xq",
       endpoint: "fund_individual_basic_info_xq",
-      fetch: async (symbol) => keyValueRows(await fetchAkshareRows("fund_individual_basic_info_xq", { symbol }), "item", "value"),
+      fetch: async (symbol) => keyValueRows(await fetchAkshareRows("fund_individual_basic_info_xq", { symbol }, signal), "item", "value"),
       isHit: (value) => Object.keys(value).length > 0,
     },
   ];
 }
 
-function navSourceCandidates(): SourceCandidate<FundNavDaily[]>[] {
+function navSourceCandidates(signal?: AbortSignal): SourceCandidate<FundNavDaily[]>[] {
+  let openFundEndpoint: FundNavEndpoint = "fund_open_fund_info_em";
   return [
     {
       id: "open_fund_em",
       provider: "eastmoney",
       endpoint: "fund_open_fund_info_em",
-      fetch: async (symbol) => (await fetchAkshareFundNav(symbol)).nav,
+      fetch: async (symbol) => {
+        const data = await fetchAkshareFundNav(symbol, signal);
+        openFundEndpoint = data.endpoint ?? "fund_open_fund_info_em";
+        return normalizeFundNav(symbol, data.nav);
+      },
+      endpointFor: () => openFundEndpoint,
       isHit: (value) => value.length > 0,
     },
     {
@@ -92,7 +101,7 @@ function navSourceCandidates(): SourceCandidate<FundNavDaily[]>[] {
       endpoint: "fund_etf_fund_info_em",
       fetch: async (symbol) => normalizeNavRows(
         symbol,
-        (await fetchAkshareRows("fund_etf_fund_info_em", { fund: symbol, start_date: "20000101", end_date: "20500101" })).rows,
+        (await fetchAkshareRows("fund_etf_fund_info_em", { fund: symbol, start_date: "20000101", end_date: "20500101" }, signal)).rows,
         "akshare:fund_etf_fund_info_em",
       ),
       isHit: (value) => value.length > 0,
@@ -103,7 +112,7 @@ function navSourceCandidates(): SourceCandidate<FundNavDaily[]>[] {
       endpoint: "fund_graded_fund_info_em",
       fetch: async (symbol) => normalizeNavRows(
         symbol,
-        (await fetchAkshareRows("fund_graded_fund_info_em", { symbol })).rows,
+        (await fetchAkshareRows("fund_graded_fund_info_em", { symbol }, signal)).rows,
         "akshare:fund_graded_fund_info_em",
       ),
       isHit: (value) => value.length > 0,
@@ -114,7 +123,7 @@ function navSourceCandidates(): SourceCandidate<FundNavDaily[]>[] {
       endpoint: "fund_financial_fund_info_em",
       fetch: async (symbol) => normalizeNavRows(
         symbol,
-        (await fetchAkshareRows("fund_financial_fund_info_em", { symbol })).rows,
+        (await fetchAkshareRows("fund_financial_fund_info_em", { symbol }, signal)).rows,
         "akshare:fund_financial_fund_info_em",
       ),
       isHit: (value) => value.length > 0,
@@ -122,58 +131,58 @@ function navSourceCandidates(): SourceCandidate<FundNavDaily[]>[] {
   ];
 }
 
-function purchaseSourceCandidates(): SourceCandidate<Record<string, unknown>>[] {
+function purchaseSourceCandidates(signal?: AbortSignal): SourceCandidate<Record<string, unknown>>[] {
   return [
     {
       id: "eastmoney_purchase",
       provider: "eastmoney",
       endpoint: "fund_purchase_em",
-      fetch: async (symbol) => filterAkshareFundRows((await fetchAkshareRows("fund_purchase_em")).rows, { fund_code: symbol })[0] ?? {},
+      fetch: async (symbol) => filterAkshareFundRows((await fetchAkshareRows("fund_purchase_em", {}, signal)).rows, { fund_code: symbol })[0] ?? {},
       isHit: (value) => Object.keys(value).length > 0,
     },
     {
       id: "eastmoney_open_daily",
       provider: "eastmoney",
       endpoint: "fund_open_fund_daily_em",
-      fetch: async (symbol) => filterAkshareFundRows((await fetchAkshareRows("fund_open_fund_daily_em")).rows, { fund_code: symbol })[0] ?? {},
+      fetch: async (symbol) => filterAkshareFundRows((await fetchAkshareRows("fund_open_fund_daily_em", {}, signal)).rows, { fund_code: symbol })[0] ?? {},
       isHit: (value) => Object.keys(value).length > 0,
     },
     {
       id: "ths_qdii_daily",
       provider: "ths",
       endpoint: "fund_etf_category_ths",
-      fetch: async (symbol) => filterAkshareFundRows((await fetchAkshareRows("fund_etf_category_ths", { symbol: "QDII" })).rows, { fund_code: symbol })[0] ?? {},
+      fetch: async (symbol) => filterAkshareFundRows((await fetchAkshareRows("fund_etf_category_ths", { symbol: "QDII" }, signal)).rows, { fund_code: symbol })[0] ?? {},
       isHit: (value) => Object.keys(value).length > 0,
     },
   ];
 }
 
-function feeSourceCandidates(indicator: string): SourceCandidate<Record<string, unknown>[]>[] {
+function feeSourceCandidates(indicator: string, signal?: AbortSignal): SourceCandidate<Record<string, unknown>[]>[] {
   return [
     {
       id: "eastmoney_fee",
       provider: "eastmoney",
       endpoint: "fund_fee_em",
-      fetch: async (symbol) => (await fetchAkshareRows("fund_fee_em", { symbol, indicator })).rows,
+      fetch: async (symbol) => (await fetchAkshareRows("fund_fee_em", { symbol, indicator }, signal)).rows,
       isHit: (value) => value.length > 0,
     },
     {
       id: "xq_trade_rule",
       provider: "xq",
       endpoint: "fund_individual_detail_info_xq",
-      fetch: async (symbol) => filterFeeRows((await fetchAkshareRows("fund_individual_detail_info_xq", { symbol })).rows, indicator),
+      fetch: async (symbol) => filterFeeRows((await fetchAkshareRows("fund_individual_detail_info_xq", { symbol }, signal)).rows, indicator),
       isHit: (value) => value.length > 0,
     },
   ];
 }
 
-function performanceSourceCandidates(): SourceCandidate<FundAchievementRow[]>[] {
+function performanceSourceCandidates(signal?: AbortSignal): SourceCandidate<FundAchievementRow[]>[] {
   return [
     {
       id: "xq_achievement",
       provider: "xq",
       endpoint: "fund_individual_achievement_xq",
-      fetch: async (symbol) => (await fetchAkshareRows("fund_individual_achievement_xq", { symbol })).rows.map(rowToAchievement),
+      fetch: async (symbol) => (await fetchAkshareRows("fund_individual_achievement_xq", { symbol }, signal)).rows.map(rowToAchievement),
       isHit: (value) => value.length > 0,
     },
     {
@@ -181,7 +190,7 @@ function performanceSourceCandidates(): SourceCandidate<FundAchievementRow[]>[] 
       provider: "eastmoney",
       endpoint: "fund_open_fund_rank_em",
       fetch: async (symbol) => {
-        const row = filterAkshareFundRows((await fetchAkshareRows("fund_open_fund_rank_em", { symbol: "全部" })).rows, { fund_code: symbol })[0];
+        const row = filterAkshareFundRows((await fetchAkshareRows("fund_open_fund_rank_em", { symbol: "全部" }, signal)).rows, { fund_code: symbol })[0];
         return row ? rankRowToAchievements(row) : [];
       },
       isHit: (value) => value.length > 0,
@@ -209,7 +218,7 @@ function mergeRecordsByPriority(records: Array<Record<string, unknown>>): Record
 }
 
 function normalizeNavRows(symbol: string, rows: Record<string, unknown>[], source: string): FundNavDaily[] {
-  return rows.map((row) => {
+  return normalizeFundNav(symbol, rows.map((row) => {
     const navDate = textValue(row["净值日期"] ?? row["日期"]);
     const unitNav = numberOrNull(row["单位净值"] ?? row["当前-单位净值"] ?? row["最新-单位净值"]);
     if (!navDate || unitNav == null) return null;
@@ -222,7 +231,7 @@ function normalizeNavRows(symbol: string, rows: Record<string, unknown>[], sourc
       isOpenDay: true,
       source,
     };
-  }).filter((row): row is FundNavDaily => Boolean(row));
+  }).filter((row): row is FundNavDaily => Boolean(row)));
 }
 
 function filterFeeRows(rows: Record<string, unknown>[], indicator: string): Record<string, unknown>[] {
@@ -280,12 +289,14 @@ function numberOrNull(value: unknown): number | null {
 
 export const akshareFundNavTool: AgentTool<typeof FundSymbolWithPriority> = {
   name: "akshare_fund_nav",
-  description: "Live AKShare fund NAV curve with source priority and fallback. No cache.",
+  description: "Live AKShare fund NAV curve with source priority, fallback and immutable public observation references.",
   label: "AKShare Fund NAV",
   parameters: FundSymbolWithPriority,
   executionMode: "sequential",
-  async execute(_id: string, args: FundSymbolWithPriorityArgs): Promise<AgentToolResult<unknown>> {
-    const result = await runFirstSource(args.symbol, args.source_priority, navSourceCandidates());
+  async execute(_id: string, args: FundSymbolWithPriorityArgs, signal?: AbortSignal): Promise<AgentToolResult<unknown>> {
+    signal?.throwIfAborted();
+    const symbol = normalizeFundSymbol(args.symbol);
+    const result = await runFirstSource(symbol.slice(0, 6), args.source_priority, navSourceCandidates(signal), signal);
     const nav = result.value ?? [];
     const latest = nav[nav.length - 1];
     if (!latest) {
@@ -294,6 +305,8 @@ export const akshareFundNavTool: AgentTool<typeof FundSymbolWithPriority> = {
         { tool: "Tool.akshare.fund.nav", symbol: args.symbol, navCurve: [], sourceAttempts: result.attempts },
       );
     }
+    const dataset = await archiveFundNav(symbol, nav, result.candidate!.endpoint as FundNavEndpoint, new Date().toISOString(), null, signal);
+    signal?.throwIfAborted();
     return ok(
       [
         `Fund NAV   ${args.symbol}`,
@@ -308,6 +321,7 @@ export const akshareFundNavTool: AgentTool<typeof FundSymbolWithPriority> = {
         tool: "Tool.akshare.fund.nav",
         provider: "akshare",
         endpoint: result.candidate?.endpoint,
+        dataset,
         symbol: args.symbol,
         latestNav: latest,
         navCurve: nav,
@@ -324,8 +338,9 @@ export const akshareFundProfileTool: AgentTool<typeof FundSymbolWithPriority> = 
   label: "AKShare Fund Profile",
   parameters: FundSymbolWithPriority,
   executionMode: "sequential",
-  async execute(_id: string, args: FundSymbolWithPriorityArgs): Promise<AgentToolResult<unknown>> {
-    const result = await runAllSources(args.symbol, args.source_priority, profileSourceCandidates());
+  async execute(_id: string, args: FundSymbolWithPriorityArgs, signal?: AbortSignal): Promise<AgentToolResult<unknown>> {
+    signal?.throwIfAborted();
+    const result = await runAllSources(args.symbol, args.source_priority, profileSourceCandidates(signal), signal);
     const profile = mergeRecordsByPriority(result.values.map((entry) => entry.value));
     const fund = normalizeFundCard({
       symbol: args.symbol,
@@ -366,8 +381,9 @@ export const akshareFundPurchaseTool: AgentTool<typeof FundSymbolWithPriority> =
   label: "AKShare Fund Purchase",
   parameters: FundSymbolWithPriority,
   executionMode: "sequential",
-  async execute(_id: string, args: FundSymbolWithPriorityArgs): Promise<AgentToolResult<unknown>> {
-    const result = await runFirstSource(args.symbol, args.source_priority, purchaseSourceCandidates());
+  async execute(_id: string, args: FundSymbolWithPriorityArgs, signal?: AbortSignal): Promise<AgentToolResult<unknown>> {
+    signal?.throwIfAborted();
+    const result = await runFirstSource(args.symbol, args.source_priority, purchaseSourceCandidates(signal), signal);
     const p = result.value ?? {};
     return ok(
       [
@@ -398,9 +414,10 @@ export const akshareFundFeeTool: AgentTool<typeof FundFeeRequest> = {
   label: "AKShare Fund Fee",
   parameters: FundFeeRequest,
   executionMode: "sequential",
-  async execute(_id: string, args: FundFeeRequestArgs): Promise<AgentToolResult<unknown>> {
+  async execute(_id: string, args: FundFeeRequestArgs, signal?: AbortSignal): Promise<AgentToolResult<unknown>> {
+    signal?.throwIfAborted();
     const indicator = args.indicator || "申购费率（前端）";
-    const result = await runFirstSource(args.symbol, args.source_priority, feeSourceCandidates(indicator));
+    const result = await runFirstSource(args.symbol, args.source_priority, feeSourceCandidates(indicator, signal), signal);
     const rows = result.value ?? [];
     return ok(
       [
@@ -428,14 +445,15 @@ export const akshareFundPerformanceTool: AgentTool<typeof FundSymbolWithPriority
   label: "AKShare Fund Performance",
   parameters: FundSymbolWithPriority,
   executionMode: "sequential",
-  async execute(_id: string, args: FundSymbolWithPriorityArgs): Promise<AgentToolResult<unknown>> {
-    const result = await runFirstSource(args.symbol, args.source_priority, performanceSourceCandidates());
+  async execute(_id: string, args: FundSymbolWithPriorityArgs, signal?: AbortSignal): Promise<AgentToolResult<unknown>> {
+    signal?.throwIfAborted();
+    const result = await runFirstSource(args.symbol, args.source_priority, performanceSourceCandidates(signal), signal);
     const riskResult = await runFirstSource<FundRiskAnalysisRow[]>(args.symbol, args.source_priority, [
       {
         id: "xq_analysis",
         provider: "xq",
         endpoint: "fund_individual_analysis_xq",
-        fetch: async (symbol) => (await fetchAkshareRows("fund_individual_analysis_xq", { symbol })).rows.map((row) => ({
+        fetch: async (symbol) => (await fetchAkshareRows("fund_individual_analysis_xq", { symbol }, signal)).rows.map((row) => ({
           period: textValue(row["周期"]),
           riskReturnScore: numberOrNull(row["较同类风险收益比"]),
           antiVolatilityScore: numberOrNull(row["较同类抗风险波动"]),
@@ -445,7 +463,7 @@ export const akshareFundPerformanceTool: AgentTool<typeof FundSymbolWithPriority
         })),
         isHit: (value) => value.length > 0,
       },
-    ]);
+    ], signal);
     const periods = pickStagePeriods(result.value ?? []);
     const sourceAttempts = [...result.attempts, ...riskResult.attempts];
     return ok(

@@ -1,14 +1,16 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
-import { FileError, loadSourcedSkills, type ExecutionEnv, type FileInfo, type Result, type Skill, type SkillDiagnostic } from "./pi/index.ts";
-import type { NodeExecutionEnv } from "./pi/node.ts";
+import { FileError, loadSourcedSkills, type ExecutionEnv, type FileInfo, type Result, type Skill, type SkillDiagnostic } from "./session-runtime/index.ts";
+import type { NodeExecutionEnv } from "./session-runtime/node.ts";
 import type { SkillIntegrationSettings } from "../../types/config.ts";
 import { perfLog, perfNow } from "../../perf.ts";
+import type { SkillReadiness } from "../../types/skills.ts";
 
 export interface QuantSkill extends Skill {
+  readiness?: SkillReadiness;
   scope: "project" | "user";
-  source: "agents" | "claude" | "codex" | "pi";
+  source: "agents" | "claude" | "codex" | "pi" | "extension";
   sourcePath: string;
 }
 
@@ -34,6 +36,14 @@ export interface DiscoverSkillsOptions {
 type DiscoverSkillsResult = { skills: QuantSkill[]; diagnostics: QuantSkillDiagnostic[]; sources: SkillSource[] };
 
 const discoveryCache = new Map<string, Promise<DiscoverSkillsResult>>();
+let discoveryRevision = 0;
+
+export function invalidateSkillDiscovery(): void {
+  discoveryCache.clear();
+  discoveryRevision++;
+}
+
+export function skillDiscoveryRevision(): number { return discoveryRevision; }
 
 export async function discoverSkills(
   options: DiscoverSkillsOptions,
@@ -58,7 +68,7 @@ export async function discoverSkills(
       return result;
     })
     .catch((error) => {
-      discoveryCache.delete(cacheKey);
+      if (discoveryCache.get(cacheKey) === loading) discoveryCache.delete(cacheKey);
       throw error;
     });
   if (process.env.WHYJ_SKILL_CACHE?.toLowerCase() !== "off") discoveryCache.set(cacheKey, loading);

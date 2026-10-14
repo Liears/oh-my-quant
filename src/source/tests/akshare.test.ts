@@ -124,7 +124,7 @@ describe("AKShare bar routing contract", () => {
     expect(AKSCRIPT).toContain('json.dumps({"bars": [], "endpoint": None, "attempts": attempts})');
     expect(AKSCRIPT).toContain("sys.exit(0)");
     expect(AKSCRIPT).toContain('df["volume"] = df["amount"]');
-    expect(AKSCRIPT).toContain('df["amount"] = 0');
+    expect(AKSCRIPT).toContain('df["amount"] = None');
   });
 });
 

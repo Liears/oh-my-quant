@@ -3,6 +3,8 @@
  * Pure functions: no GenCtx dependency, operate on raw text only.
  */
 import { esc } from "./template.ts";
+import { tableValueClass } from "./semantic-colors.ts";
+import { displayedNumber } from "../../types/metric-semantics.ts";
 import type { KlineData, OhlcRow, Card, ScoreTable, FactorBar, FactorSeries } from "./types.ts";
 
 // ── K-line detection (multi-timeframe) ──
@@ -171,11 +173,12 @@ export function renderDataTable(st: ScoreTable): string {
 
   const tb = data.map((row) =>
     `<tr>${row.map((c, i) => {
-      if (!numCols.has(i)) return `<td>${esc(c)}</td>`;
+      const label = i === 1 && /^(value|值|数值)?$/i.test(header[i] ?? "") ? row[0] ?? "" : header[i] ?? "";
+      if (!numCols.has(i)) return `<td class="${displayedNumber(c) !== null ? "n " : ""}${tableValueClass(c, label)}">${esc(c)}</td>`;
       const v = parseFloat(c.replace(/[%,+¥$]/g, ""));
       if (isNaN(v)) return `<td class="n">${esc(c)}</td>`;
-      const cls = v > 0.001 ? " p" : v < -0.001 ? " ng" : " m";
-      return `<td class="n${cls}">${esc(c)}</td>`;
+      const cls = tableValueClass(c, label);
+      return `<td class="n ${cls}">${esc(c)}</td>`;
     }).join("")}</tr>`
   ).join("");
 

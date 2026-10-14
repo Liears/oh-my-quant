@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildArtifactPanelData, buildHelpPanelData, buildPortfolioPanelData, buildResumePanelData } from "../src/panel-models.ts";
+import { buildArtifactPanelData, buildHelpPanelData, buildResumePanelData } from "../src/panel-models.ts";
 
 describe("panel models", () => {
   it("builds resume panel data with current-session usage and legacy archive markers", () => {
@@ -101,48 +101,6 @@ describe("panel models", () => {
     expect(data.meta?.stats).toContain("Branches 2");
   });
 
-  it("builds portfolio panel data with active markers and empty footer fallback", () => {
-    const data = buildPortfolioPanelData({
-      items: [
-        {
-          fileName: "holdings.json",
-          filePath: "C:\\repo\\.ohquant\\portfolio\\holdings.json",
-          name: "主组合",
-          updated: "2026-06-18T00:00:00.000Z",
-          strategy: "Core",
-          riskTag: "Medium",
-          instrument: "fund",
-          count: 3,
-          focusSectors: ["AI"],
-          holdings: [],
-        },
-      ],
-      selection: 0,
-      activeFile: "holdings.json",
-      status: "",
-      formatRelativeAge: () => "2h ago",
-    });
-
-    expect(data.meta?.title).toContain("Active: 主组合");
-    expect(data.items[0]?.active).toBe(true);
-    expect(data.footer).toContain("1 portfolio");
-  });
-
-  it("builds portfolio panel data with an actionable empty footer", () => {
-    const data = buildPortfolioPanelData({
-      items: [],
-      selection: 0,
-      activeFile: "holdings.json",
-      status: "",
-      formatRelativeAge: () => "-",
-    });
-
-    expect(data.meta).toBeUndefined();
-    expect(data.items).toEqual([]);
-    expect(data.footer).toContain(".ohquant/portfolio/");
-  });
-
-
   it("builds artifact panel data with selected metadata", () => {
     const data = buildArtifactPanelData({
       items: [
@@ -168,6 +126,6 @@ describe("panel models", () => {
     const data = buildHelpPanelData(0);
     expect(data.commands.some((cmd) => cmd.selected)).toBe(true);
     expect(data.hotkeys.some((key) => key.key === "Ctrl+P")).toBe(true);
-    expect(data.footer).toBe("");
+    expect(data.footer).toBe("Usage: /help compact");
   });
 });

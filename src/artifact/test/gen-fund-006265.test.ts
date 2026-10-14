@@ -2,7 +2,6 @@
  * Integration test: 红土创新新科技股票A (006265)
  * Full dashboard per Danjuan Funds spec — all sections
  */
-import { HS300_MONTHLY, TECH_BENCHMARK_MONTHLY, buildBenchmarkSeries } from "./benchmarks.ts";
 import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { generateArtifact } from "../src/generator.ts";
 import { saveArtifact } from "../../storage/src/artifacts.ts";

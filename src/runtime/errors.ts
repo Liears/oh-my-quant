@@ -2,6 +2,15 @@ export function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/** Never display raw I/O/parser errors near credential editors. */
+export function settingsSaveError(err: unknown): string {
+  const code = (err as NodeJS.ErrnoException | null)?.code;
+  if (code === "ESTORAGECONFLICT") return "Settings changed. Reopen /config; draft not saved.";
+  if (code === "ELOCKED") return "Settings busy. Retry Save; draft not saved.";
+  if (code === "ESTORAGEFORMAT") return "Settings invalid. Repair settings.json; draft not saved.";
+  return "Could not save settings. Check file permissions and retry.";
+}
+
 export function formatSlashRuntimeError(command: string, err: unknown): string {
   const message = errorText(err);
   if (/^Session not found:/i.test(message)) {
@@ -46,11 +55,11 @@ function agentErrorHint(message: string): string | null {
   ) {
     return "Agent API endpoint is unreachable. Check the local API service/port, proxy settings, and the configured base URL.";
   }
-  if (/\b(401|403|unauthorized|forbidden|invalid api key|missing api key)\b/i.test(message)) {
-    return "Check WHYJ_QUANT_API_KEY and WHYJ_QUANT_BASE_URL in /config. WHYJ_QUANT_AUTH_TOKEN is kept for legacy setups.";
+  if (/\b(401|403|unauthorized|forbidden|invalid api key|missing api key|missing model credentials)\b/i.test(message)) {
+    return "Open /config → Model and check the selected provider's API key or Provider setup, then run Save & Verify.";
   }
   if (/\b(404|model not found|not_found)\b/i.test(message)) {
-    return "Check the configured model and provider endpoint. If WHYJ_QUANT_BASE_URL points to /anthropic, the runtime will use Anthropic Messages automatically, but the model name still has to exist on that endpoint.";
+    return "Open /config → Model and check the exact model ID. In Connection details, confirm the base URL and protocol match the service, then run Save & Verify.";
   }
   if (/\b(429|rate limit|too many requests)\b/i.test(message)) {
     return "The provider is rate limiting requests. Wait briefly or switch to another configured model/provider.";

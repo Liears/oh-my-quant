@@ -2,6 +2,8 @@ export interface SourceCandidate<T> {
   id: string;
   provider: string;
   endpoint: string;
+  /** A candidate can resolve a different concrete route during its internal fallback. */
+  endpointFor?: (value: T) => string;
   fetch: (symbol: string) => Promise<T>;
   isHit: (value: T) => boolean;
 }
@@ -25,21 +27,27 @@ export async function runFirstSource<T>(
   symbol: string,
   sourcePriority: string | undefined,
   candidates: SourceCandidate<T>[],
+  signal?: AbortSignal,
 ): Promise<SourceResult<T>> {
+  signal?.throwIfAborted();
   const attempts: SourceAttempt[] = [];
   for (const candidate of orderCandidates(candidates, sourcePriority)) {
+    signal?.throwIfAborted();
     try {
       const value = await candidate.fetch(symbol);
+      signal?.throwIfAborted();
       const hit = candidate.isHit(value);
+      const resolved = { ...candidate, endpoint: candidate.endpointFor?.(value) ?? candidate.endpoint };
       attempts.push({
         id: candidate.id,
         provider: candidate.provider,
-        endpoint: candidate.endpoint,
+        endpoint: resolved.endpoint,
         status: hit ? "ok" : "empty",
         rows: valueCount(value),
       });
-      if (hit) return { candidate, value, attempts };
+      if (hit) return { candidate: resolved, value, attempts };
     } catch (error) {
+      signal?.throwIfAborted();
       attempts.push({
         id: candidate.id,
         provider: candidate.provider,
@@ -56,22 +64,28 @@ export async function runAllSources<T>(
   symbol: string,
   sourcePriority: string | undefined,
   candidates: SourceCandidate<T>[],
+  signal?: AbortSignal,
 ): Promise<{ values: Array<{ candidate: SourceCandidate<T>; value: T }>; attempts: SourceAttempt[] }> {
+  signal?.throwIfAborted();
   const values: Array<{ candidate: SourceCandidate<T>; value: T }> = [];
   const attempts: SourceAttempt[] = [];
   for (const candidate of orderCandidates(candidates, sourcePriority)) {
+    signal?.throwIfAborted();
     try {
       const value = await candidate.fetch(symbol);
+      signal?.throwIfAborted();
       const hit = candidate.isHit(value);
+      const resolved = { ...candidate, endpoint: candidate.endpointFor?.(value) ?? candidate.endpoint };
       attempts.push({
         id: candidate.id,
         provider: candidate.provider,
-        endpoint: candidate.endpoint,
+        endpoint: resolved.endpoint,
         status: hit ? "ok" : "empty",
         rows: valueCount(value),
       });
-      if (hit) values.push({ candidate, value });
+      if (hit) values.push({ candidate: resolved, value });
     } catch (error) {
+      signal?.throwIfAborted();
       attempts.push({
         id: candidate.id,
         provider: candidate.provider,

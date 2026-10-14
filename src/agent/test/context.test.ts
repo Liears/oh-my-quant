@@ -6,19 +6,16 @@ describe("BASE_SYSTEM_PROMPT", () => {
     expect(BASE_SYSTEM_PROMPT).toContain("quantitative finance analyst");
   });
 
-  it("lists local data tools", () => {
-    expect(BASE_SYSTEM_PROMPT).toContain("fetch_bars");
-    expect(BASE_SYSTEM_PROMPT).toContain("AKShare");
-    expect(BASE_SYSTEM_PROMPT).toContain("search_symbols");
-    expect(BASE_SYSTEM_PROMPT).toContain("fetch_snapshot");
+  it("uses actual request schemas as the capability contract", () => {
+    expect(BASE_SYSTEM_PROMPT).toContain("parameter schemas in this request");
+    expect(BASE_SYSTEM_PROMPT).toContain("Registration alone does not verify dependencies");
+    expect(BASE_SYSTEM_PROMPT).not.toMatch(/fetch_bars|search_symbols|fetch_snapshot/);
   });
 
-  it("lists computation tools", () => {
-    expect(BASE_SYSTEM_PROMPT).toContain("compute_factor");
-    expect(BASE_SYSTEM_PROMPT).toContain("run_backtest");
-    expect(BASE_SYSTEM_PROMPT).toContain("check_risk");
-    expect(BASE_SYSTEM_PROMPT).toContain("score_benchmark");
-    expect(BASE_SYSTEM_PROMPT).toContain("show_dashboard");
+  it("preserves task boundaries without advertising unselected computation tools", () => {
+    expect(BASE_SYSTEM_PROMPT).toContain("Do not add unrelated metrics, change dates, substitute engines");
+    expect(BASE_SYSTEM_PROMPT).toContain("substitute shell access to bypass disabled capabilities");
+    expect(BASE_SYSTEM_PROMPT).not.toMatch(/compute_factor|run_backtest|check_risk|score_benchmark|show_dashboard/);
   });
 
   it("forbids markdown formatting", () => {
@@ -32,25 +29,23 @@ describe("BASE_SYSTEM_PROMPT", () => {
 
   it("contains financial terminology guidance", () => {
     expect(BASE_SYSTEM_PROMPT).toContain("annualized return");
-    expect(BASE_SYSTEM_PROMPT).toContain("momentum premium");
+    expect(BASE_SYSTEM_PROMPT).toContain("historical percentiles do not establish future returns or mean reversion");
     expect(BASE_SYSTEM_PROMPT).toContain("tail risk");
     expect(BASE_SYSTEM_PROMPT).toContain("tracking error");
   });
 
   it("contains workflow rules", () => {
-    expect(BASE_SYSTEM_PROMPT).toContain("Fetch price data first");
-    expect(BASE_SYSTEM_PROMPT).toContain("data → factor → backtest → risk → benchmark");
+    expect(BASE_SYSTEM_PROMPT).toContain("Use the matching enabled tool directly");
+    expect(BASE_SYSTEM_PROMPT).toContain("Keep source, observation date and stale-cache status visible");
   });
 
   it("contains structured tool-result preservation guidance", () => {
     expect(BASE_SYSTEM_PROMPT).toContain("Structured Tool Result Handling");
     expect(BASE_SYSTEM_PROMPT).toContain("three-line plain-text table");
     expect(BASE_SYSTEM_PROMPT).toContain("must not use vertical bars");
-    expect(BASE_SYSTEM_PROMPT).toContain("run_backtest");
-    expect(BASE_SYSTEM_PROMPT).toContain("Total return, CAGR, Sharpe, Max DD, Win rate, P/L ratio");
-    expect(BASE_SYSTEM_PROMPT).toContain("check_risk");
-    expect(BASE_SYSTEM_PROMPT).toContain("VaR, CVaR, Max DD, Skew/Kurt");
-    expect(BASE_SYSTEM_PROMPT).toContain("show_dashboard");
+    expect(BASE_SYSTEM_PROMPT).toContain("Preserve the tool's labeled result rows");
+    expect(BASE_SYSTEM_PROMPT).toContain("Do not rename reported metrics");
+    expect(BASE_SYSTEM_PROMPT).toContain("time-weighted return/drawdown");
     expect(BASE_SYSTEM_PROMPT).toContain("do not replace the leaderboard with a one-line summary");
   });
 
@@ -61,29 +56,32 @@ describe("BASE_SYSTEM_PROMPT", () => {
     expect(BASE_SYSTEM_PROMPT).toContain("Figure icons");
     expect(BASE_SYSTEM_PROMPT).toContain("⌁ for trend/line/equity curve");
     expect(BASE_SYSTEM_PROMPT).toContain("▥ for bars/volume/histogram");
-    expect(BASE_SYSTEM_PROMPT).toContain("EQ, BM, α, DD");
+    expect(BASE_SYSTEM_PROMPT).toContain("EQ, BM, EXCESS (pp), DD");
   });
 
-  it("lists shell tool", () => {
-    expect(BASE_SYSTEM_PROMPT).toContain("bash:");
+  it("does not advertise shell execution when no tools are supplied", () => {
+    expect(buildSystemPrompt()).toContain("Current active tools: none.");
+    expect(buildSystemPrompt()).not.toContain("## Shell execution");
   });
 
   it("requires temporary shell artifacts to use system temp directories", () => {
-    expect(BASE_SYSTEM_PROMPT).toContain("Never place temporary scripts or scratch outputs in the current working directory");
-    expect(BASE_SYSTEM_PROMPT).toContain("$env:TEMP");
-    expect(BASE_SYSTEM_PROMPT).toContain("$env:TMP");
-    expect(BASE_SYSTEM_PROMPT).toContain("/tmp");
+    const prompt = buildSystemPrompt(undefined, [], [{ name: "bash" }]);
+    expect(prompt).toContain("Never place temporary scripts or scratch outputs in the current working directory");
+    expect(prompt).toContain("$env:TEMP");
+    expect(prompt).toContain("$env:TMP");
+    expect(prompt).toContain("/tmp");
   });
 
   it("constrains Windows shell calls to PowerShell syntax", () => {
-    expect(BASE_SYSTEM_PROMPT).toContain("PowerShell.*");
-    expect(BASE_SYSTEM_PROMPT).toContain("ls -la");
-    expect(BASE_SYSTEM_PROMPT).toContain("Get-ChildItem -Force");
-    expect(BASE_SYSTEM_PROMPT).toContain("cmd1 && cmd2");
-    expect(BASE_SYSTEM_PROMPT).toContain("cmd1; cmd2");
-    expect(BASE_SYSTEM_PROMPT).toContain("Get-Content path -Tail N");
-    expect(BASE_SYSTEM_PROMPT).toContain("Get-Content path -Encoding utf8");
-    expect(BASE_SYSTEM_PROMPT).toContain("foreach ($x in @(...))");
+    const prompt = buildSystemPrompt(undefined, [], [{ name: "bash" }]);
+    expect(prompt).toContain("PowerShell.*");
+    expect(prompt).toContain("ls -la");
+    expect(prompt).toContain("Get-ChildItem -Force");
+    expect(prompt).toContain("cmd1 && cmd2");
+    expect(prompt).toContain("cmd1; cmd2");
+    expect(prompt).toContain("Get-Content path -Tail N");
+    expect(prompt).toContain("Get-Content path -Encoding utf8");
+    expect(prompt).toContain("foreach ($x in @(...))");
   });
 });
 
@@ -160,7 +158,7 @@ describe("injectTurnContext", () => {
     expect(result).toContain("compact aligned three-line plain-text table");
     expect(result).toContain("do not use vertical bars");
     expect(result).toContain("use figure icons");
-    expect(result).toContain("EQ, BM, α, DD");
+    expect(result).toContain("EQ, BM, EXCESS (pp), DD");
     expect(result).toContain("sparkline rows");
     expect(result).toContain("last_symbol: 510300.SH");
   });
@@ -176,16 +174,16 @@ describe("injectTurnContext", () => {
         resultShape: null,
       },
     });
-    expect(result).toContain("total return, CAGR, Sharpe, max drawdown, win rate, P/L ratio");
+    expect(result).toContain("total return, CAGR, Sharpe, max drawdown, up-period ratio, period P/L ratio");
     expect(result).toContain("preserve VaR/CVaR and drawdown lines explicitly");
-    expect(result).toContain("<!-- mandatory quant analysis workflow -->");
+    expect(result).toContain("<!-- quant analysis workflow -->");
     expect(result).toContain("TECHNICAL INDICATORS");
     expect(result).toContain("RISK METRICS");
-    expect(result).toContain("compute_factor for momentum(20), rsi(14), sma_deviation(20), and volatility(20)");
-    expect(result).toContain("call check_risk");
+    expect(result).toContain("Do not expand a backtest-only or risk-only task");
+    expect(result).not.toMatch(/call compute_factor|call check_risk/);
   });
 
-  it("injects the mandatory technical and risk workflow for a symbol analysis", () => {
+  it("suggests technical and risk analysis while preserving explicit criteria and parameters", () => {
     const result = injectTurnContext("分析中际旭创 300308 的近期走势", {
       lastSymbol: null,
       lastMarket: null,
@@ -194,7 +192,8 @@ describe("injectTurnContext", () => {
       recentToolState: { toolName: null, resultShape: null },
     });
     expect(result).toContain("relevant installed quant/risk/trading skill");
-    expect(result).toContain("fetch_bars");
+    expect(result).toContain("Use enabled tools and their schemas");
+    expect(result).toContain("Explicit task criteria and user parameters take precedence");
     expect(result).toContain("volume_ratio(20)");
     expect(result).toContain("VaR(95/99)");
     expect(result).toContain("Never invent a metric");
@@ -208,7 +207,7 @@ describe("injectTurnContext", () => {
       lastEndDate: null,
       recentToolState: { toolName: null, resultShape: null },
     });
-    expect(result).not.toContain("<!-- mandatory quant analysis workflow -->");
+    expect(result).not.toContain("<!-- quant analysis workflow -->");
   });
 
   it("adds figure guidance for quant chart terms without saying chart", () => {
@@ -224,7 +223,7 @@ describe("injectTurnContext", () => {
     });
     expect(result).toContain("<!-- render guidance -->");
     expect(result).toContain("▥ bars/volume/histogram");
-    expect(result).toContain("EQ, BM, α, DD");
+    expect(result).toContain("EQ, BM, EXCESS (pp), DD");
   });
 
   it("uses last tool name to shape a generic follow-up", () => {
@@ -289,5 +288,12 @@ describe("injectSkillContext", () => {
     expect(result).toContain("Preserve score rows, ranking rows, risk rows, and backtest metric rows");
     expect(result).toContain("<!-- quant skill analysis contract -->");
     expect(result).toContain("technical factors → risk metrics");
+  });
+
+  it("keeps macro report source provenance and the SHY/TLT proxy explicit", () => {
+    const result = injectSkillContext("macro-regime-detector");
+    expect(result).toContain("metadata.data_source");
+    expect(result).toContain("FMP API on a yfinance-only run");
+    expect(result).toContain("SHY/TLT is a yield-curve proxy");
   });
 });

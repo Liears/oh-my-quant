@@ -2,13 +2,19 @@
  * Shared types for the artifact module.
  *
  * Contains data models for session parsing, content detection, rendering,
- * and trajectory (per docs/artifacts-design.md sections 7-8).
+ * and trajectory (per docs/quant-harness/artifacts-design.md sections 7-8).
  */
+
+import type { ReportProvenance } from "../../types/research-evidence.ts";
+import type { Bar, DatasetRef } from "../../types/data.ts";
+import type { FundNavDatasetRef, FundNavSnapshot } from "../../types/fund-data.ts";
+import type { MarketColorScheme } from "../../types/theme-colors.ts";
+import type { PortfolioComparisonArtifact } from "../../types/portfolio-comparison.ts";
 
 // ── Public API ──
 
-export interface GenerateArtifactInput { sessionPath: string; title?: string }
-export interface GenerateArtifactResult { html: string; title: string; sessionId: string; messageCount: number }
+export interface GenerateArtifactInput { sessionPath: string; title?: string; leafId?: string | null; marketColorScheme?: MarketColorScheme; resolveDataset?: (ref: DatasetRef) => Bar[]; resolveFundDataset?: (ref: FundNavDatasetRef) => FundNavSnapshot; resolveComparison?: (id: string) => PortfolioComparisonArtifact }
+export interface GenerateArtifactResult { html: string; title: string; sessionId: string; messageCount: number; provenance: ReportProvenance }
 
 // ── Generator context ──
 
@@ -45,7 +51,7 @@ export interface NavRow { date: string; nav: number; bm?: number; hs300?: number
 export type RawEntry = { type: string } & Record<string, unknown>;
 export interface ContentBlock { type?: string; id?: string; text?: string; thinking?: string; name?: string; arguments?: unknown }
 
-// ── Trajectory (docs/artifacts-design.md section 7-8) ──
+// ── Trajectory (docs/quant-harness/artifacts-design.md section 7-8) ──
 
 export type TrajectoryEventType =
   | "user_request"

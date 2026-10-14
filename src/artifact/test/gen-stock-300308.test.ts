@@ -122,7 +122,6 @@ function candleAnalysis(): string {
   }
 
   const totalRet = (allBars[n - 1]!.c / allBars[0]!.c - 1) * 100;
-  const ytdRet = ((allBars[n - 1]!.c - allBars[0]!.c) / allBars[0]!.c * 100);
   const align = (m5[n - 1] ?? 0) > (m10[n - 1] ?? 0) && (m10[n - 1] ?? 0) > (m20[n - 1] ?? 0) ? "多头排列(看涨)" : (m5[n - 1] ?? 0) < (m10[n - 1] ?? 0) ? "空头排列(看跌)" : "均线缠绕(震荡)";
 
   return [

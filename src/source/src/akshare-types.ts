@@ -1,5 +1,6 @@
-import type { Bar, FundNavDaily } from "../../types/data.ts";
-import type { AkshareBarSource, AksharePublicFundEndpoint, AksharePublicIndexEndpoint } from "./akshare-endpoints.ts";
+import type { Bar, FundNavDaily, PriceAdjustment } from "../../types/data.ts";
+import type { FundNavEndpoint } from "../../types/fund-data.ts";
+import type { AksharePublicFundEndpoint, AksharePublicIndexEndpoint } from "./akshare-endpoints.ts";
 
 export type AkshareIndexConstituentEndpoint =
   | "index_stock_cons_csindex"
@@ -82,12 +83,14 @@ export type { AkshareBarSource } from "./akshare-endpoints.ts";
 export type AkshareBarInstrument = "stock" | "fund" | "index" | "ambiguous";
 
 export interface AkshareBarsOptions {
+  signal?: AbortSignal;
   /** Ordered upstreams used by AKShare for ordinary A-share daily bars. */
   sourcePriority?: string | readonly string[];
 }
 
 export interface AkshareBarsResult {
   bars: Bar[];
+  adjustment?: PriceAdjustment;
   endpoint: string | null;
   attempts: AkshareAttempt[];
 }
@@ -113,6 +116,8 @@ export interface FundRiskAnalysisRow {
 
 export interface AkshareFundHistory {
   symbol: string;
+  /** Concrete successful NAV route; other history modes do not promise one. */
+  endpoint?: FundNavEndpoint;
   fetchedAt: string;
   nav: FundNavDaily[];
   profile: Record<string, unknown>;

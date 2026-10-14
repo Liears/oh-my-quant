@@ -1,14 +1,18 @@
+import { createLocalAgent as createAgent } from "../src/runtime/session.ts";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { createAgent } from "../src/agent/src/session.ts";
-import { canonicalizeWhyjEnv, readWhyjEnvValue } from "../src/storage/index.ts";
-import type { OhQuantSettings } from "../src/types/config.ts";
+import { join, resolve, sep } from "node:path";
+import { type QuantAgentSession } from "../src/agent/src/session.ts";
+import { resolveConfiguredAuth } from "../src/agent/src/model-config.ts";
+import { canonicalizeWhyjEnv, readWhyjEnvValue, resolveSettingsPath } from "../src/storage/index.ts";
+import { DEFAULT_SETTINGS, type OhQuantSettings } from "../src/types/config.ts";
 
 type SmokeCase = {
   name: string;
   model: string;
   env: Record<string, string>;
+  provider?: string;
+  providers?: OhQuantSettings["providers"];
 };
 
 type SmokeResult = {
@@ -23,18 +27,19 @@ type SmokeResult = {
 };
 
 const ROOT = resolve(import.meta.dir, "..");
-const SETTINGS_PATH = resolve(ROOT, ".ohquant", "settings.json");
 const PROMPT = "Reply with only ok.";
 
 function loadProjectSettings(): OhQuantSettings {
-  if (!existsSync(SETTINGS_PATH)) {
-    throw new Error(`Missing settings file: ${SETTINGS_PATH}`);
+  const path = resolveSettingsPath();
+  if (!existsSync(path)) {
+    throw new Error(`Missing settings file: ${path}`);
   }
-  return JSON.parse(readFileSync(SETTINGS_PATH, "utf-8")) as OhQuantSettings;
+  return JSON.parse(readFileSync(path, "utf-8")) as OhQuantSettings;
 }
 
-function buildSettingsCase(settings: OhQuantSettings): SmokeCase | null {
+export function buildSettingsCase(settings: OhQuantSettings): SmokeCase | null {
   const env = canonicalizeWhyjEnv(settings.env ?? {});
+  if (settings.provider) return { name: "current-settings", provider: settings.provider, providers: settings.providers, model: settings.model, env };
   const token = readWhyjEnvValue(env, "apiKey") || readWhyjEnvValue(env, "authToken");
   const baseUrl = readWhyjEnvValue(env, "baseUrl");
   if (!token || !baseUrl || !settings.model) return null;
@@ -119,14 +124,20 @@ function extractAssistantText(messages: Array<{ role?: string; content?: unknown
   return text || undefined;
 }
 
-async function runCase(smokeCase: SmokeCase): Promise<SmokeResult> {
+export async function runCase(smokeCase: SmokeCase, timeoutMs = 30_000): Promise<SmokeResult> {
   const tempDir = mkdtempSync(join(tmpdir(), "ohq-provider-smoke-"));
   const previousOhquantDir = process.env.OHQUANT_DIR;
+  let agent: QuantAgentSession | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const secrets = [readWhyjEnvValue(smokeCase.env, "apiKey"), readWhyjEnvValue(smokeCase.env, "authToken"), ...Object.values(smokeCase.providers ?? {}).map(provider => provider.apiKey)].filter((value): value is string => Boolean(value));
+  const safe = (value: string) => secrets.reduce((text, secret) => text.split(secret).join("[redacted]"), value);
 
   try {
     process.env.OHQUANT_DIR = tempDir;
     writeFileSync(join(tempDir, "settings.json"), JSON.stringify({
-      version: 1,
+      ...DEFAULT_SETTINGS,
+      provider: smokeCase.provider,
+      providers: smokeCase.providers,
       env: canonicalizeWhyjEnv(smokeCase.env),
       model: smokeCase.model,
       thinkingLevel: "off",
@@ -145,14 +156,29 @@ async function runCase(smokeCase: SmokeCase): Promise<SmokeResult> {
       },
     }, null, 2), "utf-8");
 
-    const agent = createAgent({
+    agent = createAgent({
       cwd: ROOT,
       sessionsRoot: join(tempDir, "sessions"),
     });
 
     await agent.waitForIdle();
-    await agent.prompt(PROMPT);
+    const auth = await resolveConfiguredAuth({ ...DEFAULT_SETTINGS, ...smokeCase }, agent.state.model);
+    if (auth?.auth.apiKey) secrets.push(auth.auth.apiKey);
+    for (const value of Object.values(auth?.auth.headers ?? {})) {
+      if (value) secrets.push(value, value.replace(/^Bearer\s+/i, ""));
+    }
+    await Promise.race([
+      agent.prompt(PROMPT),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => { agent?.abort(); reject(new Error(`Model smoke timed out after ${timeoutMs}ms`)); }, timeoutMs);
+      }),
+    ]);
     await agent.waitForIdle();
+    const last = [...agent.state.messages].reverse().find(message => message.role === "assistant");
+    const response = extractAssistantText(agent.state.messages);
+    if (!last || last.stopReason === "error" || last.stopReason === "aborted" || !response?.trim()) {
+      throw new Error(last?.errorMessage || "Model returned no assistant text");
+    }
 
     return {
       name: smokeCase.name,
@@ -161,17 +187,21 @@ async function runCase(smokeCase: SmokeCase): Promise<SmokeResult> {
       api: agent.state.model.api,
       model: agent.state.model.id,
       baseUrl: agent.state.model.baseUrl,
-      response: extractAssistantText(agent.state.messages as Array<{ role?: string; content?: unknown }>) || "(empty)",
+      response: safe(response),
     };
   } catch (error) {
     return {
       name: smokeCase.name,
       ok: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: safe(error instanceof Error ? error.message : String(error)),
     };
   } finally {
+    if (timer) clearTimeout(timer);
+    agent?.abort();
+    await agent?.waitForIdle().catch(() => {});
     if (previousOhquantDir == null) delete process.env.OHQUANT_DIR;
     else process.env.OHQUANT_DIR = previousOhquantDir;
+    if (!resolve(tempDir).startsWith(resolve(tmpdir()) + sep)) throw new Error("Unexpected smoke test directory");
     rmSync(tempDir, { recursive: true, force: true });
   }
 }
@@ -200,4 +230,4 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+if (import.meta.main) await main();

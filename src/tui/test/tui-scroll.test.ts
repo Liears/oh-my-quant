@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { layout } from "../src/render.ts";
 import { applyScrollDelta, clampScrollState, scrollRegionDelta, wheelStep } from "../src/tui-scroll.ts";
-import type { PanelSection, UIMessage } from "../src/types.ts";
+import type { PanelSection, UIMessage } from "../../types/ui.ts";
 
 describe("tui scroll helpers", () => {
   it("resets overview scroll when the overview panel is hidden", () => {

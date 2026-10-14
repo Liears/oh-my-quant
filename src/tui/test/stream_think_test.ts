@@ -1,8 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { Buffer, wrap, sanitizeTerminalText } from "../src/buffer.ts";
-import { S } from "../src/styles.ts";
-import { buildConversationView, drawConversation, layout } from "../src/render.ts";
-import type { UIMessage } from "../src/types.ts";
+import { Buffer } from "../src/buffer.ts";
+import { drawConversation, layout } from "../src/render.ts";
+import type { UIMessage } from "../../types/ui.ts";
 
 function extractThinking(m: { content: unknown[] }): string {
   return (m.content as Array<{ type?: string; thinking?: string }>)
