@@ -16,8 +16,8 @@ export function renderConfigPanelView(
 ): void {
   const { inner } = frame;
   const labels: Record<string, string> = {
-    "Model": "模型 Model", "Market Data": "行情 Market Data", "Data Token": "数据凭证 Data Token",
-    "Portfolios": "观察组合 Portfolios", "Auto Artifacts": "自动报告 Auto Artifacts",
+    "Model": "Model 模型", "Market Data": "Market Data 行情", "Data Token": "Data Token 凭证",
+    "Portfolios": "Portfolios 观察组合", "Auto Artifacts": "Auto Artifacts 报告",
   };
   const hints: Record<string, string> = {
     "Model": "模型：提供商 → 模型 → 凭证 → 保存并验证。",

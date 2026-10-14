@@ -49,7 +49,7 @@ it.each(sizes)("keeps settings focus, draft, validation and controls separate at
   const panel = controller();
   try {
     panel.open("config");
-    const labels = ["模型 Model", "行情 Market Data", "数据凭证 Data Token", "观察组合 Portfolios", "External Skills", "Overview Dock", "自动报告 Auto Artifacts", "Market Colors", "Status HUD", "Compact At"];
+    const labels = ["Model 模型", "Market Data 行情", "Data Token 凭证", "Portfolios 观察组合", "External Skills", "Overview Dock", "Auto Artifacts 报告", "Market Colors", "Status HUD", "Compact At"];
     for (const [index, label] of labels.entries()) {
       if (index) raw(panel, "\x1b[B");
       const lines = screen(panel, width, height);
@@ -65,7 +65,7 @@ it.each(sizes)("keeps settings focus, draft, validation and controls separate at
     expect(raw(panel, "\x1b")).toEqual({});
     expect(screen(panel, width, height)).toContain("↑↓ 选择 · Enter 修改 · Esc 关闭");
     raw(panel, "\x1b[B");
-    expect(screen(panel, width, height).some(line => line.startsWith("> 模型 Model"))).toBe(true);
+    expect(screen(panel, width, height).some(line => line.startsWith("> Model 模型"))).toBe(true);
   } finally { panel.close(); }
 });
 
