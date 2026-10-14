@@ -179,4 +179,4 @@ bun test src/artifact/test/report-comparison.test.ts
 
 排行榜样例：`bun run output/playwright/report-dashboard-preview.ts`，同一服务打开 `http://127.0.0.1:18441/whyj-report-dashboard.html`。通过真实工具对合成行情评分，再生成只含 Dashboard 调用/结果的报告；`check-report-dashboard.js` 检查桌面/窄屏、排名、键盘焦点、下载、CDN 503 和断网打开。
 
-组合样例：`bun run scripts/check-portfolio-report.ts output/portfolio-report-synthetic`，在新目录生成完整报告、带合成标识的分享预览及验证记录，无网络/模型/账户调用。当前 [分享样例](../../output/portfolio-report-2026-09-14-r05-final/share.html) 可直接打开；合成价格/FX 与真实工具链测试分开记录。新比较页面的宽屏/窄屏、键盘和离线视觉检查仍待完成。
+组合样例：`bun run src/artifact/dev/check-portfolio-report.ts output/portfolio-report-synthetic`，在新目录生成完整报告、带合成标识的分享预览及验证记录，无网络/模型/账户调用。当前 [分享样例](../../output/portfolio-report-2026-09-14-r05-final/share.html) 可直接打开；合成价格/FX 与真实工具链测试分开记录。新比较页面的宽屏/窄屏、键盘和离线视觉检查仍待完成。

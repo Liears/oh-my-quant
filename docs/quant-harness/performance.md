@@ -77,7 +77,7 @@ export async function inspectAuthorizedAccount(adapter: AccountHistoryAdapter, r
 
 ```powershell
 bun test src/performance/test/performance.test.ts
-bun run scripts/account-performance-example.ts
+bun run src/performance/dev/account-performance-example.ts
 bun run typecheck
 bun run check:architecture
 bun run test

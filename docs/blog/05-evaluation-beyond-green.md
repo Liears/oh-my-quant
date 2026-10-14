@@ -84,7 +84,7 @@ Langfuse 的 Skill 评测文章把输入、轨迹、评分与迭代连接起来�
 
 ## 实现索引
 
-- [测试围栏配置](../../bunfig.toml)与[围栏检查](../../scripts/check-test-fence.ts)、[研究任务评测](../quant-harness/evaluation.md#tasks)。
+- [测试围栏配置](../../bunfig.toml)与[围栏检查](../../tests/architecture/check-test-fence.ts)、[研究任务评测](../quant-harness/evaluation.md#tasks)。
 - [新闻主张规则](../../src/runtime/evidence/news-answer-claims.ts)、[回答证据绑定](../../src/runtime/evidence/news-answer-evidence.ts)。
 - [真实 Pi 固定传输回归](../../src/runtime/test/news-answer-session.test.ts)：链路验证与真实模型质量分别验收。
 

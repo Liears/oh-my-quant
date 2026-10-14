@@ -269,7 +269,7 @@ Details 使用 `methodVersion: 1`，含 `sortBy`、`snapshots`、`unavailableFil
 
 ```powershell
 bun test src/quant/test/numeric-stability.test.ts src/quant/test/numeric-decimal.test.ts src/tools/test/quant-numeric-display.test.ts src/tools/test/shared/format-percent.test.ts
-python scripts/check-numeric-reference.py
+python src/quant/dev/check-numeric-reference.py
 bun run typecheck
 bun run check:architecture
 bun run test

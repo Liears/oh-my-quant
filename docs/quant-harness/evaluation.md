@@ -1,6 +1,6 @@
 # 评测与验证指南
 
-更新：2026-10-13。这里统一维护怎样验证、输入来自哪里、自动检查能证明什么；旧结果汇编已删除，有解释力的失败与修正写入[评测博客](../blog/05-evaluation-beyond-green.md)；原始回执留在内部输出，产品完成度回到 [PRD](./PRD.md)。六份旧评测文档已合并，历史版本的案例数和通过数不再混入现行操作入口。
+更新：2026-10-14。这里统一维护怎样验证、输入来自哪里、自动检查能证明什么；旧结果汇编已删除，有解释力的失败与修正写入[评测博客](../blog/05-evaluation-beyond-green.md)；原始回执留在内部输出，产品完成度回到 [PRD](./PRD.md)。六份旧评测文档已合并，历史版本的案例数和通过数不再混入现行操作入口。
 
 - [跨领域套件](#suite)
 - [任务与恢复](#tasks)
@@ -21,7 +21,7 @@
 
 ### 执行与判定方式
 
-当前套件包含 35 个案例：股票、股票因子、指数、风险、基金、组合六类量化任务，七个新闻案例，21 个 reviewed LLMQuant workflow，以及一个年报案例。新闻新增 `news-qualified`，否定与条件标题的现行规则见[新闻研究](./news-research.md)。执行器为 [evaluate-research.ts](../../scripts/evaluate-research.ts)，每例分别限制时间与请求事件数。显式参数中的请求事件不是对模型供应商账单请求数的保证；历史套件的数量和结果保留原运行范围。
+当前套件包含 35 个案例：股票、股票因子、指数、风险、基金、组合六类量化任务，七个新闻案例，21 个 reviewed LLMQuant workflow，以及一个年报案例。新闻新增 `news-qualified`，否定与条件标题的现行规则见[新闻研究](./news-research.md)。执行器为 [evaluate-research.ts](../../src/runtime/dev/evaluate-research.ts)，每例分别限制时间与请求事件数。显式参数中的请求事件不是对模型供应商账单请求数的保证；历史套件的数量和结果保留原运行范围。
 
 ```powershell
 # 查看用法；不调用模型
@@ -94,7 +94,7 @@ bun run build
 
 ### 真实模型入口
 
-R06 第六阶段新增 [evaluate-research.ts](../../scripts/evaluate-research.ts) 和独立 [research-evaluation.ts](../../src/runtime/evaluation/research-evaluation.ts)。使用已保存的模型连接、实际 Pi 循环、Quant 工具与研究投影；价格读取注入固定的合成观察，不访问真实行情。每次运行在独立 TEMP 保存归档和 JSONL，结束后清理；输出文件保留检查结果和模型回答。
+R06 第六阶段新增 [evaluate-research.ts](../../src/runtime/dev/evaluate-research.ts) 和独立 [research-evaluation.ts](../../src/runtime/evaluation/research-evaluation.ts)。使用已保存的模型连接、实际 Pi 循环、Quant 工具与研究投影；价格读取注入固定的合成观察，不访问真实行情。每次运行在独立 TEMP 保存归档和 JSONL，结束后清理；输出文件保留检查结果和模型回答。
 
 ```powershell
 # 无模型调用，查看参数
@@ -180,7 +180,7 @@ bun run eval:research -- --case news-all --timeout-ms 180000 --max-requests 8 --
 
 ## 年报模型
 
-更新：2026-09-15。使用保存的真实模型连接，执行实际年报/决策工具与有损压缩恢复；比较、行情和决策均为固定合成数据。实现为 [annual-evaluation.ts](../../src/runtime/evaluation/annual-evaluation.ts)，统一入口为 [evaluate-research.ts](../../scripts/evaluate-research.ts)。真实账户接口不参与评测。
+更新：2026-09-15。使用保存的真实模型连接，执行实际年报/决策工具与有损压缩恢复；比较、行情和决策均为固定合成数据。实现为 [annual-evaluation.ts](../../src/runtime/evaluation/annual-evaluation.ts)，统一入口为 [evaluate-research.ts](../../src/runtime/dev/evaluate-research.ts)。真实账户接口不参与评测。
 
 <a id="annual--运行"></a>
 
@@ -243,7 +243,7 @@ bun run eval:research -- --case annual --timeout-ms 240000 --max-requests 12 --o
 
 更新：2026-10-13。该评测用 21 个任务覆盖五个精选 LLMQuant router 的全部 reviewed workflow，验证真实 Pi/WhyJ 会话是否进入允许模式、选择并只读加载正确 workflow，以及最终回答是否保留用户证据、日期和缺失边界。它使用保存的模型连接，会产生模型用量；不会访问行情、账户、LLMQuant 服务或真实 shell。
 
-实现按职责拆分：[案例聚合入口](../../src/runtime/evaluation/skill-evaluation-fixtures.ts)、[回答核验入口](../../src/runtime/evaluation/skill-evaluation-answer.ts)、[隔离执行器](../../src/runtime/evaluation/skill-evaluation.ts)和统一 [CLI](../../scripts/evaluate-research.ts)。案例与语义规则再按 data、macro、equities、portfolio、risk 五个 router 分模块，公共契约和否定语境识别独立复用。任务只描述研究意图和合成证据，不向模型泄漏预期 workflow 文件名。
+实现按职责拆分：[案例聚合入口](../../src/runtime/evaluation/skill-evaluation-fixtures.ts)、[回答核验入口](../../src/runtime/evaluation/skill-evaluation-answer.ts)、[隔离执行器](../../src/runtime/evaluation/skill-evaluation.ts)和统一 [CLI](../../src/runtime/dev/evaluate-research.ts)。案例与语义规则再按 data、macro、equities、portfolio、risk 五个 router 分模块，公共契约和否定语境识别独立复用。任务只描述研究意图和合成证据，不向模型泄漏预期 workflow 文件名。
 
 第三方 Skill 的功能与工作流直接阅读[上游文档及固定版本](./trader-skills.md#installation)，这里不维护另一份介绍清单。具体案例、预期 workflow 和反例以[本地案例注册](../../src/runtime/evaluation/skill-evaluation-fixtures.ts)及 `--help` 为准；本页只维护评测的隔离和判定规则。
 
@@ -311,11 +311,11 @@ CLI 在创建第一个 Session 前，一次性把本次要运行的全部 review
 ### 复跑方式
 
 ```powershell
-bun run scripts/measure-data-refresh.ts
-bun run scripts/measure-overview-refresh.ts
-bun run scripts/check-data-providers.ts
-bun run scripts/check-data-providers.ts --public-only
-bun run scripts/check-data-providers.ts --public-only --output output/data-provider-public-new.json
+bun run src/runtime/dev/measure-data-refresh.ts
+bun run src/runtime/dev/overview/measure-overview-refresh.ts
+bun run src/runtime/dev/check-data-providers.ts
+bun run src/runtime/dev/check-data-providers.ts --public-only
+bun run src/runtime/dev/check-data-providers.ts --public-only --output output/data-provider-public-new.json
 ```
 
 第一项默认每个条件运行 10 次，可用 `--samples 20` 调整到 1–100 次。使用临时数据目录、真实文件缓存、现有 source 编排和本地 HTTP fixture；结束后还原环境并清理临时数据，不读取用户的行情凭证。继承代理曾使回环请求返回 502，脚本现仅为自身回环服务设置 NO_PROXY，结束后还原。
@@ -325,6 +325,19 @@ bun run scripts/check-data-providers.ts --public-only --output output/data-provi
 不带参数的矩阵读取当前保存的行情配置，执行真实请求，可能消耗供应商的数据请求配额。`--public-only` 不调用配置读取，只按市场使用 AKShare 的公开端点；两者均为五个固定窗口样本全部通过才退出 0，有失败/空数据/窗口不足退出 1，主动取消为 130。原始错误可能含配置内容，因此只保存错误类别和 HTTP 状态，不记录 key、请求头或原异常。缺数据不会被其他市场或已有缓存的结果替代。
 
 输出分别为 [data-refresh-baseline.json](../../output/data-refresh-baseline.json)、[overview-refresh-baseline.json](../../output/overview-refresh-baseline.json)、[配置源矩阵](../../output/data-provider-matrix.json) 与 [公开源矩阵](../../output/data-provider-public-matrix.json)；不指定 `--output` 时再次运行只更新相应默认文件。显式 `--output PATH` 使用独占创建，目标文件已经存在时拒绝覆盖，适合留存新的独立验证记录。历次表格与日期保存在归档中。脚本不在默认确定性测试中自动运行。
+
+### 验证脚本的维护边界
+
+构建与发布门槛、生成器、有独立测量范围的基准、证据重算和显式手动核验仍保留，但不再共用根目录 `scripts/`：模块开发入口归 `src/<module>/dev/`，仓库级门槛与跨模块回归归 `tests/`，详见[职责与 npm 命令](./module-architecture.md#开发入口与-npm-命令)。没有 package/CI 引用并不等于无用。2026-10-14 删除了下列六个重复或依赖旧本机条件的入口，没有删除生产 adapter、测试夹具、原始回执或用户安装的 Skill。
+
+| 淘汰的入口 | 现行复验方式与代价 |
+|---|---|
+| `check-public-a-fallback.ts`、`check-public-global-fallback.ts`、`check-public-fund-fallback.ts` | 冷取数与缓存重放使用 [source facade 测量](../../src/runtime/dev/measure-public-source-facade.ts)，独立 NAV 使用 [基金运行时测量](../../src/runtime/dev/measure-public-fund-runtime.ts)，连接使用上方 provider 矩阵与 `/doctor --tool fetch_bars`。精确 fallback、复权和基金工具契约分别由 [A 股](../../src/source/tests/sina-a-history.test.ts)、[US/HK](../../src/source/tests/sina-global-history.test.ts)、[基金端点](../../src/source/tests/eastmoney-fund-nav.test.ts)和[基金工具](../../src/runtime/test/fund-literal-data.test.ts)固定回归。删除的是一次性「固定日期 + 固定端点 + 编译 CLI」组合探针；这些替代入口不是那三次历史观察的同范围重跑，也不会强制真实上游再次触发旧 fallback。 |
+| `check-skill-network.ts` | 公开 breadth 端点与 Python 导入已经纳入 [breadth 独立检查](../../src/cli/dev/check-breadth-skill.ts)；保留 [网络探针回归](../../src/skill/test/network-probe.test.ts)。不再额外创建一个故意不满足 reviewed files 的相同网络检查入口；完整 breadth 检查还需要固定源文件与报告链路可用，不能把二者的失败范围混同。 |
+| `chart-image-validation-fixture.py` | 原脚本固定了 `output/` 日期、个人 `.ohquant/skills` checkout、Git revision 和 Windows Arial 路径。显式图像验证仍由 [validate-chart-image.ts](../../src/runtime/dev/chart/validate-chart-image.ts)接收 `--image`、`--skills-root` 和新的 `--output`；它会调用模型，不自动生成旧教学图。图像输入与只读参考边界保留 [输入回归](../../src/runtime/test/chart-image-input.test.ts)及[参考读取回归](../../src/runtime/test/chart-reference-reader.test.ts)，不把传输测试当作视觉准确性验证。 |
+| `check-pi-dual-cli.ts` | 使用[配置文档](./configuration.md#pi-verification)中的当前连接诊断与 Pi 导入回归。旧脚本绑定单一模型和旧包布局，删除后不再提供原双 CLI 并发场景的一键入口；单侧 Doctor 不能证明双侧并发与 OAuth 刷新。 |
+
+已有报告记录的脚本路径和哈希仍属于当时的代码快照，不能因入口淘汰而回写为新路径；需要原样复现时，恢复对应 Git 版本并另存新回执。本轮清理与确定性检查不构成新的真实市场、模型或实体终端验收。
 
 <a id="model-performance"></a>
 
@@ -376,7 +389,7 @@ HUD 是当前活动会话中成功模型响应的平均值，和独立基准的�
 ### 验证
 
 ```powershell
-bun test src/runtime/test/model-benchmark.test.ts src/runtime/test/hud.test.ts src/test/app/app-hud.test.ts src/tui/test/hud-settings.test.ts
+bun test src/runtime/test/model-benchmark.test.ts src/runtime/test/hud.test.ts tests/app/app-hud.test.ts src/tui/test/hud-settings.test.ts
 bun run typecheck
 bun run check:architecture
 bun run test
