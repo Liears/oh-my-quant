@@ -544,6 +544,7 @@ export class AppRuntime {
       }
       this.pendingAutoArtifactInput = input;
       this.prepareHudForRequest();
+      if (!isAgentTurnActive(this.agent)) this.setActivity("thinking");
       const startedAt = perfNow();
       await dispatchUserMessage(this.agent, input, input, signal ? AbortSignal.any([signal, controller.signal]) : controller.signal);
       perfLog("runtime.agent.dispatch", startedAt);
@@ -559,6 +560,7 @@ export class AppRuntime {
     } finally {
       this.promptControllers.delete(controller);
       this.activePrompts--;
+      if (!this.disposed && version === this.interruptionVersion && !isAgentTurnActive(this.agent)) this.setActivity("ready");
     }
   }
 

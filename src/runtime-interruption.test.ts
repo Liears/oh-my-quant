@@ -80,17 +80,19 @@ it("cancels a prompt still preparing before the model starts", async () => {
   const gate = new Promise<void>(resolve => { release = resolve; });
   const preparing = new Promise<void>(resolve => { prepared = resolve; });
   let modelStarts = 0;
+  let activity = "ready";
   const agent = { state: { isStreaming: false, pendingToolCalls: new Set<string>(), messages: [], thinkingText: "" },
     subscribe: () => () => {}, abort: () => {}, waitForIdle: async () => {},
     prompt: async (_input: string, options?: { signal?: AbortSignal }) => {
       prepared(); await gate; options?.signal?.throwIfAborted(); modelStarts++;
     } };
-  const runtime = new AppRuntime({ onMessages: () => {}, onActivity: () => {} }, async () => [], async () => [], () => agent as never,
+  const runtime = new AppRuntime({ onMessages: () => {}, onActivity: value => { activity = value; } }, async () => [], async () => [], () => agent as never,
     undefined, undefined, undefined, 0);
   try {
     await runtime.bootstrap();
     const request = runtime.submit("分析 AAPL 的风险");
     await preparing;
+    expect(activity).toBe("thinking");
     expect(await runtime.interruptResearch()).toBe(true);
     release(); await request;
     expect(modelStarts).toBe(0);
