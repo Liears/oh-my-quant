@@ -42,6 +42,14 @@ bun run --cwd site preview
 
 本轮排版、留白和交互调整依据用户指定的 taste-skill；设计判断与保留项见 [设计复核](./DESIGN-REVIEW.md)。
 
+## 图标
+
+通用界面图标统一使用 [Lucide](https://lucide.dev/guide/static)，选取 0.577.0 的 21 个官方 SVG，固定来源提交为 `0ea8780434e2b4527dc860b18ff94883d080b59c`。原始路径组成自托管的 `public/icons.svg`，许可证位于 `public/licenses/lucide.txt`。无需图标运行库或第三方网络请求。
+
+使用 `<svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#languages" /></svg>` 引用图标；统一 24px viewBox、2px 描边与 `currentColor`。图标不承载辅助名称，纯图标链接和按钮通过本地化的 `aria-label` 命名，必要时用 `title` 提供悬停提示。
+
+语言、GitHub 和页脚外部入口采用纯图标。菜单、方向箭头、复制、设置、FAQ 与原生选择框的箭头共用此图标集。品牌标记与合成数据曲线保持各自语义。
+
 ## 中英文与 Blog
 
 | 页面 | 中文 | English |

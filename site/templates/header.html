@@ -7,42 +7,42 @@
         </a>
         <nav class="desktop-nav" aria-label="{{nav.main}}">
           <details class="feature-menu">
-            <summary>{{nav.features}} <span class="nav-chevron" aria-hidden="true"></span></summary>
+            <summary>{{nav.features}} <svg class="icon nav-chevron" aria-hidden="true" focusable="false"><use href="/icons.svg#chevron-down" /></svg></summary>
             <div class="feature-dropdown">
-              <a href="{{route.home}}#feature-research"><span class="gold" aria-hidden="true">01</span>{{nav.research}}</a>
-              <a href="{{route.home}}#feature-backtest"><span class="gold" aria-hidden="true">02</span>{{nav.backtest}}</a>
-              <a href="{{route.home}}#feature-reports"><span class="gold" aria-hidden="true">03</span>{{nav.reports}}</a>
-              <a href="{{route.home}}#workflow"><span class="gold" aria-hidden="true">04</span>{{nav.workflow}}</a>
-              <a href="{{route.home}}#settings"><span class="gold" aria-hidden="true">05</span>{{nav.settings}}</a>
-              <a class="all-features" href="{{route.home}}#features">{{nav.allFeatures}} <span aria-hidden="true">↗</span></a>
+              <a href="{{route.home}}#feature-research"><svg class="icon muted" aria-hidden="true" focusable="false"><use href="/icons.svg#search" /></svg>{{nav.research}}</a>
+              <a href="{{route.home}}#feature-backtest"><svg class="icon muted" aria-hidden="true" focusable="false"><use href="/icons.svg#chart-no-axes-combined" /></svg>{{nav.backtest}}</a>
+              <a href="{{route.home}}#feature-reports"><svg class="icon muted" aria-hidden="true" focusable="false"><use href="/icons.svg#file-text" /></svg>{{nav.reports}}</a>
+              <a href="{{route.home}}#workflow"><svg class="icon muted" aria-hidden="true" focusable="false"><use href="/icons.svg#list-ordered" /></svg>{{nav.workflow}}</a>
+              <a href="{{route.home}}#settings"><svg class="icon muted" aria-hidden="true" focusable="false"><use href="/icons.svg#settings-2" /></svg>{{nav.settings}}</a>
+              <a class="all-features" href="{{route.home}}#features">{{nav.allFeatures}} <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-up-right" /></svg></a>
             </div>
           </details>
           <a href="{{route.blog}}" aria-current="{{page.blogCurrent}}">Blog</a>
-          <a href="https://github.com/yangjingo/oh-my-quant#quick-start" target="_blank" rel="noopener">{{nav.docs}} <span aria-hidden="true">↗</span></a>
+          <a href="https://github.com/yangjingo/oh-my-quant#quick-start" target="_blank" rel="noopener">{{nav.docs}} <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-up-right" /></svg></a>
         </nav>
         <div class="nav-actions">
-          <a class="github-link" href="https://github.com/yangjingo/oh-my-quant" target="_blank" rel="noopener" aria-label="{{nav.github}}">
-            <svg class="icon"><use href="#icon-github" /></svg><span>GitHub</span>
+          <a class="github-link icon-link" href="https://github.com/yangjingo/oh-my-quant" target="_blank" rel="noopener" aria-label="{{nav.github}}" title="{{nav.github}}">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#github" /></svg>
           </a>
-          <a class="language-link" data-language-link href="{{route.alternate}}" lang="{{locale.otherLang}}" hreflang="{{locale.otherLang}}" aria-label="{{nav.languageName}}: {{nav.language}}">{{nav.languageName}}</a>
-          <a class="button button-small nav-start" href="{{route.home}}#install">{{nav.start}} <svg class="icon"><use href="#icon-arrow" /></svg></a>
-          <button class="menu-button" id="menu-button" aria-label="{{runtime.menuOpen}}" aria-expanded="false" aria-controls="mobile-nav"><span></span><span></span></button>
+          <a class="language-link icon-link" data-language-link href="{{route.alternate}}" hreflang="{{locale.otherLang}}" aria-label="{{nav.language}}" title="{{nav.language}}"><svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#languages" /></svg></a>
+          <a class="button button-small nav-start" href="{{route.home}}#install">{{nav.start}} <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-right" /></svg></a>
+          <button class="menu-button" id="menu-button" aria-label="{{runtime.menuOpen}}" aria-expanded="false" aria-controls="mobile-nav"><svg class="icon menu-open" aria-hidden="true" focusable="false"><use href="/icons.svg#menu" /></svg><svg class="icon menu-close" aria-hidden="true" focusable="false"><use href="/icons.svg#x" /></svg></button>
         </div>
       </div>
       <nav id="mobile-nav" class="mobile-nav" aria-label="{{nav.mobile}}" hidden>
         <details class="feature-menu">
-          <summary>{{nav.features}} <span class="nav-chevron" aria-hidden="true"></span></summary>
+          <summary>{{nav.features}} <svg class="icon nav-chevron" aria-hidden="true" focusable="false"><use href="/icons.svg#chevron-down" /></svg></summary>
           <div class="feature-dropdown">
-            <a href="{{route.home}}#feature-research">{{nav.research}}</a>
-            <a href="{{route.home}}#feature-backtest">{{nav.backtest}}</a>
-            <a href="{{route.home}}#feature-reports">{{nav.reports}}</a>
-            <a href="{{route.home}}#workflow">{{nav.workflow}}</a>
-            <a href="{{route.home}}#settings">{{nav.settings}}</a>
-            <a class="all-features" href="{{route.home}}#features">{{nav.allFeatures}} <span aria-hidden="true">↗</span></a>
+            <a href="{{route.home}}#feature-research"><svg class="icon muted" aria-hidden="true" focusable="false"><use href="/icons.svg#search" /></svg>{{nav.research}}</a>
+            <a href="{{route.home}}#feature-backtest"><svg class="icon muted" aria-hidden="true" focusable="false"><use href="/icons.svg#chart-no-axes-combined" /></svg>{{nav.backtest}}</a>
+            <a href="{{route.home}}#feature-reports"><svg class="icon muted" aria-hidden="true" focusable="false"><use href="/icons.svg#file-text" /></svg>{{nav.reports}}</a>
+            <a href="{{route.home}}#workflow"><svg class="icon muted" aria-hidden="true" focusable="false"><use href="/icons.svg#list-ordered" /></svg>{{nav.workflow}}</a>
+            <a href="{{route.home}}#settings"><svg class="icon muted" aria-hidden="true" focusable="false"><use href="/icons.svg#settings-2" /></svg>{{nav.settings}}</a>
+            <a class="all-features" href="{{route.home}}#features">{{nav.allFeatures}} <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-up-right" /></svg></a>
           </div>
         </details>
         <a href="{{route.blog}}" aria-current="{{page.blogCurrent}}">Blog</a>
-        <a href="https://github.com/yangjingo/oh-my-quant#quick-start" target="_blank" rel="noopener">{{nav.docs}} ↗</a>
-        <a class="mobile-start" href="{{route.home}}#install">{{nav.start}} →</a>
+        <a href="https://github.com/yangjingo/oh-my-quant#quick-start" target="_blank" rel="noopener">{{nav.docs}} <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-up-right" /></svg></a>
+        <a class="mobile-start" href="{{route.home}}#install">{{nav.start}} <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-right" /></svg></a>
       </nav>
     </header>

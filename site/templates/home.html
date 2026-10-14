@@ -9,9 +9,9 @@
           <div class="hero-actions">
             <a href="#install" class="button"
               >{{nav.start}}
-              <svg class="icon"><use href="#icon-arrow" /></svg></a
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-right" /></svg></a
             ><a href="#workspace" class="text-link"
-              >{{hero.explore}} <span aria-hidden="true">↓</span></a
+              >{{hero.explore}} <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-down" /></svg></a
             >
           </div>
         </div>
@@ -56,9 +56,7 @@
                 <span class="terminal-subtitle"
                   >/ research workspace</span
                 ></span
-              ><span class="window-dots" aria-hidden="true"
-                ><i></i><i></i><i></i
-              ></span>
+              ><svg class="icon muted" aria-hidden="true" focusable="false"><use href="/icons.svg#ellipsis" /></svg>
             </div>
             <div class="workspace-body">
               <div class="research-panel">
@@ -75,25 +73,24 @@
                     <span>Q ›</span> {{demo.question}}
                   </p>
                   <div class="tool-step">
-                    <span class="step-symbol">↳</span
-                    ><code>Source.fetch_bars</code
+                    <svg class="icon step-symbol" aria-hidden="true" focusable="false"><use href="/icons.svg#corner-down-right" /></svg><code>Source.fetch_bars</code
                     ><span class="tool-detail"
                       >{{demo.priceWindow}}</span
                     ><span class="step-state">{{demo.done}}</span>
                   </div>
                   <div class="tool-step">
-                    <span class="step-symbol">↳</span><code>Quant.Factor</code
+                    <svg class="icon step-symbol" aria-hidden="true" focusable="false"><use href="/icons.svg#corner-down-right" /></svg><code>Quant.Factor</code
                     ><span class="tool-detail">{{demo.factors}}</span
                     ><span class="step-state">{{demo.done}}</span>
                   </div>
                   <div class="tool-step">
-                    <span class="step-symbol">↳</span><code>Quant.Risk</code
+                    <svg class="icon step-symbol" aria-hidden="true" focusable="false"><use href="/icons.svg#corner-down-right" /></svg><code>Quant.Risk</code
                     ><span class="tool-detail">{{demo.risk}}</span
                     ><span class="step-state">{{demo.done}}</span>
                   </div>
                   <div class="answer">
                     <div class="answer-heading">
-                      <span class="gold">✳</span> {{demo.answerHeading}}
+                      <svg class="icon gold" aria-hidden="true" focusable="false"><use href="/icons.svg#asterisk" /></svg> {{demo.answerHeading}}
                     </div>
                     <p>
                       {{demo.answerFirst}}<br />{{demo.answerSecond}}
@@ -128,7 +125,7 @@
                     <span>Q ›</span> {{demo.compareQuestion}}
                   </p>
                   <div class="tool-step">
-                    <span class="step-symbol">↳</span><code>{{demo.commonDates}}</code
+                    <svg class="icon step-symbol" aria-hidden="true" focusable="false"><use href="/icons.svg#corner-down-right" /></svg><code>{{demo.commonDates}}</code
                     ><span class="tool-detail">{{demo.align}}</span
                     ><span class="step-state">{{demo.done}}</span>
                   </div>
@@ -154,7 +151,7 @@
                   </div>
                   <div class="answer">
                     <div class="answer-heading">
-                      <span class="gold">✳</span> {{demo.compareHeading}}
+                      <svg class="icon gold" aria-hidden="true" focusable="false"><use href="/icons.svg#asterisk" /></svg> {{demo.compareHeading}}
                     </div>
                     <p>
                       {{demo.compareFirst}}<br />{{demo.compareSecond}}
@@ -186,7 +183,7 @@
                     <p>{{demo.reportTrace}}</p>
                     <div class="document-bottom">
                       <span>Dashboard + Trajectory</span
-                      ><span>{{demo.archive}}</span>
+                      ><span>{{demo.archive}} <svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-up-right" /></svg></span>
                     </div>
                   </div>
                   <p class="report-hint">
@@ -202,7 +199,7 @@
                 <div class="panel-label">OVERVIEW <span>{{demo.watchlist}}</span></div>
                 <div class="overview-title">
                   <span>{{demo.sampleA}}</span><strong>108.42</strong
-                  ><span class="market-up">↗ +1.24%</span>
+                  ><span class="market-up"><svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-up-right" /></svg> +1.24%</span>
                 </div>
                 <svg
                   class="price-chart"
@@ -247,7 +244,7 @@
               <span class="gold">Q ›</span
               ><span id="composer-text">{{demo.composer}}</span
               ><span class="cursor" aria-hidden="true"></span
-              ><span class="composer-shortcuts">/ commands <kbd>↵</kbd></span>
+              ><span class="composer-shortcuts">/ commands <kbd aria-label="Enter"><svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="/icons.svg#corner-down-left" /></svg></kbd></span>
             </div>
             <div class="terminal-hud">
               <span>MODEL <b>your choice</b></span
@@ -259,8 +256,7 @@
             <span>{{demo.terminal}}</span
             ><a href="#settings"
               >{{demo.trySettings}}
-              <svg class="icon"><use href="#icon-settings" /></svg
-            ></a>
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#settings-2" /></svg></a>
           </div>
         </div>
       </section>
@@ -307,24 +303,23 @@
               href="https://github.com/yangjingo/oh-my-quant#commands"
               target="_blank"
               rel="noopener"
-              >{{workflow.docs}} <svg class="icon"><use href="#icon-external" /></svg
-            ></a>
+              >{{workflow.docs}} <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-up-right" /></svg></a>
           </div>
           <ol class="workflow-steps">
             <li>
-              <span class="flow-index">01</span>
+              <span class="flow-index">01</span><svg class="icon flow-arrow" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-right" /></svg>
               <h3>{{workflow.connect}}</h3>
               <p>{{workflow.connectFirst}}<br />{{workflow.connectSecond}}</p>
               <code>/config <span>·</span> /doctor</code>
             </li>
             <li>
-              <span class="flow-index">02</span>
+              <span class="flow-index">02</span><svg class="icon flow-arrow" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-right" /></svg>
               <h3>{{workflow.observe}}</h3>
               <p>{{workflow.observeFirst}}<br />{{workflow.observeSecond}}</p>
               <code>/portfolio</code>
             </li>
             <li>
-              <span class="flow-index">03</span>
+              <span class="flow-index">03</span><svg class="icon flow-arrow" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-right" /></svg>
               <h3>{{workflow.verify}}</h3>
               <p>{{workflow.verifyFirst}}<br />{{workflow.verifySecond}}</p>
               <code>{{workflow.prompt}}</code>
@@ -358,16 +353,14 @@
               href="https://github.com/yangjingo/oh-my-quant/blob/main/docs/configuration.md"
               target="_blank"
               rel="noopener"
-              >{{settings.guide}} <svg class="icon"><use href="#icon-external" /></svg
-            ></a>
+              >{{settings.guide}} <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-up-right" /></svg></a>
             <p class="settings-note">
               {{settings.demoNotice}}
             </p>
           </div>
           <div class="settings-preview">
             <div class="settings-title">
-              <svg class="icon"><use href="#icon-settings" /></svg
-              ><strong>Settings</strong><code>/config</code>
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#settings-2" /></svg><strong>Settings</strong><code>/config</code>
             </div>
             <div
               class="settings-tabs tab-list"
@@ -414,10 +407,10 @@
                   <strong>Market Colors</strong>
                   <p>{{settings.colorsHelp}}</p>
                 </div>
-                <select id="market-colors" aria-label="{{settings.colorsLabel}}">
+                <div class="select-control"><select id="market-colors" aria-label="{{settings.colorsLabel}}">
                   <option value="red-up">{{settings.redUp}}</option>
                   <option value="green-up">{{settings.greenUp}}</option>
-                </select>
+                </select><svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#chevron-down" /></svg></div>
               </div>
               <div class="setting-row">
                 <div>
@@ -450,8 +443,7 @@
                 </button>
               </div>
               <div class="settings-help">
-                <span class="gold">↳</span
-                ><span
+                <svg class="icon gold" aria-hidden="true" focusable="false"><use href="/icons.svg#corner-down-right" /></svg><span
                   >{{settings.colorNotice}}</span
                 >
               </div>
@@ -468,7 +460,7 @@
                   <strong>Model</strong>
                   <p>{{settings.modelHelp}}</p>
                 </div>
-                <span class="setting-value">{{settings.connectValue}}</span>
+                <span class="setting-value">{{settings.connectValue}} <svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-up-right" /></svg></span>
               </div>
               <div class="setting-row">
                 <div>
@@ -485,8 +477,7 @@
                 <span class="setting-value">{{settings.verifyValue}}</span>
               </div>
               <div class="settings-help">
-                <span class="gold">↳</span
-                ><span>{{settings.credentialsNotice}}</span>
+                <svg class="icon gold" aria-hidden="true" focusable="false"><use href="/icons.svg#corner-down-right" /></svg><span>{{settings.credentialsNotice}}</span>
               </div>
             </div>
             <div
@@ -518,8 +509,7 @@
                 <span class="setting-value">{{settings.saveValue}}</span>
               </div>
               <div class="settings-help">
-                <span class="gold">↳</span
-                ><span
+                <svg class="icon gold" aria-hidden="true" focusable="false"><use href="/icons.svg#corner-down-right" /></svg><span
                   >{{settings.dataNotice}}</span
                 >
               </div>
@@ -547,8 +537,7 @@
           </div>
           <div class="install-box">
             <div class="install-header">
-              <svg class="icon"><use href="#icon-terminal" /></svg
-              ><span>{{install.terminal}}</span
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#terminal" /></svg><span>{{install.terminal}}</span
               ><span class="install-requirement"
                 >{{install.requirement}}</span
               >
@@ -589,8 +578,9 @@
                 class="copy-button"
                 data-copy="npm i -g whyj-quant"
                 aria-label="{{install.copyNpm}}"
+                title="{{install.copyNpm}}"
               >
-                <svg class="icon"><use href="#icon-copy" /></svg>
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#copy" /></svg>
               </button>
             </div>
             <div
@@ -605,8 +595,9 @@
                 class="copy-button"
                 data-copy="bun add -g whyj-quant"
                 aria-label="{{install.copyBun}}"
+                title="{{install.copyBun}}"
               >
-                <svg class="icon"><use href="#icon-copy" /></svg>
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#copy" /></svg>
               </button>
             </div>
             <div class="launch-command">
@@ -615,8 +606,9 @@
                 class="copy-button"
                 data-copy="whyj"
                 aria-label="{{install.copyLaunch}}"
+                title="{{install.copyLaunch}}"
               >
-                <svg class="icon"><use href="#icon-copy" /></svg>
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#copy" /></svg>
               </button>
             </div>
             <p class="install-next">
@@ -628,8 +620,7 @@
               target="_blank"
               rel="noopener"
               >{{install.docs}}
-              <svg class="icon"><use href="#icon-external" /></svg
-            ></a>
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#arrow-up-right" /></svg></a>
             <p id="copy-status" class="copy-status" role="status"></p>
           </div>
         </div>
@@ -643,7 +634,7 @@
           <div>
             <details>
               <summary>
-                {{faq.tradingQuestion}}<span aria-hidden="true">+</span>
+                {{faq.tradingQuestion}}<svg class="icon faq-indicator" aria-hidden="true" focusable="false"><use href="/icons.svg#plus" /></svg>
               </summary>
               <p>
                 {{faq.tradingAnswer}}
@@ -651,7 +642,7 @@
             </details>
             <details>
               <summary>
-                {{faq.providersQuestion}}<span aria-hidden="true">+</span>
+                {{faq.providersQuestion}}<svg class="icon faq-indicator" aria-hidden="true" focusable="false"><use href="/icons.svg#plus" /></svg>
               </summary>
               <p>
                 {{faq.providersAnswer}}
@@ -659,7 +650,7 @@
             </details>
             <details>
               <summary>
-                {{faq.storageQuestion}}<span aria-hidden="true">+</span>
+                {{faq.storageQuestion}}<svg class="icon faq-indicator" aria-hidden="true" focusable="false"><use href="/icons.svg#plus" /></svg>
               </summary>
               <p>
                 {{faq.storageAnswer}}
@@ -667,7 +658,7 @@
             </details>
             <details>
               <summary>
-                {{faq.contributeQuestion}}<span aria-hidden="true">+</span>
+                {{faq.contributeQuestion}}<svg class="icon faq-indicator" aria-hidden="true" focusable="false"><use href="/icons.svg#plus" /></svg>
               </summary>
               <p>
                 {{faq.contributeFirst}}

@@ -144,8 +144,8 @@
     "en": "Tool trace and source session"
   },
   "demo.archive": {
-    "zh": "版本归档 ↗",
-    "en": "Version archive ↗"
+    "zh": "版本归档",
+    "en": "Version archive"
   },
   "demo.reportHint": {
     "zh": "在终端开启 Auto Artifacts 后生成；通过 /artifact 浏览已有报告。",
@@ -396,8 +396,8 @@
     "en": "Choose a provider and model ID in the terminal"
   },
   "settings.connectValue": {
-    "zh": "自主连接 ↗",
-    "en": "Your connection ↗"
+    "zh": "自主连接",
+    "en": "Your connection"
   },
   "settings.thinkingHelp": {
     "zh": "选择模型支持的推理级别",
@@ -623,10 +623,6 @@
     "zh": "切换到英文",
     "en": "Switch to Chinese"
   },
-  "nav.languageName": {
-    "zh": "EN",
-    "en": "中文"
-  },
   "runtime.menuOpen": {
     "zh": "打开导航菜单",
     "en": "Open navigation menu"
@@ -690,5 +686,9 @@
   "blog.status": {
     "zh": "即将发布",
     "en": "Coming soon"
+  },
+  "footer.npm": {
+    "zh": "在 npm 查看软件包",
+    "en": "View package on npm"
   }
 }

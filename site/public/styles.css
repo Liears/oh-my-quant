@@ -116,21 +116,37 @@ summary:focus-visible {
 [hidden] {
   display: none !important;
 }
-.svg-sprite {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-}
 .icon {
   width: 18px;
   height: 18px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.5;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
   flex-shrink: 0;
+}
+.icon-small {
+  width: 14px;
+  height: 14px;
+}
+.icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  transition: color 0.18s, background-color 0.18s, transform 0.18s;
+}
+.icon-link:hover {
+  background: var(--elevated);
+  color: var(--gold);
+}
+.icon-link:active {
+  transform: scale(0.98);
 }
 .container {
   width: min(1120px, calc(100% - 80px));
@@ -231,6 +247,7 @@ kbd {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+  gap: 6px;
 }
 .feature-menu summary::-webkit-details-marker {
   display: none;
@@ -240,14 +257,12 @@ kbd {
   color: var(--gold);
 }
 .nav-chevron {
-  width: 6px;
-  height: 6px;
-  border-right: 1px solid currentColor;
-  border-bottom: 1px solid currentColor;
-  transform: translateY(-2px) rotate(45deg);
+  width: 14px;
+  height: 14px;
+  transition: transform 0.18s;
 }
 .feature-menu[open] .nav-chevron {
-  transform: translateY(2px) rotate(225deg);
+  transform: rotate(180deg);
 }
 .feature-dropdown {
   position: absolute;
@@ -273,31 +288,12 @@ kbd {
   background: var(--elevated);
   color: var(--ink);
 }
-.feature-dropdown a > .gold {
-  font: 10px var(--mono);
-}
 .feature-dropdown .all-features {
   border-top: 1px solid var(--hairline);
   margin-top: 5px;
   border-radius: 0;
   color: var(--gold);
   justify-content: space-between;
-}
-.language-link {
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 4px 7px;
-  border: 1px solid var(--hairline);
-  border-radius: 6px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-.language-link:hover {
-  color: var(--gold);
-  border-color: var(--gold);
 }
 .desktop-nav a:hover,
 .text-link:hover,
@@ -309,16 +305,7 @@ kbd {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 24px;
-}
-.github-link {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 13px;
-  min-width: 44px;
-  min-height: 44px;
-  justify-content: center;
+  gap: 12px;
 }
 .button {
   min-height: 44px;
@@ -368,15 +355,22 @@ kbd {
   width: 44px;
   height: 44px;
   background: transparent;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: 8px;
-  padding: 10px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
 }
-.menu-button span {
-  height: 1px;
+.menu-button:hover {
+  background: var(--elevated);
+  color: var(--gold);
+}
+.menu-button .menu-close,
+.menu-button[aria-expanded="true"] .menu-open {
+  display: none;
+}
+.menu-button[aria-expanded="true"] .menu-close {
   display: block;
-  background: var(--ink);
-  margin: 5px 0;
 }
 .mobile-nav {
   padding: 8px 24px 20px;
@@ -385,7 +379,9 @@ kbd {
   overflow-y: auto;
 }
 .mobile-nav a {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 12px;
 }
 .mobile-nav .feature-menu summary {
@@ -532,16 +528,6 @@ html[lang="en"] .answer p br {
   color: var(--muted);
   margin-left: 12px;
 }
-.window-dots {
-  display: flex;
-  gap: 6px;
-}
-.window-dots i {
-  width: 5px;
-  height: 5px;
-  border: 1px solid #777;
-  border-radius: 50%;
-}
 .workspace-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 310px;
@@ -584,7 +570,8 @@ html[lang="en"] .answer p br {
 }
 .step-symbol {
   color: var(--gold);
-  font-size: 16px;
+  width: 16px;
+  height: 16px;
 }
 .tool-step code {
   min-width: 137px;
@@ -610,9 +597,7 @@ html[lang="en"] .answer p br {
   font-weight: 600;
   display: flex;
   gap: 10px;
-}
-.answer-heading .gold {
-  font-size: 18px;
+  align-items: center;
 }
 .answer p {
   font-size: 12px;
@@ -670,6 +655,9 @@ html[lang="en"] .answer p br {
 .overview-title > span:last-child {
   font-size: 11px;
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .price-chart {
   width: 100%;
@@ -745,6 +733,8 @@ html[lang="en"] .answer p br {
   margin-left: auto;
   color: var(--muted);
   font-size: 10px;
+  display: flex;
+  align-items: center;
 }
 .composer-shortcuts kbd {
   margin-left: 14px;
@@ -844,6 +834,9 @@ html[lang="en"] .answer p br {
 }
 .document-bottom > span:last-child {
   color: var(--gold);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .report-hint {
   font: 11px/1.7 var(--sans);
@@ -916,8 +909,7 @@ h2 {
   padding-top: 22px;
   border-top: 1px solid var(--hairline);
 }
-.workflow-steps li:not(:last-child):after {
-  content: "→";
+.flow-arrow {
   position: absolute;
   right: 0;
   top: 22px;
@@ -1026,14 +1018,29 @@ h2 {
   margin-top: 6px;
 }
 .setting-row select {
+  appearance: none;
+  width: 100%;
   min-height: 44px;
   color: var(--ink);
   font-size: 11px;
   background: var(--elevated);
-  padding: 8px;
+  padding: 8px 26px 8px 10px;
   border: 1px solid var(--hairline);
   border-radius: 6px;
-  max-width: 140px;
+}
+.select-control {
+  position: relative;
+  flex-shrink: 0;
+  max-width: 150px;
+}
+.select-control > .icon {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 .switch {
   position: relative;
@@ -1082,6 +1089,9 @@ h2 {
   font-size: 11px;
   color: var(--muted);
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .settings-footer {
   display: flex;
@@ -1251,11 +1261,11 @@ h2 {
 .faq-grid summary::-webkit-details-marker {
   display: none;
 }
-.faq-grid summary > span {
-  font: 22px var(--mono);
+.faq-indicator {
   color: var(--muted);
+  transition: transform 0.18s;
 }
-.faq-grid details[open] summary > span {
+.faq-grid details[open] .faq-indicator {
   transform: rotate(45deg);
   color: var(--gold);
 }
@@ -1394,9 +1404,6 @@ h2 {
   .nav-actions {
     gap: 16px;
   }
-  .github-link span {
-    display: none;
-  }
   .features {
     gap: 48px;
   }
@@ -1452,11 +1459,11 @@ h2 {
   .nav-actions {
     gap: 12px;
   }
-  .github-link {
+  .nav-actions .github-link {
     display: none;
   }
   .menu-button {
-    display: block;
+    display: flex;
   }
   .blog-main {
     padding-block: 52px 72px;
@@ -1671,7 +1678,7 @@ h2 {
     font-size: 11px;
     margin-top: 20px;
   }
-  .workflow-steps li:nth-child(2):after {
+  .workflow-steps li:nth-child(2) .flow-arrow {
     display: none;
   }
   .workflow-section .section-heading .text-link {
@@ -1803,8 +1810,10 @@ h2 {
     font-size: 10px;
   }
   html[lang="en"] .setting-row select {
-    max-width: 127px;
     font-size: 10px;
+  }
+  html[lang="en"] .select-control {
+    max-width: 140px;
   }
   html[lang="en"] .comparison-table {
     font-size: 10px;
