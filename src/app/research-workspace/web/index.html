@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>WhyJ · 研究工作台</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <aside>
+      <a class="brand" href="/">▥ WhyJ <span>研究工作台</span></a
+      ><button id="new" class="primary">＋ 新建研究</button>
+      <p class="eyebrow">已保存的研究</p>
+      <div id="studies"></div>
+      <footer>本机服务 · 单股日线研究<br />证据与版本保存在本机</footer>
+    </aside>
+    <main>
+      <header>
+        <div>
+          <span class="eyebrow">RESEARCH WORKSPACE</span>
+          <h1>从一个问题，开始研究。</h1>
+        </div>
+        <span class="badge">真实 Agent · 实验版</span>
+      </header>
+      <div class="workspace">
+        <section class="conversation">
+          <div class="intro">
+            <h2>提问之后，每一步都有出处。</h2>
+            <p>
+              先取得股票与大盘日线，再复算指标、解释结构。保留结论背后的证据，以便下一次复核。
+            </p>
+          </div>
+          <form id="research">
+            <label for="question">你的研究问题</label
+            ><textarea id="question" rows="3" required maxlength="4000">
+研究 002048.SZ 最近的回撤结构：相对沪深300表现如何？哪些证据支持继续观察，哪些变化会破坏当前结构？</textarea
+            >
+            <details>
+              <summary>研究范围 · 明确代码与日期</summary>
+              <div class="scope">
+                <label
+                  >股票代码<input
+                    id="symbol"
+                    value="002048.SZ"
+                    required /></label
+                ><label
+                  >大盘基准<select id="benchmark">
+                    <option>000300.SH</option>
+                    <option>000001.SH</option>
+                    <option>399001.SZ</option>
+                  </select></label
+                ><label>起始日期<input id="start" type="date" required /></label
+                ><label>截至日期<input id="end" type="date" required /></label>
+              </div>
+            </details>
+            <div class="compose-actions">
+              <span>首轮支持沪深主板 · 排除当天日线</span
+              ><button type="submit" class="primary" id="submit">
+                开始研究 ↗
+              </button>
+            </div>
+          </form>
+          <div id="alert" role="alert"></div>
+          <div id="progress" aria-live="polite"></div>
+          <div id="answer"></div>
+          <div class="actions">
+            <button id="cancel" hidden>停止研究 · Ctrl+G</button
+            ><button id="continue" hidden>继续未完成工作</button
+            ><button id="save" hidden>保存本次研究</button
+            ><button id="review" hidden>以新证据复核</button>
+          </div>
+        </section>
+        <section class="inspector">
+          <nav aria-label="研究视图">
+            <button data-tab="conclusion" aria-selected="true">结论</button
+            ><button data-tab="chart">图表</button
+            ><button data-tab="evidence">证据</button
+            ><button data-tab="review">复核</button>
+          </nav>
+          <div id="inspect">
+            <h2>研究将从这里展开</h2>
+            <p>结论说明判断，图表呈现结构，证据提供出处，复核记录变化。</p>
+          </div>
+        </section>
+      </div>
+      <p class="footnote">
+        模型解释与程序计算分别呈现。当前缺少板块证据与交易所终态认证，结果用于结构观察，不能认证买点。
+      </p>
+    </main>
+  </body>
+</html>
