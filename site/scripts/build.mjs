@@ -10,6 +10,7 @@ const allowed = new Set([
   "styles.css",
   "app.js",
   "favicon.svg",
+  "logo-mark.svg",
   "icons.svg",
   "licenses",
   "fonts",

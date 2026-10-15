@@ -607,10 +607,6 @@
     "zh": "工作区设置",
     "en": "Workspace settings"
   },
-  "nav.docs": {
-    "zh": "文档",
-    "en": "Docs"
-  },
   "nav.github": {
     "zh": "在 GitHub 查看源码",
     "en": "View source on GitHub"
