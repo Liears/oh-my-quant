@@ -6,7 +6,11 @@ import type { Model } from "@earendil-works/pi-ai";
 import { JsonlSessionRepo } from "../../../agent/src/session-runtime/index.ts";
 import { NodeExecutionEnv } from "../../../agent/src/session-runtime/node.ts";
 import type { QuantAgentDependencies } from "../../../agent/src/session-contracts.ts";
-import { createWorkspaceStore, workspaceHash } from "../../../storage/index.ts";
+import {
+  createWorkspaceStore,
+  workspaceHash,
+  subscribeFileEvents,
+} from "../../../storage/index.ts";
 import { buildResearchReport } from "../../../research/input.ts";
 import { startWorkspaceServer } from "../server.ts";
 import { calculateMetrics } from "../metrics.ts";
@@ -383,6 +387,60 @@ test("metrics use preceding volume and common dates; revisions preserve original
   expect(review.historicalRevisions).toEqual(["2026-01-01"]);
   expect(review.previousBoundary).toEqual(m.structuralLow);
 });
+
+test("missing forward sessions and regressed coverage cannot validate an old boundary", () => {
+  const stock = evidence(scope.symbol),
+    base = evidence(scope.benchmark);
+  const previous = {
+    evidence: [
+      structuredClone(stock),
+      { result: calculateMetrics(stock, base) },
+    ],
+  } as WorkspaceRun;
+  stock.bars!.push({
+    date: "2026-01-27",
+    open: 90,
+    high: 91,
+    low: 89,
+    close: 90,
+    volume: 100,
+    amount: null,
+  });
+  stock.sessions!.push("2026-01-26", "2026-01-27");
+  const missing = calculateMetrics(stock, base, previous);
+  expect(missing.comparison.advanced).toBe(true);
+  expect(missing.close).toBeLessThan(missing.previousBoundary!.price);
+  expect(missing.comparison.comparable).toBe(false);
+  stock.bars!.splice(-2);
+  const regressed = calculateMetrics(stock, base, previous);
+  expect(regressed.comparison.comparable).toBe(false);
+  expect(regressed.limitations.join(" ")).toContain("倒退");
+  expect(regressed.limitations.join(" ")).not.toContain("截止日相同");
+});
+
+test("successful file activities are observable and idempotent saves do not invent writes", async () => {
+  const f = await fixture();
+  const r = (await (
+    await f.post("api/runs", { question: "test", scope })
+  ).json()) as WorkspaceRun;
+  await f.wait(r.id);
+  const operations: string[] = [];
+  const unsubscribe = subscribeFileEvents((event) => {
+    if (event.path.startsWith(join(f.root, "saved")))
+      operations.push(event.operation);
+  });
+  try {
+    await f.post(`api/runs/${r.id}/save`);
+    f.store.list();
+    expect(operations).toContain("MKDIR");
+    expect(operations).toContain("READ");
+    expect(operations.filter((op) => op === "WRITE")).toHaveLength(1);
+    await f.post(`api/runs/${r.id}/save`);
+    expect(operations.filter((op) => op === "WRITE")).toHaveLength(1);
+  } finally {
+    unsubscribe();
+  }
+}, 10000);
 test("saved checksum detects corruption without overwriting original", async () => {
   const f = await fixture();
   const r = (await (

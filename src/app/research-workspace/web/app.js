@@ -96,6 +96,7 @@ function renderProgress() {
 }
 function render() {
   if (!run) return;
+  document.body.classList.add("has-run");
   renderProgress();
   $("alert").textContent = run.error || run.clarification || "";
   $("submit").disabled = run.status === "running";
@@ -390,6 +391,7 @@ $("new").onclick = () => {
   }
   events?.close();
   run = null;
+  document.body.classList.remove("has-run");
   $("answer").replaceChildren();
   $("progress").replaceChildren();
   $("alert").textContent = "";

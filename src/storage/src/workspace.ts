@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { atomicWriteJson, withFileLock } from "./atomic-file.ts";
 import { resolveOhquantDir } from "./dirs.ts";
+import { emitFileEvent } from "./fs-events.ts";
 import type { WorkspaceRun } from "../../types/workspace.ts";
 
 export function workspaceHash(value: unknown): string {
@@ -16,7 +17,15 @@ export function createWorkspaceStore(
     return join(root, `${id}.json`);
   }
   function load(id: string): WorkspaceRun {
-    const envelope = JSON.parse(readFileSync(path(id), "utf8")) as {
+    const file = path(id),
+      text = readFileSync(file, "utf8");
+    emitFileEvent({
+      operation: "READ",
+      path: file,
+      bytes: Buffer.byteLength(text),
+      detail: "workspace research",
+    });
+    const envelope = JSON.parse(text) as {
       run: WorkspaceRun;
       hash: string;
     };
@@ -37,7 +46,14 @@ export function createWorkspaceStore(
     save(run: WorkspaceRun): WorkspaceRun {
       if (run.status !== "complete" || !run.answer)
         throw new Error("Only completed research can be saved.");
-      mkdirSync(root, { recursive: true });
+      if (!existsSync(root)) {
+        mkdirSync(root, { recursive: true });
+        emitFileEvent({
+          operation: "MKDIR",
+          path: root,
+          detail: "workspace research",
+        });
+      }
       const file = path(run.id);
       const snapshot = structuredClone({ ...run, saved: true });
       return withFileLock(file, () => {
@@ -47,14 +63,29 @@ export function createWorkspaceStore(
             throw new Error("Research version is immutable.");
           return existing;
         }
-        atomicWriteJson(file, { run: snapshot, hash: workspaceHash(snapshot) });
+        const bytes = atomicWriteJson(file, {
+          run: snapshot,
+          hash: workspaceHash(snapshot),
+        });
+        emitFileEvent({
+          operation: "WRITE",
+          path: file,
+          bytes,
+          detail: "workspace research",
+        });
         return snapshot;
       });
     },
     list(): WorkspaceRun[] {
       if (!existsSync(root)) return [];
       // A corrupt saved version is surfaced, never silently overwritten or hidden.
-      return readdirSync(root)
+      const names = readdirSync(root);
+      emitFileEvent({
+        operation: "READ",
+        path: root,
+        detail: "workspace research index",
+      });
+      return names
         .filter((name) => /^[a-f0-9-]{36}\.json$/.test(name))
         .map((name) => load(name.slice(0, -5)))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));

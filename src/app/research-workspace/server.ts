@@ -60,15 +60,13 @@ export function startWorkspaceServer(
           });
         if (request.method === "GET" && url.pathname === "/api/studies")
           return json(
-            manager
-              .list()
-              .map((r) => ({
-                id: r.id,
-                question: r.question,
-                scope: r.scope,
-                createdAt: r.createdAt,
-                parentId: r.parentId,
-              })),
+            manager.list().map((r) => ({
+              id: r.id,
+              question: r.question,
+              scope: r.scope,
+              createdAt: r.createdAt,
+              parentId: r.parentId,
+            })),
           );
         if (request.method === "POST") {
           if (Number(request.headers.get("content-length") ?? 0) > 16000)
@@ -97,7 +95,7 @@ export function startWorkspaceServer(
                 );
               return json(
                 manager.start(
-                  `复核原研究：${old.question}。比较新旧证据与边界，明确哪些变化、哪些未变化。`,
+                  old.question,
                   { ...old.scope, end: body.end ?? old.scope.end },
                   id,
                 ),

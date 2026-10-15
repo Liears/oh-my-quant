@@ -137,6 +137,20 @@ p {
 .intro p {
   max-width: 590px;
 }
+.has-run .intro {
+  display: none;
+}
+.has-run #research textarea {
+  min-height: 60px;
+  max-height: 90px;
+  font-size: 12px;
+}
+.has-run #progress {
+  margin: 16px 0;
+}
+.has-run #answer h2 {
+  font-size: 16px;
+}
 form {
   border: 1px solid #343434;
   background: #111;

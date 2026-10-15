@@ -87,6 +87,7 @@ export function calculateMetrics(
       advanced: old.length > 0 && last.date > old.at(-1)!.date,
       comparable:
         old.length > 0 &&
+        missing.length === 0 &&
         old.every((b) => bars.some((x) => x.date === b.date)) &&
         stock.adjustment ===
           previous?.evidence.find((e) => e.symbol === stock.symbol)?.adjustment,
@@ -101,8 +102,11 @@ export function calculateMetrics(
       ...(old.length === 0
         ? ["首次研究，无前一版本可比较；修订列表为空不表示已验证历史未修订。"]
         : []),
-      ...(old.length > 0 && last.date <= old.at(-1)!.date
+      ...(old.length > 0 && last.date === old.at(-1)!.date
         ? ["新旧证据截止日相同，覆盖日期尚未推进。"]
+        : []),
+      ...(old.length > 0 && last.date < old.at(-1)!.date
+        ? ["本次证据截止日倒退，覆盖不完整；不能把缺失历史解释为正常无变化。"]
         : []),
       ...(revisions.length
         ? ["历史价格或成交量发生修订，旧价格边界不能直接判定失效。"]
