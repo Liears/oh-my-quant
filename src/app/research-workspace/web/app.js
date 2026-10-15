@@ -85,7 +85,7 @@ function renderProgress() {
   $("progress").replaceChildren();
   const state = el(
     "div",
-    `${{ running: "研究进行中", complete: "研究完成", cancelled: "研究已停止", failed: "研究未完成", needs_input: "需要澄清" }[run.status]}${run.status === "running" ? ` · 已等待 ${Math.floor((Date.now() - startedAt) / 1000)} 秒` : ""}`,
+    `${{ running: "研究进行中", complete: run.saved ? "研究完成 · 已保存" : "研究完成", cancelled: "研究已停止", failed: "研究未完成", needs_input: "需要澄清" }[run.status]}${run.status === "running" ? ` · 已等待 ${Math.floor((Date.now() - startedAt) / 1000)} 秒` : ""}`,
     "current",
   );
   $("progress").append(state);

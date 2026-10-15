@@ -52,7 +52,6 @@ export interface WorkspacePorts {
     signal: AbortSignal,
   ) => Promise<WorkspacePrices>;
   store?: ReturnType<typeof createWorkspaceStore>;
-  agent?: (dependencies: QuantAgentDependencies) => QuantAgentSession;
   dependencies?: () => QuantAgentDependencies;
   timeoutMs?: number;
 }
@@ -372,9 +371,7 @@ export function createWorkspaceManager(ports: WorkspacePorts = {}) {
           skill: () => "",
         },
       };
-      const agent = (
-        ports.agent ?? ((deps) => createLocalAgent({ dependencies: deps }))
-      )(restricted);
+      const agent = createLocalAgent({ dependencies: restricted });
       live.set(id, {
         agent,
         controller: new AbortController(),
@@ -385,6 +382,12 @@ export function createWorkspaceManager(ports: WorkspacePorts = {}) {
       agent.subscribe((e) => {
         if (e.type === "tool_execution_start")
           event(run, "tool", `正在调用 ${e.toolName}`);
+        if (e.type === "tool_execution_end" && e.isError)
+          event(
+            run,
+            "tool_error",
+            `${e.toolName} 未成功；等待 Agent 修正或停止。`,
+          );
       });
       event(run, "start", `开始研究 ${normalized.symbol}；模型 ${run.model}`);
       void execute(
