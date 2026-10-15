@@ -20,6 +20,12 @@ description: Draft and manage single-module issues for oh-my-quant with explicit
 2. Read the [documentation index](../../../docs/README.md), [module architecture](../../../docs/quant-harness/module-architecture.md), and relevant module documentation.
 3. Separate observed behavior, user reports, and suspected causes. Mark unverified claims explicitly.
 
+## Worktree Handoff
+
+Prefer one dedicated branch and worktree per implementation issue. Start from the latest verified target revision; for a stacked PR, use its explicit dependency branch rather than assuming `main`. Reuse the issue's existing worktree when continuing its PR, and record the issue, branch, worktree path, and base revision together in the handoff.
+
+Keep implementation changes out of the primary checkout and preserve its existing work. Plan to remove completed worktrees after their PRs merge, using the checks and authorization boundary in [pr-skill](../pr-skill/SKILL.md#post-merge-cleanup). An issue assignment or PR merge is not permission to discard local data.
+
 ## Issue Template
 
 Title: `[type][module] Observable problem or capability`

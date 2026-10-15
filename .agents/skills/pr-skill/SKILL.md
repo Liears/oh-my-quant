@@ -10,6 +10,7 @@ description: Prepare and review single-issue PRs for oh-my-quant with complete t
 - Require one implementation issue; use [issue-skill](../issue-skill/SKILL.md) if missing. Continue an existing implementation PR when available.
 - Follow the issue's primary module, allowed paths, and acceptance criteria. Split unrelated problems or independent module changes.
 - Confirm the base branch and inspect the full diff. Preserve others' uncommitted work.
+- Prefer the issue's dedicated branch and worktree for development, verification, commits, and pushes. Record their association with the issue and PR; reuse that worktree for revisions rather than mixing implementation changes into the primary checkout.
 
 ## Before Commit and Push
 
@@ -18,6 +19,7 @@ description: Prepare and review single-issue PRs for oh-my-quant with complete t
 3. Add applicable module and end-to-end checks. Desktop changes require desktop typecheck/build; installer changes require actual package verification of paths, shortcuts, upgrade/reinstall behavior, and data retention in an isolated environment.
 4. Record commands, environment, results, and evidence. Distinguish synthetic tests from live-service validation. Rerun affected checks after edits; ensure the complete gate remains valid for the final content.
 5. Inspect the staged diff and run `git diff --check`. Commit only issue-related files. Report baseline failures without weakening assertions or claiming success. Push an incomplete WIP/draft only when explicitly requested.
+6. Before handoff, inspect tracked and untracked changes for omitted issue work. Commit intended deliverables and explicitly report any preserved unrelated changes; a clean Git status does not prove ignored local data is disposable.
 
 Local checks precede the final commit and push. CI follows the push and must pass before merge readiness.
 
@@ -84,5 +86,14 @@ Article link and the design question it explains; omit when unused.
 - Inspect failed job logs and fix confirmed causes; repeated reruns are not a substitute. Require all applicable checks and mandatory manual acceptance before declaring merge readiness.
 - Refresh descriptions and evidence after changes. Return the PR link, final SHA, results, and outstanding work.
 - Treat PR creation, merging, and publishing as separate actions governed by existing authorization.
+
+## Post-Merge Cleanup
+
+Recommend removing a completed issue's worktree and local/remote branches after its PR merges. Keep unmerged, still-under-review, or dependent worktrees; a closed-but-unmerged PR is not a merged delivery. Perform cleanup only within the user's authorization, not automatically on merge.
+
+1. Verify live PR merge status, target branch, exact branch heads, and worktree association. Confirm no undelivered branch-only work remains. Squash/rebase merges require comparing the delivered changes and later commits; ancestry alone cannot establish equivalence. Check whether other open PRs still depend on the branch.
+2. Inspect tracked, untracked, and ignored files, and any process using the worktree. Preserve unique verification receipts needed by the issue/PR. Do not discard user state or credentials, including `.ohquant`, merely because Git status is clean; preserve them at an agreed private location or obtain explicit discard approval. Never publish private files as cleanup evidence.
+3. Resolve and validate the exact worktree path. From another checkout, use normal `git worktree remove`, then delete only the confirmed local branch with `git branch -d` and its verified remote counterpart. If safe removal is refused, stop and explain why; do not default to `--force`, `-D`, or recursive filesystem deletion. Recheck remote heads before deletion so concurrent updates are not lost.
+4. Synchronize the primary checkout only when its existing work is protected; prefer a fast-forward update without reset or checkout-based discards. Confirm the remaining worktree/branch inventory and Git status. Report removed objects, preserved evidence/data locations, and any retained changes or dependencies in the issue/PR follow-up.
 
 This skill does not configure branch protection or CI enforcement.

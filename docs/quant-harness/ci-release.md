@@ -6,6 +6,8 @@ Automation is maintained in [issue #17](https://github.com/yangjingo/oh-my-quant
 
 Use the [implementation issue form](../../.github/ISSUE_TEMPLATE/implementation.yml) to define one module and checkable acceptance criteria, then complete the [PR template](../../.github/pull_request_template.md). Keep exactly one standalone `Closes #<issue>` line. Link dependencies without closing them. Follow [AGENTS.md](../../AGENTS.md) and its Issue/PR skills.
 
+Prefer a dedicated issue worktree: [Issue worktree handoff](../../.agents/skills/issue-skill/SKILL.md#worktree-handoff) records the branch, path, and verified base; [PR post-merge cleanup](../../.agents/skills/pr-skill/SKILL.md#post-merge-cleanup) defines delivery checks and authorized removal. These are contributor procedures, not automated GitHub enforcement. Merging does not authorize discarding ignored evidence, private state, or dependent branches.
+
 [PR policy](../../.github/workflows/pr-policy.yml) reads the trusted base revision, never PR code. It checks an open issue rather than a PR number, completed sections, a non-deleted Markdown change under `docs/`, and other open PRs using the canonical closing format. Examples inside comments or code do not count. Scope, evidence quality, UI captures, and whether documentation reflects behavior remain review responsibilities.
 
 The check runs on PR creation, body edits, pushes, reopening, and readiness changes. It does not reconcile later issue-only changes or provide atomic enforcement across concurrent PRs. The first PR introducing this trusted-base workflow needs explicit policy validation; automatic enforcement starts after the workflow reaches the base branch.
