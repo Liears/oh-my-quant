@@ -1,6 +1,6 @@
 ---
 name: pr-skill
-description: Prepare and review single-issue PRs for oh-my-quant with complete testing, current documentation, UI evidence, and final-commit CI verification.
+description: Prepare and review single-issue PRs for oh-my-quant targeting stable iterative main, with testing, documentation, final-commit CI verification, and remote/local cleanup after authorized merges.
 ---
 
 # PR Skill
@@ -10,6 +10,7 @@ description: Prepare and review single-issue PRs for oh-my-quant with complete t
 - Require one implementation issue; use [issue-skill](../issue-skill/SKILL.md) if missing. Continue an existing implementation PR when available.
 - Follow the issue's primary module, allowed paths, and acceptance criteria. Split unrelated problems or independent module changes.
 - Confirm the base branch and inspect the full diff. Preserve others' uncommitted work.
+- Treat `main` as the stable iterative development version and the final integration target, not a scratch branch or a synonym for an npm release. Develop in issue branches; integrate only reviewed changes with the applicable final-revision checks passing. Stacked branches are temporary dependencies and ultimately integrate into `main`.
 - Prefer the issue's dedicated branch and worktree for development, verification, commits, and pushes. Record their association with the issue and PR; reuse that worktree for revisions rather than mixing implementation changes into the primary checkout.
 
 ## Before Commit and Push
@@ -89,11 +90,14 @@ Article link and the design question it explains; omit when unused.
 
 ## Post-Merge Cleanup
 
-Recommend removing a completed issue's worktree and local/remote branches after its PR merges. Keep unmerged, still-under-review, or dependent worktrees; a closed-but-unmerged PR is not a merged delivery. Perform cleanup only within the user's authorization, not automatically on merge.
+When the user authorizes completing a PR merge into `main` or explicitly requests post-merge cleanup, include removal of the delivered remote branch, local branch, and completed worktree in that task unless the user asks to retain them. Proceed after the checks below without asking for the same permission again. A request only to review or report merge status does not authorize cleanup. Keep unmerged, still-under-review, active, or dependent worktrees; a closed-but-unmerged PR is not a merged delivery.
 
-1. Verify live PR merge status, target branch, exact branch heads, and worktree association. Confirm no undelivered branch-only work remains. Squash/rebase merges require comparing the delivered changes and later commits; ancestry alone cannot establish equivalence. Check whether other open PRs still depend on the branch.
-2. Inspect tracked, untracked, and ignored files, and any process using the worktree. Preserve unique verification receipts needed by the issue/PR. Do not discard user state or credentials, including `.ohquant`, merely because Git status is clean; preserve them at an agreed private location or obtain explicit discard approval. Never publish private files as cleanup evidence.
-3. Resolve and validate the exact worktree path. From another checkout, use normal `git worktree remove`, then delete only the confirmed local branch with `git branch -d` and its verified remote counterpart. If safe removal is refused, stop and explain why; do not default to `--force`, `-D`, or recursive filesystem deletion. Recheck remote heads before deletion so concurrent updates are not lost.
-4. Synchronize the primary checkout only when its existing work is protected; prefer a fast-forward update without reset or checkout-based discards. Confirm the remaining worktree/branch inventory and Git status. Report removed objects, preserved evidence/data locations, and any retained changes or dependencies in the issue/PR follow-up.
+GitHub's automatic branch deletion concerns remote branches only; it does not remove local branches or worktrees. Check actual refs instead of assuming the setting completed cleanup. Never delete `main` or another protected integration branch. A request limited to local cleanup remains limited to local objects.
+
+1. Verify live PR merge status, target branch, exact branch heads, and worktree association. For a stacked PR merged into a dependency branch, verify its merge revision and the dependency's delivery chain have reached `main`; merging into a temporary branch alone is not final delivery. Confirm no undelivered branch-only work remains. Squash/rebase merges require comparing the delivered changes and later commits; ancestry alone cannot establish equivalence. Check whether other open PRs still depend on the branch.
+2. Inspect tracked, untracked, and ignored files, and any process using the worktree. Keep worktrees with uncommitted tracked or untracked work. Preserve unique verification receipts and private state, including `.ohquant`, outside the removable worktree; a clean Git status does not make ignored data disposable. Use an established private archive location when available, or a private local archive outside the repository, and report its location. If preservation cannot be completed safely, retain the affected worktree and explain the specific blocker. Never publish private files as cleanup evidence.
+3. Recheck the remote branch head immediately before deletion; it must still match the delivered revision with no later work or open dependency. Delete that exact remote ref with an expected-head lease (for example, `git push --force-with-lease=refs/heads/<branch>:<verified-sha> origin :refs/heads/<branch>`); the lease guards a deletion, not permission to overwrite history. If it fails, refresh and retain changed work rather than retrying blindly. An already absent remote ref is complete.
+4. Resolve and validate the exact worktree path. From another checkout that contains the verified `main` revision, use normal `git worktree remove`, then delete only the confirmed local branch with `git branch -d`. If safe removal is refused, retain that object and explain why; do not default to `--force`, `-D`, or recursive filesystem deletion. An already absent local object is complete.
+5. Synchronize the primary checkout only when its existing work is protected; prefer a fast-forward update without reset or checkout-based discards. Cleanup can run from a separate checkout without updating a dirty primary checkout. Confirm removed paths and local/remote refs are absent, then report removed branches/worktrees, preserved evidence/data locations, and any retained changes or dependencies. Update an issue/PR follow-up only within existing publication authorization.
 
 This skill does not configure branch protection or CI enforcement.
