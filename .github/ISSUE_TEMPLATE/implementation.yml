@@ -1,0 +1,56 @@
+name: Implementation issue
+description: Define one module, one outcome, and one implementation PR.
+title: "[type][module] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who is affected, what happens, and what should happen?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Version, revision, environment, reproduction or feature use case. Separate confirmed causes from hypotheses.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      value: |
+        Primary module:
+        Allowed code and test paths:
+        Required docs updates:
+        Non-goals and dependencies:
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Observable behavior, relevant failure cases, and compatibility requirements.
+      value: "- [ ] AC1: Given ..., when ..., then ..."
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: Tests, full release gate, docs checks, and actual screenshots for visible UI changes. Identify unavailable prerequisites.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and Rollback
+      description: Compatibility or data impact and recovery procedure.
+    validations:
+      required: true
+  - type: textarea
+    id: pr
+    attributes:
+      label: Implementation PR
+      value: Pending. Link the single implementation PR here.

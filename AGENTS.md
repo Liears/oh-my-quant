@@ -1,0 +1,42 @@
+# Repository Guidelines
+
+## 1. Principles
+
+### Think Before Coding
+
+State your interpretation and consequential assumptions before editing. Explain meaningful tradeoffs. Ask when guessing creates real risk; otherwise state the assumption and proceed.
+
+### Keep It Simple
+
+Implement the smallest solution that satisfies the request. Avoid unrequested features, premature configuration, abstractions for one caller, and unnecessary dependencies. Prefer direct implementations.
+
+### Make Surgical Changes
+
+Follow local style and change only necessary files. Avoid unrelated formatting, renaming, and reorganization. Remove code made unused by your changes; report unrelated problems separately. Preserve others' uncommitted work.
+
+### Define the Goal and Verify It
+
+Identify the failing case for bugs, observable behavior for features, preserved behavior for refactors, and concrete risks for reviews. Use focused checks during development and complete the release gate before delivery. Report unrun checks and limitations; never present assumptions or historical results as current evidence.
+
+For substantial work, briefly communicate **Assumption**, **Changed**, **Verified**, and **Remaining risk**. Challenge unnecessary scope or inadequate verification and propose a smaller sufficient approach.
+
+## 2. Repository Writing Conventions
+
+### Issues, Pull Requests, and Documentation
+
+- Keep one implementation issue, one primary functional module, and one implementation PR together. Define allowed paths, non-goals, and checkable acceptance criteria.
+- Update the relevant current `docs/` pages. README, CHANGELOG, and PR descriptions do not replace module documentation.
+- Provide actual screenshots for visible UI changes, with environment and reproduction details. Use recordings for interactions; label mockups separately.
+- Tie verification evidence to acceptance criteria and the final revision. Distinguish proposed, implemented, verified, and unverified behavior.
+- For major changes, consider a focused `docs/blog/` article explaining alternatives, decisions, evidence, and limits.
+
+### Skill Index
+
+| Skill | Instructions | Use when |
+| --- | --- | --- |
+| `issue-skill` | [SKILL.md](.agents/skills/issue-skill/SKILL.md) | Defining issues, scope, and acceptance criteria. |
+| `pr-skill` | [SKILL.md](.agents/skills/pr-skill/SKILL.md) | Implementing issues and preparing or reviewing PRs. |
+
+Read applicable skills first; use both for issue-to-PR work. Reuse an existing compliant issue. Drafting and review requests do not authorize publication or implementation.
+
+Maintain finalized procedures in `.agents/skills/<name>/SKILL.md` and their index here. Avoid duplicated rules and active draft skills. Current automation and setup requirements live in [CI and npm Releases](docs/quant-harness/ci-release.md); these instructions alone do not enforce GitHub merge rules.

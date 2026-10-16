@@ -1,6 +1,6 @@
 # 08｜桌面优先之后，CLI 如何延续同一份研究？
 
-Agent Engineering / oh-my-quant · 初稿 2026-10-13 · 修订 2026-10-15 · 产品形态与架构演进
+Agent Engineering / oh-my-quant · 初稿 2026-10-13 · 修订 2026-10-16 · 产品形态与架构演进
 
 用户今天比较两组标的，明天再问“换一个基准会怎样”。在终端里可以接着说，换到桌面应用以后，研究还能接得上吗？如果需要重新输入日期、解释数据来源、寻找旧报告，我们交付的就只是两个入口，而不是一份能够继续的工作。
 
@@ -34,7 +34,6 @@ Agent Engineering / oh-my-quant · 初稿 2026-10-13 · 修订 2026-10-15 · 产
 apps/
   desktop/    Electron main、preload、renderer 与桌面打包
   cli/        公共 whyj 命令、JSON 入口与终端适配
-  site/       产品网站、Docs、Blog、手册与 Demo
 packages/
   agent-runtime/   通用会话、模型循环与生命周期
   quant-harness/   量化应用服务、领域模块与显式契约
@@ -46,6 +45,7 @@ docs/
   agent-runtime/
   quant-harness/
   blog/
+site/         产品网站、Docs、Blog、手册与公开 Demo
 ```
 
 沿用[现有文档划分](../README.md#design)，Agent Runtime 负责通用会话运行机制；数据、计算、执行、报告、产品与 UI/UX 均属于 Quant Harness 的应用体系。文档归属不要求所有界面代码住在同一个共享包：具体渲染留在各 app，跨界面确实复用的状态契约和应用服务再进入共享层。现有 `source`、`storage`、`quant`、`execution` 的依赖与授权规则仍需保留。
@@ -65,6 +65,12 @@ docs/
 | 入口归位 | 先迁 `apps/cli` 与 `apps/desktop`，共享实现暂留根 `src/`；同步构建、测试、CI 和安装路径 | npm 包名与 `whyj` 命令、Electron appId、用户数据目录、安装更新与历史读取 |
 | 一条工作链贯通 | 从 AppRuntime 分离应用服务；先让配置保存、状态投影与诊断消费同一已提交配置快照及其保存代次，再接研究、取消、报告恢复 | 旧 PTY 可以继续工作；renderer 不解析字符流充当业务接口，不新增重复真值；共享工作区先限定单写者，并发保护验收前不开放两端同时写入 |
 | 边界稳定后成包 | 再形成 Agent Runtime / Quant Harness 工作区；迁移测试和发布配置 | 无 GUI 的 CLI 可独立构建/运行，领域内部入口约束不被总包抹平 |
+
+**后续前端实现的交接约束。** 根据 [PR #22 的归属讨论](https://github.com/yangjingo/oh-my-quant/pull/22#issuecomment-6193433860)，网站继续由 `site/` 独立维护；本阶段不迁网站，也不把真实研究工作台放进官网。正式产品界面归 `apps/desktop` 的 renderer，窗口、preload、系统能力与打包归桌面宿主。共享实现第一阶段仍可留在根 `src/`；“入口归位”不等于把研究服务、计算、Source 或 Storage 搬进 renderer。
+
+[PR #27](https://github.com/yangjingo/oh-my-quant/pull/27) 的 `src/app/research-workspace/web/` 与本地 HTTP 服务是已声明的过渡验证入口，不是最终产品目录。后续正式前端应依赖本方案和入口迁移：浏览器界面归 renderer，开发用 HTTP/SSE 入口作为宿主适配器，研究编排和状态契约独立于传输与界面。桌面接入复用这些服务，不复制研究逻辑；仅修改目录或注释不足以证明接入完成。入口迁移、研究闭环和桌面打包分别验收，保持 CLI/npm 命令、appId、用户目录和历史数据兼容。
+
+当前说明确定职责与迁移顺序，不确定前端框架、业务进程或 IPC 协议。[Issue #29](https://github.com/yangjingo/oh-my-quant/issues/29) 的技术栈仍是讨论项；网站上线、本地浏览器验证与 Desktop 实际打包运行必须分别记录。本方案合入只交付架构依据，后续实现继续通过对应 Issue/PR 验收。
 
 未来根 package 可以成为 private workspace 编排器，以 `dev` 优先启动 Desktop、`dev:cli` 显式启动 CLI；公共 `whyj-quant` 仍由 CLI 产品发布。[npm workspaces](https://docs.npmjs.com/cli/v11/using-npm/workspaces/)可以管理本地包与命令，但不会自动解决依赖方向。现在没有必要同时发布十几个 npm 包，也不应在入口尚未清楚时引入统一插件平台。这些脚本与发布调整都属于后续实现，不改变本轮现行 README 命令。
 

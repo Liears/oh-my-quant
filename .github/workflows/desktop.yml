@@ -73,15 +73,7 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Install and exercise the shipped application
         run: |
-          $version = (Get-Content desktop/package.json | ConvertFrom-Json).version
-          $installer = (Resolve-Path "release/WhyJ-Quant-Setup-$version-win-x64.exe").Path
-          $installDir = Join-Path $env:RUNNER_TEMP 'WhyJ Quant installed'
-          $process = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDir") -PassThru -Wait -WindowStyle Hidden
-          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
-          $env:WHYJ_SMOKE_EXE = Join-Path $installDir 'WhyJ Quant.exe'
-          if (-not (Test-Path $env:WHYJ_SMOKE_EXE)) { throw 'Installed executable missing' }
-          bun run --cwd desktop test:smoke
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./desktop/scripts/test-install.ps1
           Get-ChildItem release/*.exe | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content release/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         if: always()
