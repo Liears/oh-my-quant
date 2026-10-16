@@ -2,6 +2,13 @@ import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { createWorkspaceManager, type WorkspacePorts } from "./manager.ts";
 import type { WorkspaceScope } from "../../types/workspace.ts";
+import {
+  loadWorkspaceMetadata,
+  saveWorkspaceMetadata,
+  resolveProjectDirPath,
+  type WorkspaceMetadata,
+} from "../../storage/index.ts";
+import { revealInFileManager } from "./reveal.ts";
 
 /** Local-only composition. No model credentials, raw provider events, or arbitrary files cross this boundary. */
 export function startWorkspaceServer(
@@ -58,6 +65,8 @@ export function startWorkspaceServer(
             local: true,
             current: manager.current(),
           });
+        if (request.method === "GET" && url.pathname === "/api/workspace/meta")
+          return json(loadWorkspaceMetadata());
         if (request.method === "GET" && url.pathname === "/api/studies")
           return json(
             manager.list().map((r) => ({
@@ -75,6 +84,30 @@ export function startWorkspaceServer(
             return json({ error: "请求过大。" }, 413);
           const text = await request.text();
           if (text.length > 16000) return json({ error: "请求过大。" }, 413);
+          if (url.pathname === "/api/workspace/meta") {
+            const meta = JSON.parse(text) as WorkspaceMetadata;
+            return json(saveWorkspaceMetadata(meta));
+          }
+          if (url.pathname === "/api/workspace/reveal") {
+            const payload = JSON.parse(text) as {
+              type: "project" | "study";
+              id: string;
+              symbol?: string;
+            };
+            if (payload.type === "study") {
+              const run = manager.get(payload.id);
+              const target = manager.store.filePath(run.id);
+              revealInFileManager(target);
+              return json({ ok: true, path: target });
+            }
+            if (payload.type === "project") {
+              const symbol = payload.symbol || payload.id;
+              const dir = resolveProjectDirPath(symbol);
+              revealInFileManager(dir);
+              return json({ ok: true, path: dir });
+            }
+            return json({ error: "不支持的打开类型。" }, 400);
+          }
           const body = JSON.parse(text) as {
             question: string;
             scope: WorkspaceScope;
@@ -83,11 +116,22 @@ export function startWorkspaceServer(
           if (url.pathname === "/api/runs")
             return json(manager.start(body.question, body.scope), 202);
           const match =
-            /^\/api\/runs\/([a-f0-9-]{36})\/(cancel|continue|save|review|followup)$/.exec(
+            /^\/api\/runs\/([a-f0-9-]{36})\/(cancel|continue|save|review|followup|delete)$/.exec(
               url.pathname,
             );
           if (match) {
             const id = match[1]!;
+            if (match[2] === "delete") {
+              const result = manager.delete(id);
+              try {
+                const meta = loadWorkspaceMetadata();
+                if (meta.studies[id]) {
+                  delete meta.studies[id];
+                  saveWorkspaceMetadata(meta);
+                }
+              } catch {}
+              return json(result);
+            }
             if (match[2] === "followup")
               return json(manager.followup(id, body.question), 202);
             if (match[2] === "review") {

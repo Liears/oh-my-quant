@@ -10,6 +10,7 @@ import {
   createWorkspaceStore,
   workspaceHash,
   subscribeFileEvents,
+  type WorkspaceMetadata,
 } from "../../../storage/index.ts";
 import { buildResearchReport } from "../../../research/input.ts";
 import { startWorkspaceServer } from "../server.ts";
@@ -696,3 +697,52 @@ test("saved checksum detects corruption without overwriting original", async () 
   expect(() => f.store.load(r.id)).toThrow("integrity");
   expect((await f.post(`api/runs/${r.id}/save`)).status).toBe(400);
 }, 10000);
+
+test("workspace meta supports project pinning, study custom titles, and study deletion", async () => {
+  const f = await fixture();
+  // 1. Check default metadata
+  const metaRes = await fetch(new URL("api/workspace/meta", f.url));
+  expect(metaRes.status).toBe(200);
+  const initialMeta = (await metaRes.json()) as WorkspaceMetadata;
+  expect(initialMeta.projects.length).toBeGreaterThanOrEqual(1);
+
+  // 2. Update metadata with pinned project and custom study title
+  const updatedMeta = {
+    projects: [
+      {
+        id: "002048.SZ",
+        symbol: "002048.SZ",
+        name: "002048.SZ 宁波华翔跟踪",
+        benchmark: "000300.SH",
+        pinned: true,
+        pinnedAt: new Date().toISOString(),
+      },
+    ],
+    studies: {
+      "test-study-id": {
+        customTitle: "华翔回撤结构研判",
+        projectId: "002048.SZ",
+        archived: true,
+      },
+    },
+  };
+  const saveMetaRes = await f.post("api/workspace/meta", updatedMeta);
+  expect(saveMetaRes.status).toBe(200);
+  const savedMeta = (await saveMetaRes.json()) as WorkspaceMetadata;
+  expect(savedMeta.projects[0].pinned).toBe(true);
+  expect(savedMeta.studies["test-study-id"].archived).toBe(true);
+
+  // 3. Test study creation, save, and deletion
+  const r = (await (
+    await f.post("api/runs", { question: "test delete", scope })
+  ).json()) as WorkspaceRun;
+  await f.wait(r.id);
+  await f.post(`api/runs/${r.id}/save`);
+  expect(f.store.list().some((s) => s.id === r.id)).toBe(true);
+
+  // Delete the study
+  const delRes = await f.post(`api/runs/${r.id}/delete`);
+  expect(delRes.status).toBe(200);
+  expect(f.store.list().some((s) => s.id === r.id)).toBe(false);
+}, 10000);
+

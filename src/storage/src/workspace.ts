@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { atomicWriteJson, withFileLock } from "./atomic-file.ts";
 import { resolveOhquantDir } from "./dirs.ts";
@@ -116,5 +116,21 @@ export function createWorkspaceStore(
         .map((name) => load(name.slice(0, -5)))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     },
+    delete(id: string): boolean {
+      if (!existsSync(root)) return false;
+      const file = path(id);
+      if (!existsSync(file)) return false;
+      unlinkSync(file);
+      emitFileEvent({
+        operation: "DELETE",
+        path: file,
+        detail: "workspace research",
+      });
+      return true;
+    },
+    filePath(id: string): string {
+      return path(id);
+    },
+    root,
   };
 }

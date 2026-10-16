@@ -565,5 +565,14 @@ export function createWorkspaceManager(ports: WorkspacePorts = {}) {
       if (state?.context.run.id === id) state.context.run = saved;
       return structuredClone(saved);
     },
+    delete(id: string) {
+      const state = live.get(id);
+      if (state?.busy) throw new Error("正在运行的研究不能直接删除，请先停止。");
+      live.delete(id);
+      runs.delete(id);
+      if (store.delete) store.delete(id);
+      return { ok: true, id };
+    },
+    store,
   };
 }

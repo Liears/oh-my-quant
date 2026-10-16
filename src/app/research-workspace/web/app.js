@@ -10,18 +10,41 @@ let token,
   currentProjectId = null,
   activeStudyId = null;
 const collapsedProjects = new Set();
+let workspaceMeta = { projects: [], studies: {} };
+
 function getCustomProjects() {
   try {
     const raw = localStorage.getItem("whyj_projects_v1");
     if (raw) return JSON.parse(raw);
   } catch {}
   return [
-    { id: "002048.SZ", name: "002048.SZ 结构跟踪", symbol: "002048.SZ", benchmark: "000300.SH" }
+    { id: "002048.SZ", name: "002048.SZ 结构跟踪", symbol: "002048.SZ", benchmark: "000300.SH", pinned: false }
   ];
 }
 function saveCustomProjects(list) {
   try {
     localStorage.setItem("whyj_projects_v1", JSON.stringify(list));
+  } catch {}
+}
+async function fetchWorkspaceMeta() {
+  try {
+    const meta = await api("/api/workspace/meta");
+    if (meta && Array.isArray(meta.projects)) {
+      workspaceMeta = meta;
+      saveCustomProjects(meta.projects);
+      return workspaceMeta;
+    }
+  } catch {}
+  workspaceMeta = {
+    projects: getCustomProjects(),
+    studies: {},
+  };
+  return workspaceMeta;
+}
+async function persistWorkspaceMeta() {
+  saveCustomProjects(workspaceMeta.projects);
+  try {
+    await api("/api/workspace/meta", workspaceMeta);
   } catch {}
 }
 const date = new Intl.DateTimeFormat("sv-SE", {
@@ -94,10 +117,269 @@ function follow(value) {
     elapsed = setInterval(renderProgress, 1000);
   }
 }
+function showContextMenu(x, y, items) {
+  const menu = $("context-menu");
+  menu.replaceChildren();
+  for (const item of items) {
+    if (item.divider) {
+      menu.append(el("div", undefined, "context-menu-divider"));
+      continue;
+    }
+    const btn = el("button", undefined, item.danger ? "danger" : undefined);
+    if (item.icon) {
+      const icon = el("span", item.icon, "menu-icon");
+      btn.append(icon);
+    }
+    const label = el("span", item.label);
+    btn.append(label);
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      hideContextMenu();
+      item.action();
+    };
+    menu.append(btn);
+  }
+  menu.hidden = false;
+  const w = 160, h = items.length * 32;
+  const left = Math.min(x, window.innerWidth - w - 10);
+  const top = Math.min(y, window.innerHeight - h - 10);
+  menu.style.left = `${Math.max(10, left)}px`;
+  menu.style.top = `${Math.max(10, top)}px`;
+}
+function hideContextMenu() {
+  const menu = $("context-menu");
+  if (menu) menu.hidden = true;
+}
+function showModal({ title, body, buttons }) {
+  $("modal-title").textContent = title;
+  $("modal-body").replaceChildren(body);
+  $("modal-footer").replaceChildren();
+  for (const b of buttons) {
+    const btn = el("button", b.label, b.cls || "");
+    btn.onclick = async () => {
+      if (b.action) {
+        const keepOpen = await b.action();
+        if (keepOpen) return;
+      }
+      hideModal();
+    };
+    $("modal-footer").append(btn);
+  }
+  $("app-modal").hidden = false;
+}
+function hideModal() {
+  $("app-modal").hidden = true;
+}
+function togglePinProject(project) {
+  project.pinned = !project.pinned;
+  project.pinnedAt = project.pinned ? new Date().toISOString() : undefined;
+  persistWorkspaceMeta();
+  studies();
+}
+function renameProjectModal(project) {
+  const input = el("input");
+  input.value = project.name;
+  input.maxLength = 40;
+  const wrap = el("div");
+  const tip = el("div", "为该标的跟踪设定个性化名称：", "modal-tip");
+  wrap.append(tip, input);
+  showModal({
+    title: "重命名项目",
+    body: wrap,
+    buttons: [
+      { label: "取消" },
+      {
+        label: "保存",
+        cls: "primary",
+        action: async () => {
+          const val = input.value.trim();
+          if (!val) return true;
+          project.name = val;
+          await persistWorkspaceMeta();
+          updateBreadcrumb(project, run);
+          await studies();
+        },
+      },
+    ],
+  });
+  setTimeout(() => input.select(), 50);
+}
+async function openProjectFolder(project) {
+  try {
+    await api("/api/workspace/reveal", {
+      type: "project",
+      id: project.id,
+      symbol: project.symbol,
+    });
+  } catch (e) {
+    error(e);
+  }
+}
+function deleteProjectModal(project, projectStudies) {
+  const wrap = el("div");
+  const count = projectStudies.length;
+  const msg = count > 0
+    ? `项目「${project.name}」包含 ${count} 个本地研究会话。确认删除该项目及其关联的所有本地研究文件吗？`
+    : `确定删除项目「${project.name}」吗？`;
+  const tip = el("div", msg);
+  wrap.append(tip);
+  showModal({
+    title: "删除项目",
+    body: wrap,
+    buttons: [
+      { label: "取消" },
+      {
+        label: "删除",
+        cls: "btn-danger",
+        action: async () => {
+          for (const s of projectStudies) {
+            try {
+              await api(`/api/runs/${s.id}/delete`);
+            } catch {}
+          }
+          workspaceMeta.projects = workspaceMeta.projects.filter((p) => p.id !== project.id);
+          if (currentProjectId === project.id) {
+            currentProjectId = null;
+            run = null;
+            activeStudyId = null;
+            document.body.classList.remove("has-run");
+            $("answer").replaceChildren();
+            $("progress").replaceChildren();
+            updateBreadcrumb(null, null);
+            renderInspect();
+          }
+          await persistWorkspaceMeta();
+          await studies();
+        },
+      },
+    ],
+  });
+}
+function renameStudyModal(study) {
+  const currentTitle = workspaceMeta.studies[study.id]?.customTitle || study.question;
+  const input = el("input");
+  input.value = currentTitle;
+  input.maxLength = 100;
+  const wrap = el("div");
+  const tip = el("div", "修改该研究的自定义展示标题：", "modal-tip");
+  wrap.append(tip, input);
+  showModal({
+    title: "重命名研究",
+    body: wrap,
+    buttons: [
+      { label: "取消" },
+      {
+        label: "保存",
+        cls: "primary",
+        action: async () => {
+          const val = input.value.trim();
+          if (!val) return true;
+          if (!workspaceMeta.studies[study.id]) workspaceMeta.studies[study.id] = {};
+          workspaceMeta.studies[study.id].customTitle = val;
+          await persistWorkspaceMeta();
+          updateBreadcrumb(null, run);
+          await studies();
+        },
+      },
+    ],
+  });
+  setTimeout(() => input.select(), 50);
+}
+async function revealStudyFile(study) {
+  try {
+    await api("/api/workspace/reveal", {
+      type: "study",
+      id: study.id,
+    });
+  } catch (e) {
+    error(e);
+  }
+}
+async function toggleArchiveStudy(study) {
+  if (!workspaceMeta.studies[study.id]) workspaceMeta.studies[study.id] = {};
+  const isArchived = Boolean(workspaceMeta.studies[study.id].archived);
+  workspaceMeta.studies[study.id].archived = !isArchived;
+  workspaceMeta.studies[study.id].archivedAt = !isArchived ? new Date().toISOString() : undefined;
+  await persistWorkspaceMeta();
+  await studies();
+}
+function moveStudyModal(study, currentProject) {
+  const otherProjects = workspaceMeta.projects.filter((p) => p.id !== currentProject.id);
+  if (otherProjects.length === 0) {
+    error(new Error("暂无其他项目可移动。请先新建一个项目。"));
+    return;
+  }
+  const select = el("select");
+  for (const p of otherProjects) {
+    const opt = el("option", `${p.name} (${p.symbol})`);
+    opt.value = p.id;
+    select.append(opt);
+  }
+  const wrap = el("div");
+  const tip = el("div", "将研究移动至目标项目：", "modal-tip");
+  wrap.append(tip, select);
+  showModal({
+    title: "移动研究至其他项目",
+    body: wrap,
+    buttons: [
+      { label: "取消" },
+      {
+        label: "确认移动",
+        cls: "primary",
+        action: async () => {
+          const targetId = select.value;
+          if (!workspaceMeta.studies[study.id]) workspaceMeta.studies[study.id] = {};
+          workspaceMeta.studies[study.id].projectId = targetId;
+          await persistWorkspaceMeta();
+          await studies();
+        },
+      },
+    ],
+  });
+}
+function deleteStudyModal(study) {
+  const title = workspaceMeta.studies[study.id]?.customTitle || study.question.slice(0, 30);
+  const wrap = el("div");
+  const tip = el("div", `确定删除研究「${title}」吗？此操作将移出本地存储，无法恢复。`);
+  wrap.append(tip);
+  showModal({
+    title: "删除研究",
+    body: wrap,
+    buttons: [
+      { label: "取消" },
+      {
+        label: "删除",
+        cls: "btn-danger",
+        action: async () => {
+          try {
+            await api(`/api/runs/${study.id}/delete`);
+            if (run?.id === study.id || run?.conversationId === study.id) {
+              run = null;
+              activeStudyId = null;
+              document.body.classList.remove("has-run");
+              $("answer").replaceChildren();
+              $("progress").replaceChildren();
+              updateBreadcrumb(null, null);
+              renderInspect();
+            }
+            await studies();
+          } catch (e) {
+            error(e);
+          }
+        },
+      },
+    ],
+  });
+}
 function updateBreadcrumb(project, currentRun) {
   if (!project && currentRun) {
-    const projects = getCustomProjects();
-    project = projects.find((p) => p.symbol === currentRun.scope.symbol);
+    const pId = workspaceMeta.studies[currentRun.id]?.projectId;
+    if (pId) {
+      project = workspaceMeta.projects.find((p) => p.id === pId);
+    }
+    if (!project) {
+      project = workspaceMeta.projects.find((p) => p.symbol === currentRun.scope.symbol);
+    }
   }
   if (project) {
     if ($("bc-project")) $("bc-project").textContent = "📁 " + project.name;
@@ -106,7 +388,8 @@ function updateBreadcrumb(project, currentRun) {
     if ($("bc-project")) $("bc-project").textContent = "全部项目";
   }
   if (currentRun) {
-    const q = currentRun.question.replace(/\s+/g, " ");
+    const custom = workspaceMeta.studies[currentRun.id]?.customTitle;
+    const q = (custom || currentRun.question).replace(/\s+/g, " ");
     if ($("bc-study"))
       $("bc-study").textContent = "📄 " + (q.length > 20 ? q.slice(0, 20) + "…" : q);
   } else {
@@ -163,7 +446,92 @@ function startNewResearchInProject(project) {
   renderInspect();
   $("question").focus();
 }
+function renderStudyRow(container, study, project, isArchived) {
+  const isActive =
+    activeStudyId === study.id ||
+    (run && (run.id === study.id || run.conversationId === study.id));
+  const row = el(
+    "div",
+    undefined,
+    `study-item-row ${isActive ? "active-study" : ""}`,
+  );
+  const item = el(
+    "button",
+    undefined,
+    `study-item ${isActive ? "active-study" : ""} ${isArchived ? "archived" : ""}`,
+  );
+  item.dataset.studyId = study.id;
+  const customTitle = workspaceMeta.studies[study.id]?.customTitle;
+  const titleText = (customTitle || study.question).replace(/\s+/g, " ");
+  const title = el("div", titleText, "study-title");
+  if (customTitle) title.title = customTitle;
+  const meta = el("div", undefined, "study-meta");
+  const turns = el("span", `${study.turns ?? 1} 轮对话`);
+  const dateStr = new Date(study.createdAt).toLocaleDateString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+  });
+  const time = el("span", dateStr);
+  meta.append(turns, time);
+  item.append(title, meta);
+
+  item.onclick = (e) => {
+    e.stopPropagation();
+    currentProjectId = project.id;
+    activeStudyId = study.id;
+    api(`/api/runs/${study.id}/latest`)
+      .then((loaded) => {
+        $("question").value = "";
+        follow(loaded);
+        updateBreadcrumb(project, loaded);
+        updateActiveStudyUi();
+      })
+      .catch(error);
+  };
+
+  const actionBox = el("div", undefined, "study-item-actions");
+  const moreBtn = el("button", "···", "btn-more-study");
+  moreBtn.title = "会话操作";
+  moreBtn.onclick = (e) => {
+    e.stopPropagation();
+    const rect = moreBtn.getBoundingClientRect();
+    showContextMenu(rect.right - 148, rect.bottom + 4, [
+      {
+        icon: "✏️",
+        label: "重命名研究",
+        action: () => renameStudyModal(study),
+      },
+      {
+        icon: "📁",
+        label: "在资源管理器中定位",
+        action: () => revealStudyFile(study),
+      },
+      {
+        icon: isArchived ? "📤" : "📦",
+        label: isArchived ? "取消归档" : "归档研究",
+        action: () => toggleArchiveStudy(study),
+      },
+      {
+        icon: "↗️",
+        label: "移动到其他项目...",
+        action: () => moveStudyModal(study, project),
+      },
+      { divider: true },
+      {
+        icon: "🗑️",
+        label: "删除研究",
+        danger: true,
+        action: () => deleteStudyModal(study),
+      },
+    ]);
+  };
+  actionBox.append(moreBtn);
+  row.append(item, actionBox);
+  container.append(row);
+}
+
 async function studies() {
+  await fetchWorkspaceMeta();
   const values = await api("/api/studies");
   $("studies").replaceChildren();
   const latest = new Map();
@@ -172,26 +540,56 @@ async function studies() {
       latest.set(value.conversationId ?? value.id, value);
   const allStudies = Array.from(latest.values());
 
-  const projects = getCustomProjects();
   for (const s of allStudies) {
+    const studyMeta = workspaceMeta.studies[s.id] || {};
     const sym = s.scope.symbol;
-    if (!projects.some((p) => p.symbol === sym)) {
-      projects.push({
+    if (studyMeta.projectId) {
+      if (!workspaceMeta.projects.some((p) => p.id === studyMeta.projectId)) {
+        delete studyMeta.projectId;
+      }
+    }
+    if (
+      !studyMeta.projectId &&
+      !workspaceMeta.projects.some((p) => p.symbol === sym)
+    ) {
+      workspaceMeta.projects.push({
         id: sym,
         name: `${sym} 专题跟踪`,
         symbol: sym,
         benchmark: s.scope.benchmark || "000300.SH",
+        pinned: false,
+        createdAt: new Date().toISOString(),
       });
     }
   }
-  saveCustomProjects(projects);
-  if ($("projects-count"))
-    $("projects-count").textContent = String(projects.length);
+  await persistWorkspaceMeta();
 
-  for (const project of projects) {
-    const projectStudies = allStudies.filter(
-      (s) => s.scope.symbol === project.symbol,
+  if ($("projects-count"))
+    $("projects-count").textContent = String(workspaceMeta.projects.length);
+
+  const sortedProjects = [...workspaceMeta.projects].sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    if (a.pinned && b.pinned && a.pinnedAt && b.pinnedAt) {
+      return b.pinnedAt.localeCompare(a.pinnedAt);
+    }
+    return (a.name || a.symbol).localeCompare(b.name || b.symbol);
+  });
+
+  for (const project of sortedProjects) {
+    const projectStudies = allStudies.filter((s) => {
+      const meta = workspaceMeta.studies[s.id];
+      if (meta?.projectId) return meta.projectId === project.id;
+      return s.scope.symbol === project.symbol;
+    });
+
+    const activeStudies = projectStudies.filter(
+      (s) => !workspaceMeta.studies[s.id]?.archived,
     );
+    const archivedStudies = projectStudies.filter((s) =>
+      Boolean(workspaceMeta.studies[s.id]?.archived),
+    );
+
     const folder = el("div", undefined, "project-folder");
     folder.dataset.projectId = project.id;
     if (collapsedProjects.has(project.id)) {
@@ -212,16 +610,57 @@ async function studies() {
     const name = el("span", project.name, "project-name");
     name.title = `${project.name} (${project.symbol})`;
     titleGroup.append(chevron, icon, name);
+    if (project.pinned) {
+      const pin = el("span", "📌", "project-pin-badge");
+      pin.title = "已置顶项目";
+      titleGroup.append(pin);
+    }
 
     const actions = el("div", undefined, "project-actions");
-    const count = el("span", String(projectStudies.length), "folder-count");
+    const count = el(
+      "span",
+      String(activeStudies.length + archivedStudies.length),
+      "folder-count",
+    );
     const addBtn = el("button", "＋", "btn-add-study");
     addBtn.title = `在「${project.name}」中发起新研究`;
     addBtn.onclick = (e) => {
       e.stopPropagation();
       startNewResearchInProject(project);
     };
-    actions.append(count, addBtn);
+
+    const moreBtn = el("button", "···", "btn-more-project");
+    moreBtn.title = "项目操作";
+    moreBtn.onclick = (e) => {
+      e.stopPropagation();
+      const rect = moreBtn.getBoundingClientRect();
+      showContextMenu(rect.right - 148, rect.bottom + 4, [
+        {
+          icon: project.pinned ? "📍" : "📌",
+          label: project.pinned ? "取消置顶" : "置顶项目",
+          action: () => togglePinProject(project),
+        },
+        {
+          icon: "✏️",
+          label: "重命名项目",
+          action: () => renameProjectModal(project),
+        },
+        {
+          icon: "📁",
+          label: "打开本地文件夹",
+          action: () => openProjectFolder(project),
+        },
+        { divider: true },
+        {
+          icon: "🗑️",
+          label: "删除项目",
+          danger: true,
+          action: () => deleteProjectModal(project, projectStudies),
+        },
+      ]);
+    };
+
+    actions.append(count, addBtn, moreBtn);
     header.append(titleGroup, actions);
 
     header.onclick = () => {
@@ -237,48 +676,38 @@ async function studies() {
     };
 
     const studiesContainer = el("div", undefined, "project-studies");
-    if (projectStudies.length === 0) {
+    if (activeStudies.length === 0 && archivedStudies.length === 0) {
       const empty = el("div", "暂无研究 · 点击 ＋ 启动", "empty-project-hint");
       empty.onclick = () => startNewResearchInProject(project);
       empty.style.cursor = "pointer";
       studiesContainer.append(empty);
     } else {
-      for (const study of projectStudies) {
-        const isActive =
-          activeStudyId === study.id ||
-          (run && (run.id === study.id || run.conversationId === study.id));
-        const item = el(
-          "button",
+      for (const study of activeStudies) {
+        renderStudyRow(studiesContainer, study, project, false);
+      }
+      if (archivedStudies.length > 0) {
+        const archivedSection = el(
+          "div",
           undefined,
-          `study-item ${isActive ? "active-study" : ""}`,
+          "archived-section collapsed",
         );
-        item.dataset.studyId = study.id;
-        const titleText = study.question.replace(/\s+/g, " ");
-        const title = el("div", titleText, "study-title");
-        const meta = el("div", undefined, "study-meta");
-        const turns = el("span", `${study.turns ?? 1} 轮对话`);
-        const dateStr = new Date(study.createdAt).toLocaleDateString("zh-CN", {
-          month: "numeric",
-          day: "numeric",
-        });
-        const time = el("span", dateStr);
-        meta.append(turns, time);
-        item.append(title, meta);
-
-        item.onclick = (e) => {
+        const archivedHeader = el("div", undefined, "archived-header");
+        const archivedTitle = el(
+          "span",
+          `📦 已归档 (${archivedStudies.length})`,
+        );
+        const archivedChev = el("span", "▾", "archived-chevron");
+        archivedHeader.append(archivedTitle, archivedChev);
+        archivedHeader.onclick = (e) => {
           e.stopPropagation();
-          currentProjectId = project.id;
-          activeStudyId = study.id;
-          api(`/api/runs/${study.id}/latest`)
-            .then((loaded) => {
-              $("question").value = "";
-              follow(loaded);
-              updateBreadcrumb(project, loaded);
-              updateActiveStudyUi();
-            })
-            .catch(error);
+          archivedSection.classList.toggle("collapsed");
         };
-        studiesContainer.append(item);
+        const archivedList = el("div", undefined, "archived-list");
+        for (const study of archivedStudies) {
+          renderStudyRow(archivedList, study, project, true);
+        }
+        archivedSection.append(archivedHeader, archivedList);
+        studiesContainer.append(archivedSection);
       }
     }
     folder.append(header, studiesContainer);
@@ -747,7 +1176,7 @@ $("new-project").onclick = () => {
 $("cancel-project").onclick = () => {
   $("project-form").hidden = true;
 };
-$("project-form").onsubmit = (e) => {
+$("project-form").onsubmit = async (e) => {
   e.preventDefault();
   const rawSymbol = $("new-project-symbol").value.trim().toUpperCase();
   const rawName = $("new-project-name").value.trim();
@@ -756,8 +1185,7 @@ $("project-form").onsubmit = (e) => {
     error(new Error("标的代码须为沪深主板格式，如 002048.SZ 或 600519.SH"));
     return;
   }
-  const projects = getCustomProjects();
-  if (projects.some((p) => p.symbol === rawSymbol)) {
+  if (workspaceMeta.projects.some((p) => p.symbol === rawSymbol)) {
     error(new Error(`标的 ${rawSymbol} 的项目已存在`));
     return;
   }
@@ -766,9 +1194,11 @@ $("project-form").onsubmit = (e) => {
     name: rawName || `${rawSymbol} 专题跟踪`,
     symbol: rawSymbol,
     benchmark: "000300.SH",
+    pinned: false,
+    createdAt: new Date().toISOString(),
   };
-  projects.push(newProj);
-  saveCustomProjects(projects);
+  workspaceMeta.projects.push(newProj);
+  await persistWorkspaceMeta();
   $("project-form").hidden = true;
   startNewResearchInProject(newProj);
 };
@@ -841,6 +1271,14 @@ function initAsideResizer() {
     } catch {}
   });
 }
+$("modal-close").onclick = hideModal;
+window.addEventListener("click", () => hideContextMenu());
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    hideContextMenu();
+    hideModal();
+  }
+});
 try {
   const status = await api("/api/status");
   token = status.token;

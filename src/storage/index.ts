@@ -47,6 +47,15 @@ export { saveResearchDecision, loadResearchDecision, listResearchDecisionFiles, 
 export { listStoredSessions } from "./src/sessions.ts";
 export { LocalSessionFile } from "./src/session-file.ts";
 export { createWorkspaceStore, workspaceHash, canArchiveWorkspaceReply } from "./src/workspace.ts";
+export {
+  loadWorkspaceMetadata,
+  saveWorkspaceMetadata,
+  resolveProjectDirPath,
+  resolveWorkspaceMetaPath,
+  type WorkspaceProject,
+  type WorkspaceStudyMeta,
+  type WorkspaceMetadata,
+} from "./src/workspace-meta.ts";
 export type { StoredSessionContextUsage, StoredSessionEntryCount, StoredSessionSummary } from "./src/sessions.ts";
 export {
   addSymbol,
