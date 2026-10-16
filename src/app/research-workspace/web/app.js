@@ -783,13 +783,16 @@ function initAsideResizer() {
   const resizer = $("aside-resizer");
   if (!aside || !resizer) return;
 
-  const savedWidth = localStorage.getItem("whyj_aside_width");
-  if (savedWidth) {
-    const w = parseInt(savedWidth, 10);
-    if (!isNaN(w) && w >= 210 && w <= 500) {
-      aside.style.width = `${w}px`;
+  try {
+    const savedWidth = localStorage.getItem("whyj_aside_width");
+    if (savedWidth) {
+      const w = parseInt(savedWidth, 10);
+      if (!isNaN(w) && w >= 210 && w <= 500) {
+        aside.style.width = `${w}px`;
+        resizer.setAttribute("aria-valuenow", String(w));
+      }
     }
-  }
+  } catch {}
 
   let isResizing = false;
   let startX = 0;
@@ -810,6 +813,7 @@ function initAsideResizer() {
       if (newWidth < 210) newWidth = 210;
       if (newWidth > 500) newWidth = 500;
       aside.style.width = `${newWidth}px`;
+      resizer.setAttribute("aria-valuenow", String(Math.round(newWidth)));
     };
 
     const onMouseUp = () => {
@@ -820,7 +824,9 @@ function initAsideResizer() {
       document.body.style.userSelect = "";
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
-      localStorage.setItem("whyj_aside_width", String(parseInt(aside.style.width, 10)));
+      try {
+        localStorage.setItem("whyj_aside_width", String(parseInt(aside.style.width, 10)));
+      } catch {}
     };
 
     document.addEventListener("mousemove", onMouseMove);
@@ -829,7 +835,10 @@ function initAsideResizer() {
 
   resizer.addEventListener("dblclick", () => {
     aside.style.width = "268px";
-    localStorage.setItem("whyj_aside_width", "268px");
+    resizer.setAttribute("aria-valuenow", "268");
+    try {
+      localStorage.setItem("whyj_aside_width", "268px");
+    } catch {}
   });
 }
 try {
