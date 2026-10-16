@@ -1,0 +1,91 @@
+name: Publish npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact stable version already committed in package.json
+        required: true
+        type: string
+      dry_run:
+        description: Validate publication without uploading to npm
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Validate release branch and version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+          if (process.env.GITHUB_REF !== 'refs/heads/main') {
+            throw new Error('Dispatch npm releases from main');
+          }
+          if (pkg.name !== 'whyj-quant' || pkg.version !== process.env.RELEASE_VERSION ||
+              !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(pkg.version)) {
+            throw new Error('Input must match the stable whyj-quant package version');
+          }
+          NODE
+
+  checks:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Verify npm supports Trusted Publishing
+        run: |
+          node --input-type=module -e '
+            import { execFileSync } from "node:child_process";
+            const version = execFileSync("npm", ["--version"], { encoding: "utf8" }).trim();
+            const [major, minor, patch] = version.split(".").map(Number);
+            if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) {
+              throw new Error(`npm >=11.5.1 is required; found ${version}`);
+            }
+          '
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      # npm publish runs prepublishOnly: insight generation and the full release gate.
+      - name: Rehearse npm publication
+        if: inputs.dry_run
+        run: npm publish --dry-run --access public --tag latest
+      - name: Publish to npm with provenance
+        if: ${{ !inputs.dry_run }}
+        run: npm publish --access public --tag latest --provenance

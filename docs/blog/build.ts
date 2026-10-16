@@ -26,7 +26,7 @@ for (const file of files) {
   });
   for (const match of [...html.matchAll(/<p><img src="(\.\/images\/[^"\s]+\.svg)" alt="([^"]*)"[^>]*><\/p>/g)]) {
     const svg = await readFile(resolve(dir, match[1]), "utf8");
-    const encoded = Buffer.from(svg).toString("base64");
+    const encoded = Buffer.from(svg.replace(/\r\n/g, "\n")).toString("base64");
     html = html.replace(match[0], `<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="架构图，可横向滚动"><img src="data:image/svg+xml;base64,${encoded}" alt="${match[2]}" loading="lazy"></div><figcaption class="scroll-hint">窄屏可横向滚动查看完整配图</figcaption></figure>`);
   }
   html = html.replace(/<table>/g, '<div class="table-scroll" tabindex="0" role="region" aria-label="比较表，可横向滚动"><table>').replace(/<\/table>/g, "</table></div>");
