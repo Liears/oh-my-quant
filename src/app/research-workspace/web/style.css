@@ -14,14 +14,32 @@ body {
   min-height: 100vh;
 }
 aside {
-  width: 236px;
+  position: relative;
+  width: 268px;
+  min-width: 210px;
+  max-width: 500px;
   flex-shrink: 0;
   border-right: 1px solid #242424;
-  padding: 26px 18px;
+  padding: 24px 16px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   background: #101011;
+}
+.resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 10;
+  transition: background-color 0.15s ease;
+}
+.resizer:hover,
+.resizer.resizing {
+  background: #d4af37;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
 }
 .brand {
   color: #d4af37;
@@ -84,23 +102,18 @@ aside footer {
   font-size: 11px;
   line-height: 1.8;
 }
-.aside-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-button.secondary {
-  background: #1e1e21;
-  border-color: #38383e;
-  color: #ccc;
-  font-size: 12px;
-  padding: 8px 10px;
-  border-radius: 7px;
-}
-button.secondary:hover {
-  border-color: #d4af37;
-  color: #fff;
-  background: #25252a;
+.btn-new-study {
+  width: 100%;
+  padding: 11px 16px;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.15);
 }
 .project-inline-form {
   background: #17171a;
@@ -146,7 +159,13 @@ button.small {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 2px;
+  margin-top: 4px;
+  padding: 0 2px;
+}
+.meta-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .badge-count {
   font-size: 10px;
@@ -154,6 +173,22 @@ button.small {
   background: #1e1e22;
   padding: 2px 7px;
   border-radius: 10px;
+}
+.btn-icon-add {
+  background: #1a1a1d;
+  border: 1px solid #333338;
+  color: #aaa;
+  padding: 2px 7px;
+  font-size: 12px;
+  border-radius: 4px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-icon-add:hover {
+  border-color: #d4af37;
+  color: #d4af37;
+  background: rgba(212, 175, 55, 0.1);
 }
 #studies.projects-tree {
   display: flex;
@@ -767,7 +802,8 @@ textarea,
 }
 @media (max-width: 1100px) {
   aside {
-    width: 190px;
+    width: 240px;
+    min-width: 190px;
   }
   main {
     padding: 24px;
@@ -812,12 +848,17 @@ textarea,
   }
   aside {
     width: 100%;
+    min-width: 0;
+    max-width: none;
     border-right: 0;
     border-bottom: 1px solid #242424;
     padding: 16px;
     gap: 12px;
     flex-shrink: 0;
     max-height: 160px;
+  }
+  .resizer {
+    display: none;
   }
   aside footer {
     display: none;

@@ -10,10 +10,7 @@
   <body>
     <aside>
       <a class="brand" href="/">▥ WhyJ <span>投资研究工作台</span></a>
-      <div class="aside-actions">
-        <button id="new" class="primary" title="发起全局新研究">＋ 新建研究</button>
-        <button id="new-project" class="secondary" title="新建标的专题项目">＋ 新项目</button>
-      </div>
+      <button id="new" class="primary btn-new-study" title="发起全局新研究">＋ 新建研究</button>
       <form id="project-form" class="project-inline-form" hidden>
         <div class="form-title">新建标的专题项目</div>
         <input id="new-project-symbol" placeholder="标的代码，如 600519.SH" required maxlength="12" />
@@ -25,10 +22,14 @@
       </form>
       <div class="projects-meta-bar">
         <span class="eyebrow">研究项目 · PROJECTS</span>
-        <span id="projects-count" class="badge-count">0</span>
+        <div class="meta-right">
+          <span id="projects-count" class="badge-count">0</span>
+          <button id="new-project" class="btn-icon-add" title="新建标的专题项目">＋</button>
+        </div>
       </div>
       <div id="studies" class="projects-tree" role="tree"></div>
       <footer>本机服务 · 单股日线研究<br />证据与版本保存在本机</footer>
+      <div id="aside-resizer" class="resizer" title="按住拖拽调整侧边栏宽度，双击恢复默认"></div>
     </aside>
     <main>
       <header>

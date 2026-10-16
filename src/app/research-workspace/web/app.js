@@ -778,9 +778,64 @@ document.addEventListener("keydown", (e) => {
     $("cancel").click();
   }
 });
+function initAsideResizer() {
+  const aside = document.querySelector("aside");
+  const resizer = $("aside-resizer");
+  if (!aside || !resizer) return;
+
+  const savedWidth = localStorage.getItem("whyj_aside_width");
+  if (savedWidth) {
+    const w = parseInt(savedWidth, 10);
+    if (!isNaN(w) && w >= 210 && w <= 500) {
+      aside.style.width = `${w}px`;
+    }
+  }
+
+  let isResizing = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  resizer.addEventListener("mousedown", (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = aside.getBoundingClientRect().width;
+    resizer.classList.add("resizing");
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onMouseMove = (moveEvent) => {
+      if (!isResizing) return;
+      const dx = moveEvent.clientX - startX;
+      let newWidth = startWidth + dx;
+      if (newWidth < 210) newWidth = 210;
+      if (newWidth > 500) newWidth = 500;
+      aside.style.width = `${newWidth}px`;
+    };
+
+    const onMouseUp = () => {
+      if (!isResizing) return;
+      isResizing = false;
+      resizer.classList.remove("resizing");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      localStorage.setItem("whyj_aside_width", String(parseInt(aside.style.width, 10)));
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  });
+
+  resizer.addEventListener("dblclick", () => {
+    aside.style.width = "268px";
+    localStorage.setItem("whyj_aside_width", "268px");
+  });
+}
 try {
   const status = await api("/api/status");
   token = status.token;
+  initAsideResizer();
   await studies();
   if (status.current) {
     $("question").value = "";
