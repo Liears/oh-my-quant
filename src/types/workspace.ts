@@ -53,6 +53,18 @@ export interface WorkspaceAnswer {
   next: string[];
   limitations: string[];
 }
+export interface WorkspaceEvent {
+  at: string;
+  kind: string;
+  text: string;
+  toolName?: string;
+  toolCallId?: string;
+  args?: unknown;
+  result?: unknown;
+  error?: string;
+  isError?: boolean;
+}
+
 export interface WorkspaceRun {
   /** Optional for snapshots saved before conversations were introduced. */
   conversationId?: string;
@@ -68,7 +80,8 @@ export interface WorkspaceRun {
   status: "running" | "complete" | "cancelled" | "failed" | "needs_input";
   saved: boolean;
   model: string;
-  events: Array<{ at: string; kind: string; text: string }>;
+  events: WorkspaceEvent[];
+  thinking?: string;
   evidence: WorkspaceEvidence[];
   answer: WorkspaceAnswer | null;
   /** Conversation only; not a newly verified research artifact. */
@@ -87,5 +100,6 @@ export type WorkspaceTurn = Pick<
   | "reply"
   | "clarification"
   | "events"
+  | "thinking"
   | "error"
 >;

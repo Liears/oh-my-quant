@@ -60,6 +60,7 @@ function turnSnapshot(run: WorkspaceRun) {
     reply,
     clarification,
     events,
+    thinking,
     error,
   } = structuredClone(run);
   return {
@@ -71,6 +72,7 @@ function turnSnapshot(run: WorkspaceRun) {
     reply,
     clarification,
     events,
+    thinking,
     error,
   };
 }
@@ -117,8 +119,53 @@ export function createWorkspaceManager(ports: WorkspacePorts = {}) {
       }
     }
   };
-  const event = (run: WorkspaceRun, kind: string, text: string) => {
-    run.events.push({ at: new Date().toISOString(), kind, text });
+function scrubSensitive(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/fixture-key/gi, "[REDACTED]")
+    .replace(/(?:api[_-]?key|bearer|token|secret|password)[=:\s]+[^\s,;"'}{]+/gi, "[REDACTED]");
+}
+
+function scrubValue<T>(val: T): T {
+  if (val === undefined || val === null) return val;
+  if (typeof val === "string") return scrubSensitive(val) as unknown as T;
+  if (typeof val === "object") {
+    try {
+      const serialized = JSON.stringify(val);
+      const scrubbed = scrubSensitive(serialized);
+      return JSON.parse(scrubbed) as T;
+    } catch {
+      return val;
+    }
+  }
+  return val;
+}
+
+  const event = (
+    run: WorkspaceRun,
+    kind: string,
+    text: string,
+    details?: {
+      toolName?: string;
+      toolCallId?: string;
+      args?: unknown;
+      result?: unknown;
+      error?: string;
+      isError?: boolean;
+    },
+  ) => {
+    const cleanText = scrubSensitive(text);
+    const cleanDetails = details
+      ? {
+          toolName: details.toolName,
+          toolCallId: details.toolCallId,
+          args: scrubValue(details.args),
+          result: scrubValue(details.result),
+          error: details.error ? scrubSensitive(details.error) : undefined,
+          isError: details.isError,
+        }
+      : undefined;
+    run.events.push({ at: new Date().toISOString(), kind, text: cleanText, ...cleanDetails });
     emit(run);
   };
   const get = (id: string): WorkspaceRun => runs.get(id) ?? store.load(id);
@@ -435,26 +482,74 @@ export function createWorkspaceManager(ports: WorkspacePorts = {}) {
       });
       runs.set(id, run);
       agent.subscribe((e) => {
-        if (
-          e.type === "message_end" &&
-          e.message.role === "assistant" &&
-          e.message.stopReason === "stop"
-        ) {
-          const text = e.message.content
-            .filter((part) => part.type === "text")
-            .map((part) => part.text)
-            .join("\n")
-            .trim();
-          if (text) context.run.reply = text;
+        if (e.type === "message_update" && e.message.role === "assistant") {
+          const thinkParts = (
+            e.message.content as Array<{ type: string; thinking?: string }>
+          )
+            .filter((p) => p.type === "thinking" && p.thinking)
+            .map((p) => p.thinking!);
+          if (thinkParts.length > 0) {
+            context.run.thinking = thinkParts.join("\n\n").trim();
+            emit(context.run);
+          }
         }
-        if (e.type === "tool_execution_start")
-          event(context.run, "tool", `正在调用 ${e.toolName}`);
-        if (e.type === "tool_execution_end" && e.isError)
-          event(
-            context.run,
-            "tool_error",
-            `${e.toolName} 未成功；等待 Agent 修正或停止。`,
-          );
+        if (e.type === "message_end" && e.message.role === "assistant") {
+          const thinkParts = (
+            e.message.content as Array<{ type: string; thinking?: string }>
+          )
+            .filter((p) => p.type === "thinking" && p.thinking)
+            .map((p) => p.thinking!);
+          if (thinkParts.length > 0) {
+            context.run.thinking = thinkParts.join("\n\n").trim();
+          }
+          if (e.message.stopReason === "stop") {
+            const text = (
+              e.message.content as Array<{ type: string; text?: string }>
+            )
+              .filter((part) => part.type === "text" && part.text)
+              .map((part) => part.text!)
+              .join("\n")
+              .trim();
+            if (text) context.run.reply = text;
+          }
+        }
+        if (e.type === "tool_execution_start") {
+          event(context.run, "tool_start", `正在调用 ${e.toolName}`, {
+            toolName: e.toolName,
+            toolCallId: e.toolCallId,
+            args: e.args,
+          });
+        }
+        if (e.type === "tool_execution_end") {
+          if (e.isError) {
+            let errMessage = "";
+            const res = e.result as any;
+            if (typeof res === "string") errMessage = res;
+            else if (res?.content?.[0]?.text) errMessage = res.content[0].text;
+            else if (res?.error) errMessage = String(res.error);
+            else if (res?.message) errMessage = String(res.message);
+            else errMessage = JSON.stringify(res);
+            event(
+              context.run,
+              "tool_error",
+              `${e.toolName} 未成功：${errMessage.slice(0, 120)}`,
+              {
+                toolName: e.toolName,
+                toolCallId: e.toolCallId,
+                isError: true,
+                error: errMessage,
+                result: e.result,
+              },
+            );
+          } else {
+            event(context.run, "tool_success", `${e.toolName} 执行成功`, {
+              toolName: e.toolName,
+              toolCallId: e.toolCallId,
+              isError: false,
+              result: (e.result as any)?.details ?? e.result,
+            });
+          }
+        }
       });
       event(
         run,

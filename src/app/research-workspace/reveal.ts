@@ -5,6 +5,7 @@ import { resolveOhquantDir } from "../../storage/index.ts";
 
 export function revealInFileManager(targetPath: string): boolean {
   const absPath = normalize(resolve(targetPath));
+  const base = normalize(resolve(resolveOhquantDir()));
   const sep = process.platform === "win32" ? "\\" : "/";
   if (absPath !== base && !absPath.startsWith(base + sep)) {
     throw new Error("只能打开工作台受控目录下的文件或文件夹。");

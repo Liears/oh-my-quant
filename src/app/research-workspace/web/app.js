@@ -714,19 +714,259 @@ async function studies() {
     $("studies").append(folder);
   }
 }
+const TOOL_LABELS = {
+  get_market_evidence: "获取日线证据",
+  calculate_research: "复算研究指标",
+  publish_research: "发布引用结论",
+  ask_user: "发起问题澄清",
+};
+
+let traceManuallyToggled = false;
+let traceExpanded = true;
+const expandedStepKeys = new Set();
+
 function renderProgress() {
   if (!run) return;
-  $("progress").replaceChildren();
-  const state = el(
+  const progressRoot = $("progress");
+  progressRoot.replaceChildren();
+
+  const isRunning = run.status === "running";
+  const isComplete = run.status === "complete";
+  const isNeedsInput = run.status === "needs_input";
+
+  if (!traceManuallyToggled) {
+    const urlTrace = new URLSearchParams(window.location.search).get("trace");
+    traceExpanded =
+      urlTrace === "open" ? true : urlTrace === "close" ? false : !isComplete;
+  }
+
+  const expandAllSteps =
+    new URLSearchParams(window.location.search).get("steps") === "open";
+
+  const elapsedSec = startedAt
+    ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
+    : 0;
+
+  const traceCard = el(
     "div",
-    `${{ running: "研究进行中", complete: `${run.answer ? "研究完成" : "回复完成"}${run.saved ? " · 已保存" : ""}`, cancelled: "研究已停止", failed: "研究未完成", needs_input: "需要澄清" }[run.status]}${run.status === "running" ? ` · 已等待 ${Math.floor((Date.now() - startedAt) / 1000)} 秒` : ""}`,
-    "current",
+    undefined,
+    `trace-card ${isComplete ? "trace-complete" : isRunning ? "trace-running" : "trace-stopped"}`,
   );
-  $("progress").append(state);
-  for (const e of run.events.slice(-5))
-    $("progress").append(
-      el("div", `${new Date(e.at).toLocaleTimeString()} · ${e.text}`),
+
+  const traceHeader = el("div", undefined, "trace-header");
+  const leftGroup = el("div", undefined, "trace-header-left");
+  const icon = el(
+    "span",
+    isRunning ? "🧠" : isComplete ? "✓" : isNeedsInput ? "❓" : "⏹",
+    "trace-status-icon",
+  );
+  if (isRunning) icon.classList.add("pulse");
+
+  let headlineText = "";
+  if (isRunning) {
+    headlineText = `Agent 正在思考与执行 · 已耗时 ${elapsedSec} 秒`;
+  } else if (isComplete) {
+    headlineText = `${run.answer ? "研究完成" : "回复完成"}${run.saved ? " · 已保存" : ""} · 点击展开执行细节`;
+  } else if (isNeedsInput) {
+    headlineText = "需要进一步澄清研究问题";
+  } else {
+    headlineText = `研究已停止 (${run.status === "cancelled" ? "已取消" : "未完成"})`;
+  }
+
+  const headline = el("span", headlineText, "trace-headline");
+  leftGroup.append(icon, headline);
+
+  const toggleBtn = el(
+    "button",
+    traceExpanded ? "收起明细 ▴" : "展开明细 ▾",
+    "trace-toggle-btn",
+  );
+  toggleBtn.onclick = (e) => {
+    e.stopPropagation();
+    traceManuallyToggled = true;
+    traceExpanded = !traceExpanded;
+    renderProgress();
+  };
+
+  traceHeader.append(leftGroup, toggleBtn);
+  traceHeader.onclick = () => {
+    traceManuallyToggled = true;
+    traceExpanded = !traceExpanded;
+    renderProgress();
+  };
+  traceCard.append(traceHeader);
+
+  if (traceExpanded) {
+    const traceBody = el("div", undefined, "trace-body");
+
+    if (run.thinking) {
+      const thinkingBox = el("div", undefined, "trace-thinking-box");
+      const thinkingHeader = el("div", undefined, "trace-thinking-header");
+      const thinkingTitle = el(
+        "span",
+        "💭 模型推理思考过程 (Chain of Thought)",
+      );
+      thinkingHeader.append(thinkingTitle);
+
+      const thinkingContent = el("pre", run.thinking, "trace-thinking-content");
+      thinkingBox.append(thinkingHeader, thinkingContent);
+      traceBody.append(thinkingBox);
+    }
+
+    const stepsContainer = el("div", undefined, "trace-steps-list");
+
+    const stepEvents = run.events.filter((e) =>
+      [
+        "tool_start",
+        "tool_error",
+        "tool_success",
+        "tool",
+        "evidence",
+        "calculation",
+        "start",
+        "context_restore",
+        "continue",
+      ].includes(e.kind),
     );
+
+    if (stepEvents.length === 0) {
+      const emptySteps = el(
+        "div",
+        isRunning ? "正在启动 Agent 推理分析..." : "暂无单步执行记录",
+        "trace-empty-steps",
+      );
+      stepsContainer.append(emptySteps);
+    } else {
+      stepEvents.forEach((ev, idx) => {
+        const stepKey = `step-${idx}-${ev.toolCallId || ev.toolName || ev.kind}`;
+        const isStepExpanded = expandAllSteps || expandedStepKeys.has(stepKey);
+
+        const stepRow = el(
+          "div",
+          undefined,
+          `trace-step-item ${ev.isError ? "step-error" : ev.kind === "tool_success" ? "step-success" : ev.kind === "tool_start" ? "step-running" : "step-info"}`,
+        );
+
+        const stepHeader = el("div", undefined, "trace-step-header");
+        const statusBadge = el(
+          "span",
+          ev.isError
+            ? "✕"
+            : ev.kind === "tool_success"
+              ? "✓"
+              : ev.kind === "tool_start"
+                ? "⏳"
+                : "•",
+          "step-badge",
+        );
+
+        const stepTitleGroup = el("div", undefined, "step-title-group");
+        const toolLabel = ev.toolName
+          ? TOOL_LABELS[ev.toolName] || ev.toolName
+          : "";
+        const titleText = toolLabel
+          ? `${toolLabel} (${ev.toolName})`
+          : ev.text;
+        const titleSpan = el("span", titleText, "step-title-text");
+        stepTitleGroup.append(titleSpan);
+
+        const hasDetails = Boolean(
+          (ev.args && Object.keys(ev.args).length > 0) ||
+            ev.result ||
+            ev.error ||
+            (toolLabel && ev.text && ev.text !== titleText),
+        );
+
+        const stepMeta = el("div", undefined, "step-meta");
+        const timeSpan = el(
+          "span",
+          new Date(ev.at).toLocaleTimeString(),
+          "step-time",
+        );
+        stepMeta.append(timeSpan);
+        if (hasDetails) {
+          const chev = el("span", isStepExpanded ? "▴" : "▾", "step-chev");
+          stepMeta.append(chev);
+        }
+
+        stepHeader.append(statusBadge, stepTitleGroup, stepMeta);
+
+        if (hasDetails) {
+          stepHeader.style.cursor = "pointer";
+          stepHeader.onclick = (e) => {
+            e.stopPropagation();
+            if (expandedStepKeys.has(stepKey)) {
+              expandedStepKeys.delete(stepKey);
+            } else {
+              expandedStepKeys.add(stepKey);
+            }
+            renderProgress();
+          };
+        }
+
+        stepRow.append(stepHeader);
+
+        if (isStepExpanded && hasDetails) {
+          const detailBox = el("div", undefined, "step-detail-box");
+          if (toolLabel && ev.text && ev.text !== titleText) {
+            detailBox.append(el("div", ev.text, "step-detail-note"));
+          }
+          if (ev.args && Object.keys(ev.args).length > 0) {
+            const argsSection = el("div", undefined, "step-detail-section");
+            argsSection.append(
+              el("div", "调用入参 (Arguments):", "step-section-label"),
+            );
+            const pre = el(
+              "pre",
+              JSON.stringify(ev.args, null, 2),
+              "step-code-block",
+            );
+            argsSection.append(pre);
+            detailBox.append(argsSection);
+          }
+          if (ev.isError && ev.error) {
+            const errSection = el(
+              "div",
+              undefined,
+              "step-detail-section step-error-section",
+            );
+            errSection.append(
+              el("div", "未成功原因 (Error):", "step-section-label error-label"),
+            );
+            const errPre = el(
+              "pre",
+              String(ev.error),
+              "step-code-block error-block",
+            );
+            errSection.append(errPre);
+            detailBox.append(errSection);
+          } else if (ev.result) {
+            const resSection = el("div", undefined, "step-detail-section");
+            resSection.append(
+              el("div", "执行结果 (Output):", "step-section-label"),
+            );
+            const resPre = el(
+              "pre",
+              typeof ev.result === "string"
+                ? ev.result
+                : JSON.stringify(ev.result, null, 2),
+              "step-code-block",
+            );
+            resSection.append(resPre);
+            detailBox.append(resSection);
+          }
+          stepRow.append(detailBox);
+        }
+
+        stepsContainer.append(stepRow);
+      });
+    }
+
+    traceBody.append(stepsContainer);
+    traceCard.append(traceBody);
+  }
+
+  progressRoot.append(traceCard);
 }
 function render() {
   if (!run) return;
@@ -824,10 +1064,16 @@ function render() {
     $("answer").append(user, assistant);
   });
   renderInspect();
-  if (nearBottom)
+  const forceBottom =
+    new URLSearchParams(window.location.search).get("scroll") === "bottom";
+  if (nearBottom || forceBottom) {
+    if (forceBottom) thread.style.scrollBehavior = "auto";
+    thread.scrollTop = thread.scrollHeight;
     requestAnimationFrame(() => {
       thread.scrollTop = thread.scrollHeight;
+      if (forceBottom) thread.style.scrollBehavior = "";
     });
+  }
 }
 function showInspector() {
   if (matchMedia("(max-width: 900px)").matches) {
@@ -1284,9 +1530,11 @@ try {
   token = status.token;
   initAsideResizer();
   await studies();
-  if (status.current) {
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetId = urlParams.get("id") || status.current;
+  if (targetId) {
     $("question").value = "";
-    follow(await api(`/api/runs/${status.current}`));
+    follow(await api(`/api/runs/${targetId}`));
   }
 } catch (e) {
   error(e);
