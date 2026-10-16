@@ -15,7 +15,7 @@
 <a href="#chapter-09"><span>09</span>模块与变化边界</a>
 <a href="#chapter-10"><span>10</span>布局与视觉语义</a>
 <a href="#chapter-11"><span>11</span>功能发现与交互</a>
-<a href="#chapter-12"><span>12</span>反馈与失败恢复</a></nav><a class="back" href="../README.md">← 项目文档</a></aside><main id="main"><header class="hero" id="top"><p class="eyebrow">TWELVE NOTES ON BUILDING A RESEARCH AGENT</p><h1>Agent Engineering<span>产品、架构与体验，如何一起演进</span></h1><p class="lead">oh-my-quant 的十二个问题，十二组取舍。从研究工作流到模块边界，从证据与状态到界面的空间、反馈和恢复。</p><p class="scope">技术负责人阅读版 · 系列始于 2026-10-12 / 2026-10-15 最近修订 · 非发布说明<br>配图为机制与布局示意，不是真实终端截图或效果测量。<a href="./editorial-notes.md">证据与编辑说明</a></p></header><section class="contents" id="contents" aria-labelledby="contents-title"><h2 id="contents-title">沿着产品、技术架构与 UI/UX 阅读</h2><p class="scope">产品：08 → 11 → 12 → 07　·　架构：01 → 09 → 02 → 03 → 04 → 05　·　UI/UX：10 → 11 → 12 → 06</p><nav aria-label="文章目录"><a href="#chapter-01"><span>01</span>内核与所有权</a>
+<a href="#chapter-12"><span>12</span>反馈与失败恢复</a></nav><a class="back" href="../README.md">← 项目文档</a></aside><main id="main"><header class="hero" id="top"><p class="eyebrow">TWELVE NOTES ON BUILDING A RESEARCH AGENT</p><h1>Agent Engineering<span>产品、架构与体验，如何一起演进</span></h1><p class="lead">oh-my-quant 的十二个问题，十二组取舍。从研究工作流到模块边界，从证据与状态到界面的空间、反馈和恢复。</p><p class="scope">技术负责人阅读版 · 系列始于 2026-10-12 / 2026-10-16 最近修订 · 非发布说明<br>配图为机制与布局示意，不是真实终端截图或效果测量。<a href="./editorial-notes.md">证据与编辑说明</a></p></header><section class="contents" id="contents" aria-labelledby="contents-title"><h2 id="contents-title">沿着产品、技术架构与 UI/UX 阅读</h2><p class="scope">产品：08 → 11 → 12 → 07　·　架构：01 → 09 → 02 → 03 → 04 → 05　·　UI/UX：10 → 11 → 12 → 06</p><nav aria-label="文章目录"><a href="#chapter-01"><span>01</span>内核与所有权</a>
 <a href="#chapter-02"><span>02</span>数据与成功语义</a>
 <a href="#chapter-03"><span>03</span>上下文与恢复</a>
 <a href="#chapter-04"><span>04</span>工具与 Skill</a>
@@ -347,42 +347,75 @@ equity[t] = cash[t] + positionShares[t] × price[t]
 </ul>
 <p><a href="#chapter-06">← 上一篇</a> · <a href="#chapter-08">下一篇：研究产品的工作流 →</a></p>
 </article>
-<article id="chapter-08" aria-labelledby="chapter-08-title"><p class="eyebrow">FIELD NOTES / 08</p><h2 id="chapter-08-title">研究终端，为什么不能只是一个聊天框？</h2><p class="article-meta">初稿 2026-10-13 · 修订 2026-10-13 · oh-my-quant · <a href="./08-research-workbench.md">Markdown 原文</a></p><p>用户今天比较两组标的，明天再问“换一个基准会怎样”。对话可以接着说，但研究是否真的接得上？这个差别决定了 oh-my-quant 应该围绕消息设计，还是围绕持续进行的工作设计。</p>
-<h3>用户离开以后，什么应该留下？</h3>
-<p>聊天是一个合适的研究入口。用户不必先理解因子函数或工具参数，就能提出一个尚不完整的问题，再通过追问补齐日期、对象和比较口径。自然语言承担探索，而不是要求用户在第一步就填完所有表格。</p>
-<p>但用户离开之后，需要留下的不只是一段回答。下一次研究还需要知道：比较了哪两组标的，采用什么日期、权重、币种和基准，当时的数据是否仍然可核验。这些信息如果只能从聊天文字中重新猜测，连续对话就不等于连续研究。</p>
-<p><a href="../quant-harness/PRD.md">PRD</a>因此把主要工作串成“配置 → 获取数据 → 分析与比较 → 报告 → 恢复”。从产品设计看，这条链比功能清单更有约束力：报告不是最后多一个导出按钮，而是下一次研究的入口。</p>
-<h3>功能都在，工作仍可能接不上</h3>
-<p>已有的终端验收记录提供了一条很具体的路径：在界面开启自动报告，创建两组观察标的，输入带日期、基准和币种的比较请求，完成计算，再通过 <code>/clear</code> 重置当前研究会话（保留磁盘存档），从报告恢复。测试必须经过这些入口，而不能直接调用比较函数代替用户完成工作。<a href="../../src/tui/test/research-workflow.test.ts">键盘流程回归</a>保留这条可重复路径。</p>
-<p>这里有一个容易被功能统计掩盖的冲突：单独的“创建组合”“运行工具”“生成 HTML”都能成功，组合起来仍可能丢失来源会话，或者在恢复时重新取一份不同的数据。局部能力存在，并没有回答用户是否能够接着昨天的工作往下做。</p>
-<p>对象名称也会改变承诺。Portfolio 听起来像一个账户，但默认 Portfolio 管理的是观察标的与分组，不持有用户的实际股数、成本或现金。把它展示成“我的资产”，会让公开行情与模拟结果承担并不存在的账户含义。这个限制不应只藏在技术文档里，而应进入帮助、字段和报告用语。</p>
-<h3>把探索、控制和留存放在不同位置</h3>
-<p>当前产品把自然语言交给研究过程，把配置、诊断、组合维护和恢复交给明确的本地入口。Analyzing 展示研究，Overview 提供观察背景，Composer 承接意图，报告保存一次有来源的结果。它们服务同一条工作流，却不要求用户在同一个聊天流里完成所有事情。</p>
+<article id="chapter-08" aria-labelledby="chapter-08-title"><p class="eyebrow">FIELD NOTES / 08</p><h2 id="chapter-08-title">桌面优先之后，CLI 如何延续同一份研究？</h2><p class="article-meta">初稿 2026-10-13 · 修订 2026-10-16 · oh-my-quant · <a href="./08-research-workbench.md">Markdown 原文</a></p><p>用户今天比较两组标的，明天再问“换一个基准会怎样”。在终端里可以接着说，换到桌面应用以后，研究还能接得上吗？如果需要重新输入日期、解释数据来源、寻找旧报告，我们交付的就只是两个入口，而不是一份能够继续的工作。</p>
+<p>本文以当前实现为起点，讨论已经选择的维护方向：<strong>优先维护 Desktop，同时保留 CLI</strong>。当前 <code>desktop/</code> 仍是 Electron 中的终端宿主；下面的 <code>apps/cli</code>、<code>apps/desktop</code>、共享包和独立桌面界面均是改造提案，尚未实施。目录与发布方法仍以<a href="../quant-harness/module-architecture.md">模块架构</a>和<a href="../quant-harness/desktop.md">桌面宿主文档</a>为准。</p>
+<h3>一次研究，为什么要在两种界面里延续？</h3>
+<p>自然语言适合尚未成形的问题。用户可以先表达研究意图，再逐步明确对象、窗口、币种和基准。但一段回答不是全部研究状态：下一次工作还需要知道采用了哪个组合版本、哪些数据能重算、报告固定了什么，以及失败后有没有可用的草稿。<a href="../quant-harness/PRD.md">PRD</a>因此把主要路径串成“配置 → 获取数据 → 分析与比较 → 报告 → 恢复”。</p>
+<p>已有<a href="../../src/tui/test/research-workflow.test.ts">键盘流程回归</a>经过设置自动报告、维护两组观察标的、带日期与基准的比较、<code>/clear</code> 和报告恢复。这条路径提醒我们：局部的取数、计算、导出都成功，仍不保证研究能连续进行。恢复必须保留原数据引用与报告版本，不能为了“打开成功”悄悄换成今天的数据。</p>
+<p>两种入口并非两份独立产品。CLI 仍适合终端研究、明确的 JSON one-shot 读取和可组合命令；Desktop 优先承担安装、发现、配置与长时间工作的体验。这里优先的是日常产品迭代与体验验收，不是取消 CLI 的兼容、测试或发布维护。桌面应用让用户不必先组织终端环境，也给对象、参数与报告更稳定的展示位置；这仍是需要验证的产品判断，不是已经测得的效率提升。</p>
+<p>真正应该共享的是研究事实，而不是窗口布局。配置快照、会话分支、任务条件、数据引用和报告身份应有一致解释；焦点、滚动、面板展开和暂时的输入状态属于各自界面。强行复用整个 TUI 布局会限制桌面体验，复制业务逻辑又会让两个入口产生不同答案。我们需要的是同一套约束下的两种投影。</p>
+<h3>终端复用降低了成本，也划出了桌面体验的边界</h3>
+<p>当前方案有充分的合理性。<a href="../../desktop/scripts/build.ts">桌面构建</a>把根 <code>src/index.ts</code> 编译成随包运行的 WhyJ，Electron <a href="../../desktop/src/main.ts">主进程</a>通过 node-pty 启动它。<a href="../../desktop/src/bridge.ts">Bridge</a>主要传输终端输入、尺寸、输出和确认，再提供剪贴板、工作目录与链接能力。复用既有 CLI/TUI，减少了研究行为分叉，也避免要求桌面用户先安装整套开发工具。</p>
+<p>但终端字符流不是研究对象协议。Renderer 接到输出，不能据此可靠地拿到“当前报告版本”“配置保存代次”或“这次失败的请求身份”。如果下一步需要可点击的数据来源、并列比较的报告、独立设置页，就不能用解析屏幕文字来构造第二份业务状态。保留 PTY 作为过渡入口合理，把它当成独立桌面工作台的完整边界则不够。</p>
+<p>共享核心也还没有自然长出来。<code>src/runtime/</code> 已经受不依赖 CLI/TUI 的架构约束，但顶层 <a href="../../src/app-runtime.ts">AppRuntime</a>仍导入 CLI 目录/执行器以及 TUI 的 <code>CurrentSessionMeta</code> 类型。把它原样放进 <code>packages/core</code>，只会把终端依赖换一个名字。必须先分开应用服务、命令适配与界面回调，再讨论包边界。</p>
+<p>因此，问题不是把 <code>desktop</code> 改叫 <code>app</code>。<code>src/app/</code> 已经容纳显式选择的模拟执行与账户宿主；再增加一个单数 <code>app/</code> 会混淆“可发布产品”与“领域宿主适配器”。<code>apps/cli</code> 和 <code>apps/desktop</code> 更清楚地表达两个产品入口，但迁移目录本身不会解除上述依赖，也不会获得新的用户体验。</p>
+<h3>把桌面做成工作台，让两端共享研究事实</h3>
+<p>我们的候选终态如下。它是用于讨论责任的地图，不是本 PR 的文件移动清单；其中 <code>packages/quant-harness</code> 也不是把所有领域代码合成一个无边界总包。</p>
+<pre><code class="language-text">apps/
+  desktop/    Electron main、preload、renderer 与桌面打包
+  cli/        公共 whyj 命令、JSON 入口与终端适配
+packages/
+  agent-runtime/   通用会话、模型循环与生命周期
+  quant-harness/   量化应用服务、领域模块与显式契约
+tests/
+  architecture/   仓库依赖与入口边界
+  integration/    跨模块、跨入口的行为契约
+  e2e/            实际产品工作流，按端分别验收
+docs/
+  agent-runtime/
+  quant-harness/
+  blog/
+site/         产品网站、Docs、Blog、手册与公开 Demo
+</code></pre>
+<p>沿用<a href="../README.md#design">现有文档划分</a>，Agent Runtime 负责通用会话运行机制；数据、计算、执行、报告、产品与 UI/UX 均属于 Quant Harness 的应用体系。文档归属不要求所有界面代码住在同一个共享包：具体渲染留在各 app，跨界面确实复用的状态契约和应用服务再进入共享层。现有 <code>source</code>、<code>storage</code>、<code>quant</code>、<code>execution</code> 的依赖与授权规则仍需保留。</p>
+<p>桌面工作台应围绕意图、对象和结果组织，而不只是增加页面。研究对话承接探索；对象区明确观察分组、日期、币种与基准；报告区固定版本与来源，并能返回对应会话。准备、运行、取消、空结果和失败要分别可见，不能都呈现为一个停止转动的加载图标。观察 Portfolio 仍不是用户真实持仓，研究完成也不授予下单权限。<a href="../quant-harness/quant-uiux.md">界面职责</a>、<a href="../quant-harness/execution.md">执行边界</a>、<a href="../quant-harness/performance.md">账户业绩</a></p>
 <figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="架构图，可横向滚动"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMTIwIiBoZWlnaHQ9IjYzMCIgdmlld0JveD0iMCAwIDExMjAgNjMwIiByb2xlPSJpbWciIGFyaWEtbGFiZWxsZWRieT0idGl0bGUgZGVzYyI+Cjx0aXRsZSBpZD0idGl0bGUiPuS7juS4gOasoeWvueivne+8jOi1sOWQkeWPr+S7pee7p+e7reeahOeglOeptjwvdGl0bGU+PGRlc2MgaWQ9ImRlc2MiPuWHhuWkh+OAgeeglOeptuOAgeeVmeWtmOWSjOe7p+e7reWxnuS6juWQjOS4gOW3peS9nOa1ge+8jOWNtOS4jeW/heaMpOWcqOWQjOS4gOS4quiBiuWkqeWFpeWPo+OAgjwvZGVzYz4KPGRlZnM+PG1hcmtlciBpZD0iYXJyb3ciIHZpZXdCb3g9IjAgMCAxMCAxMCIgcmVmWD0iOSIgcmVmWT0iNSIgbWFya2VyV2lkdGg9IjciIG1hcmtlckhlaWdodD0iNyIgb3JpZW50PSJhdXRvIj48cGF0aCBkPSJNMCAwIEwxMCA1IEwwIDEweiIgZmlsbD0iIzY5NzU4NiIvPjwvbWFya2VyPjwvZGVmcz48c3R5bGU+dGV4dHtmb250LWZhbWlseToiTWljcm9zb2Z0IFlhSGVpIiwiUGluZ0ZhbmcgU0MiLHNhbnMtc2VyaWY7ZmlsbDojMTgyMzMzfS50aXRsZXtmb250LXNpemU6MzBweDtmb250LXdlaWdodDo3MDB9LmV5ZWJyb3d7Zm9udC1zaXplOjE0cHg7bGV0dGVyLXNwYWNpbmc6MnB4O2ZpbGw6IzQ5Njg3ZH0ubGFiZWx7Zm9udC1zaXplOjIxcHg7Zm9udC13ZWlnaHQ6NjAwfS5ib2R5e2ZvbnQtc2l6ZToxN3B4O2ZpbGw6IzQwNTE2NH0ubm90ZXtmb250LXNpemU6MTZweDtmaWxsOiM2NTcwODN9LmJveHtzdHJva2Utd2lkdGg6MS41fS5uZXV0cmFse2ZpbGw6I2Y0ZjZmODtzdHJva2U6I2NiZDNkY30uYmx1ZXtmaWxsOiNlZGY0ZmQ7c3Ryb2tlOiM4YWFkZDV9LnRlYWx7ZmlsbDojZWRmN2Y0O3N0cm9rZTojODRiN2E1fS5hbWJlcntmaWxsOiNmZmY2ZTc7c3Ryb2tlOiNkMmFkNjl9LmFycm93e2ZpbGw6bm9uZTtzdHJva2U6IzY5NzU4NjtzdHJva2Utd2lkdGg6MjttYXJrZXItZW5kOnVybCgjYXJyb3cpfS5kYXNoZWR7c3Ryb2tlLWRhc2hhcnJheTo3IDZ9PC9zdHlsZT48cmVjdCB3aWR0aD0iMTEyMCIgaGVpZ2h0PSI2MzAiIGZpbGw9IiNmZmYiLz4KPHRleHQgeD0iNDQiIHk9IjM0IiBjbGFzcz0iZXllYnJvdyI+T0gtTVktUVVBTlQgLyBBR0VOVCBFTkdJTkVFUklORyAvIDA4PC90ZXh0Pjx0ZXh0IHg9IjQ0IiB5PSI4NCIgY2xhc3M9InRpdGxlIj7ku47kuIDmrKHlr7nor53vvIzotbDlkJHlj6/ku6Xnu6fnu63nmoTnoJTnqbY8L3RleHQ+PHRleHQgeD0iNDQiIHk9IjExOSIgY2xhc3M9Im5vdGUiPuWHhuWkh+OAgeeglOeptuOAgeeVmeWtmOWSjOe7p+e7reWxnuS6juWQjOS4gOW3peS9nOa1ge+8jOWNtOS4jeW/heaMpOWcqOWQjOS4gOS4quiBiuWkqeWFpeWPo+OAgjwvdGV4dD4KPHJlY3QgeD0iNDQiIHk9IjE3MyIgd2lkdGg9IjIxNiIgaGVpZ2h0PSIxNDIiIHJ4PSIxMCIgY2xhc3M9ImJveCBibHVlIi8+PHRleHQgeD0iNjQiIHk9IjIwOCIgY2xhc3M9ImxhYmVsIj7lh4blpIc8L3RleHQ+PHRleHQgeD0iNjQiIHk9IjI0OCIgY2xhc3M9ImJvZHkiPuaooeWeiyAvIOaVsOaNriAvIOinguWvn+e7hDwvdGV4dD48dGV4dCB4PSI2NCIgeT0iMjgyIiBjbGFzcz0ibm90ZSI+5pys5Zyw5o6n5Yi2PC90ZXh0PjxwYXRoIGQ9Ik0yNjIgMjQxSDMwOCIgY2xhc3M9ImFycm93Ii8+PHJlY3QgeD0iMzE2IiB5PSIxNzMiIHdpZHRoPSIyMTYiIGhlaWdodD0iMTQyIiByeD0iMTAiIGNsYXNzPSJib3ggdGVhbCIvPjx0ZXh0IHg9IjMzNiIgeT0iMjA4IiBjbGFzcz0ibGFiZWwiPueglOeptjwvdGV4dD48dGV4dCB4PSIzMzYiIHk9IjI0OCIgY2xhc3M9ImJvZHkiPuaEj+WbviAvIOWPguaVsCAvIOW3peWFtzwvdGV4dD48dGV4dCB4PSIzMzYiIHk9IjI4MiIgY2xhc3M9Im5vdGUiPuiHqueEtuivreiogOaOoue0ojwvdGV4dD48cGF0aCBkPSJNNTM0IDI0MUg1ODAiIGNsYXNzPSJhcnJvdyIvPjxyZWN0IHg9IjU4OCIgeT0iMTczIiB3aWR0aD0iMjE2IiBoZWlnaHQ9IjE0MiIgcng9IjEwIiBjbGFzcz0iYm94IGFtYmVyIi8+PHRleHQgeD0iNjA4IiB5PSIyMDgiIGNsYXNzPSJsYWJlbCI+55WZ5a2YPC90ZXh0Pjx0ZXh0IHg9IjYwOCIgeT0iMjQ4IiBjbGFzcz0iYm9keSI+5Zu65a6a5oql5ZGKIC8g5p2l5rqQ5YiG5pSvPC90ZXh0Pjx0ZXh0IHg9IjYwOCIgeT0iMjgyIiBjbGFzcz0ibm90ZSI+5pyJ5L6d5o2u55qE57uT5p6cPC90ZXh0PjxwYXRoIGQ9Ik04MDYgMjQxSDg1MiIgY2xhc3M9ImFycm93Ii8+PHJlY3QgeD0iODYwIiB5PSIxNzMiIHdpZHRoPSIyMTYiIGhlaWdodD0iMTQyIiByeD0iMTAiIGNsYXNzPSJib3ggYmx1ZSIvPjx0ZXh0IHg9Ijg4MCIgeT0iMjA4IiBjbGFzcz0ibGFiZWwiPue7p+e7rTwvdGV4dD48dGV4dCB4PSI4ODAiIHk9IjI0OCIgY2xhc3M9ImJvZHkiPuaguOWvueadpea6kCAvIOaBouWkjeWIhuaUrzwvdGV4dD48dGV4dCB4PSI4ODAiIHk9IjI4MiIgY2xhc3M9Im5vdGUiPuS4jeaYr+mHjeaWsOWPluaVsOabv+aNojwvdGV4dD48cGF0aCBkPSJNOTY4IDMyMFYzNjZINDI0VjMyMCIgY2xhc3M9ImFycm93Ii8+PHRleHQgeD0iNDgwIiB5PSIzNTUiIGNsYXNzPSJub3RlIj7lm7Tnu5XlkIzkuIDnoJTnqbbnu6fnu63vvIzogIzkuI3mmK/ku47mtojmga/ph43mlrDnjJzlj4LmlbA8L3RleHQ+PHJlY3QgeD0iNDQiIHk9IjQxMCIgd2lkdGg9IjEwMzIiIGhlaWdodD0iMTI0IiByeD0iMTAiIGNsYXNzPSJib3ggbmV1dHJhbCIvPjx0ZXh0IHg9IjY2IiB5PSI0NTAiIGNsYXNzPSJsYWJlbCI+5Lqn5ZOB6L6555WM5YWI5LqO5Yqf6IO95pWw6YePPC90ZXh0Pjx0ZXh0IHg9IjY2IiB5PSI0ODYiIGNsYXNzPSJib2R5Ij7op4Llr5/nu4TlkIgg4omgIOecn+Wunui0puaIt+OAgOOAgOeglOeptuWujOaIkCDiiaAg5Lqk5piT5o6I5p2DPC90ZXh0Pjx0ZXh0IHg9IjY2IiB5PSI1MTciIGNsYXNzPSJub3RlIj7pl63njq/lm57lvZLpqozor4Hlt6XkvZzlj6/lu7bnu63vvJvnlKjmiLflrabkuaDmiJDmnKzkuI7ku7vliqHmlYjnjofpnIDopoHlj6blpJbmtYvph4/jgII8L3RleHQ+CjxwYXRoIGQ9Ik00NCA1ODJIMTA3NiIgc3Ryb2tlPSIjZGRlM2U4Ii8+PHRleHQgeD0iNDQiIHk9IjYxMCIgY2xhc3M9Im5vdGUiPuacuuWItuS4juW4g+WxgOekuuaEjyDCtyDkvp3mja4gMjAyNi0xMC0xMyDlt6XkvZzljLogwrcg6Z2e55yf5a6e57uI56uv5oiq5Zu+5oiW55So5oi35pWI5p6c5rWL6YePPC90ZXh0Pgo8L3N2Zz4K" alt="研究工作流由准备、研究、留存和继续构成；聊天负责表达意图，本地控制负责确定动作，固定报告与分支支持恢复。" loading="lazy"></div><figcaption class="scroll-hint">窄屏可横向滚动查看完整配图</figcaption></figure>
-<p><em>图 8：产品工作流示意，不是逐屏操作截图。箭头表示工作如何延续；报告可打开、来源可恢复、证据可重算仍须分别检查。</em></p>
-<p>这一选择也可以放在三种产品组织方式之间理解。下表是对当前方案的分析，不是对历史方案会议的还原。</p>
+<p><em>图 8：沿用研究连续性示意，解释两端应共同维护的工作链；不是新桌面界面的截图，也不是上述目录已经迁移的证明。</em></p>
+<p>进程边界同样不能由视觉布局决定。Electron main 管理窗口、宿主资源与后台运行的生命周期；preload 只开放有限、带类型和参数校验的能力；renderer 不直接读取凭证、文件或启动 Python。这与 Electron 的<a href="https://www.electronjs.org/docs/latest/tutorial/process-model">进程模型</a>一致，当前已有<a href="../../desktop/src/main.ts">隔离设置</a>和 <a href="../../desktop/src/preload.ts">preload</a>，但它们并不证明未来业务接口已经实现。共享应用服务应由可信宿主接线。究竟放在 main、独立后台进程还是 utility process，采用哪种传输协议，还需要结合取消、崩溃恢复与打包成本验证，本文不预先承诺 JSON-RPC 或某个框架。</p>
+<p>目录改造按三个可停止的阶段推进，每一步都应独立可回退：</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="比较表，可横向滚动"><table>
 <thead>
-<tr><th>组织方式</th><th>对用户的帮助</th><th>留下的成本</th></tr>
+<tr><th>阶段</th><th>先交付什么</th><th>必须保住什么</th></tr>
 </thead>
 <tbody>
-<tr><td>只围绕聊天</td><td>自由提问，入口轻</td><td>状态与对象容易埋进历史，需要反复说明</td></tr>
-<tr><td>只围绕固定表单</td><td>参数和步骤明确</td><td>尚未成形的问题难以表达，新研究容易要求新表单</td></tr>
-<tr><td>研究对话配合本地控制与报告</td><td>探索可以开放，关键动作有确定入口</td><td>用户要理解几类对象，团队要维护跨入口一致性</td></tr>
+<tr><td>入口归位</td><td>先迁 <code>apps/cli</code> 与 <code>apps/desktop</code>，共享实现暂留根 <code>src/</code>；同步构建、测试、CI 和安装路径</td><td>npm 包名与 <code>whyj</code> 命令、Electron appId、用户数据目录、安装更新与历史读取</td></tr>
+<tr><td>一条工作链贯通</td><td>从 AppRuntime 分离应用服务；先让配置保存、状态投影与诊断消费同一已提交配置快照及其保存代次，再接研究、取消、报告恢复</td><td>旧 PTY 可以继续工作；renderer 不解析字符流充当业务接口，不新增重复真值；共享工作区先限定单写者，并发保护验收前不开放两端同时写入</td></tr>
+<tr><td>边界稳定后成包</td><td>再形成 Agent Runtime / Quant Harness 工作区；迁移测试和发布配置</td><td>无 GUI 的 CLI 可独立构建/运行，领域内部入口约束不被总包抹平</td></tr>
 </tbody>
 </table></div>
-<p>因此，“少几个页面”并不是这里唯一的简化标准。更重要的是用户是否还需要反复搬运同一份参数，是否知道下一步在研究、修改设置，还是恢复一份旧结果。第 <a href="#chapter-11">11 篇</a>讨论这些入口怎样被发现，第 <a href="#chapter-12">12 篇</a>讨论它们失败后怎样继续。</p>
-<p>实盘执行没有被塞进这条默认研究链。研究完成不能继承下单授权，真实账户业绩也不能由观察组合估算。执行端口与私有账户输入各有独立契约；这缩小了默认产品的承诺，也意味着用户不能把它当作完整交易工作站。<a href="../quant-harness/execution.md">执行边界</a>、<a href="../quant-harness/performance.md">账户业绩</a></p>
-<h3>闭环已经可走，价值还需要测量</h3>
-<p>最早的连续回归采用本地固定模型响应与合成行情，验证键盘到存储、报告和恢复的链路。后续记录再加入空配置路径，以及隔离生产 PTY 下的真实模型、公开行情、双组合比较和恢复。2026-10-09，F05 的本地布局与工作流范围完成验收；这些证据不能合并成“首次真实账号开通到任意研究均已通过”。现行范围由 <a href="../quant-harness/PRD.md">PRD</a>维护，本轮未重新执行上述阶段验证。</p>
-<p>我们得到的是一条可以检验的产品链，而不是用户价值已经成立的统计结论。固定任务能完成，不说明初次使用者能够独立发现它；恢复事实正确，也不说明模型一定解释正确。</p>
-<p>下一轮产品验证应围绕完整任务记录：第一次配置在哪里停住，比较时哪些参数反复补问，隔天恢复是否需要重新组织材料。完成时间、回退次数和独立完成比例都是待测指标，目前没有统一用户研究基线，不能填入一个看似漂亮的提升数字。</p>
-<p>这也给功能扩张一个判断条件：新增能力是否减少了研究链上的真实中断，还是只让演示多出一个按钮。后者不必一律拒绝，但不应与前者混用同一种价值声明。</p>
+<p><strong>后续前端实现的交接约束。</strong> 根据 <a href="https://github.com/yangjingo/oh-my-quant/pull/22#issuecomment-6193433860">PR #22 的归属讨论</a>，网站继续由 <code>site/</code> 独立维护；本阶段不迁网站，也不把真实研究工作台放进官网。正式产品界面归 <code>apps/desktop</code> 的 renderer，窗口、preload、系统能力与打包归桌面宿主。共享实现第一阶段仍可留在根 <code>src/</code>；“入口归位”不等于把研究服务、计算、Source 或 Storage 搬进 renderer。</p>
+<p><a href="https://github.com/yangjingo/oh-my-quant/pull/27">PR #27</a> 的 <code>src/app/research-workspace/web/</code> 与本地 HTTP 服务是已声明的过渡验证入口，不是最终产品目录。后续正式前端应依赖本方案和入口迁移：浏览器界面归 renderer，开发用 HTTP/SSE 入口作为宿主适配器，研究编排和状态契约独立于传输与界面。桌面接入复用这些服务，不复制研究逻辑；仅修改目录或注释不足以证明接入完成。入口迁移、研究闭环和桌面打包分别验收，保持 CLI/npm 命令、appId、用户目录和历史数据兼容。</p>
+<p>当前说明确定职责与迁移顺序，不确定前端框架、业务进程或 IPC 协议。<a href="https://github.com/yangjingo/oh-my-quant/issues/29">Issue #29</a> 的技术栈仍是讨论项；网站上线、本地浏览器验证与 Desktop 实际打包运行必须分别记录。本方案合入只交付架构依据，后续实现继续通过对应 Issue/PR 验收。</p>
+<p>未来根 package 可以成为 private workspace 编排器，以 <code>dev</code> 优先启动 Desktop、<code>dev:cli</code> 显式启动 CLI；公共 <code>whyj-quant</code> 仍由 CLI 产品发布。<a href="https://docs.npmjs.com/cli/v11/using-npm/workspaces/">npm workspaces</a>可以管理本地包与命令，但不会自动解决依赖方向。现在没有必要同时发布十几个 npm 包，也不应在入口尚未清楚时引入统一插件平台。这些脚本与发布调整都属于后续实现，不改变本轮现行 README 命令。</p>
+<h3>先减少工作中断，再决定拆到哪一层</h3>
+<p>这次得到的是维护方向、责任边界和可分步验证的路线，而不是已经交付的独立桌面 UI。原连续工作流在 2026-10-09 的 F05 范围内完成过本地布局与流程验收；它不能外推为“两端共享工作区”或首次真实账号到任意研究均通过，本轮也没有重跑历史模型与行情验收。</p>
+<p>还有一个不能藏起来的成本：共享服务不等于已经共享磁盘。当前桌面默认使用自己的用户数据目录，CLI 也可能指向不同工作区。让两个客户端恢复同一份研究，需要明确选择同一工作区，并在开放同时写入之前规定写入所有权、冲突和文件格式兼容。不能因为改了目录，就自动合并凭证、账户或用户存档，也不能默许两个进程同时覆盖设置。第一阶段不迁移用户数据。本轮没有实现或验收跨端共享工作区及并发写入保护；手动指向相同目录也不能充当完整支持的证明。</p>
+<p>后续实现应以完整任务验收，而不是以迁了多少文件验收：</p>
+<ul>
+<li>桌面首次安装可启动与完成配置，不要求另行安装 Bun 或 Node；Python 能力缺失能被明确解释，而非冒充已可用。</li>
+<li>保存数据配置后，诊断、研究工具与两端状态投影使用同一已提交快照；旧请求迟到不能把显示改回旧版本。</li>
+<li>取消不发布“完成”报告，输入与可恢复工作仍可达；空数据与服务失败有不同反馈。</li>
+<li>明确选择同一工作区后，两端恢复同一报告身份与原数据引用；故障与并发冲突不静默覆盖历史。</li>
+<li>CLI 在无桌面依赖的环境中继续支持既有命令与 JSON 契约，升级安装保留既有用户状态。</li>
+</ul>
+<p>这些是待实现的验收条件，不是本篇博客的运行成绩。独立完成比例、反复输入次数和隔天恢复损失也需要先建立基线，目前没有可信的提升数字。</p>
+<p>如果用户的主要工作仍是提示、读取报告和终端操作，现有 PTY 可能继续是成本最低的方案。只有当对象控制与研究恢复反复被字符流限制时，独立 renderer 才有足够理由承担新的状态协议、交互测试和发布成本。Desktop-first 不意味着越早重写越好；它意味着让下一次工程投入优先修复桌面用户的真实中断，并用 CLI 的兼容约束守住共享事实。</p>
 <h3>实现索引</h3>
 <ul>
-<li><a href="../quant-harness/PRD.md">产品范围与完成度</a>、<a href="../../src/runtime/research/portfolio.ts">观察组合服务</a>。</li>
-<li><a href="../../src/tui/test/research-workflow.test.ts">连续键盘流程回归</a>。</li>
-<li><a href="../quant-harness/artifacts-design.md">报告与恢复契约</a>、<a href="../quant-harness/quant-uiux.md">界面职责</a>。</li>
+<li>当前产品与宿主：<a href="../quant-harness/PRD.md">PRD</a>、<a href="../quant-harness/desktop.md">Desktop</a>、<a href="../../desktop/src/main.ts">main</a>、<a href="../../desktop/src/bridge.ts">Bridge</a>、<a href="../../desktop/scripts/build.ts">构建</a>。这些链接定位现状，不是未来 apps 目录的实现证据。</li>
+<li>当前边界与待解耦点：<a href="../quant-harness/module-architecture.md">模块架构</a>、<a href="../../src/app-runtime.ts">AppRuntime</a>、<a href="../agent-runtime/README.md">通用运行时</a>。</li>
+<li>可复用的验收基础：<a href="../../src/tui/test/research-workflow.test.ts">连续键盘流程</a>、<a href="../quant-harness/configuration.md">配置</a>、<a href="../quant-harness/artifacts-design.md">报告与恢复</a>。</li>
+<li>相关讨论：<a href="#chapter-10">布局与视觉语言</a>、<a href="#chapter-11">功能发现</a>、<a href="#chapter-12">失败后的继续工作</a>。</li>
 </ul>
 <p><a href="#chapter-07">← 上一篇</a> · <a href="#chapter-09">下一篇：模块边界 →</a></p>
 </article>
