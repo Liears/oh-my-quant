@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Release checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Run complete release gate
+        run: bun run check:release
+      - name: Pack and smoke-test the npm installation
+        run: |
+          $packed = npm pack --ignore-scripts --json
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $tarball = Join-Path $PWD (($packed | ConvertFrom-Json)[0].filename)
+          $expected = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $smokeDir = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
+          npm install --prefix $smokeDir --ignore-scripts --no-audit --no-fund $tarball
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Set-Location $smokeDir
+          $output = node node_modules/whyj-quant/dist/index.js --json --version
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $result = $output | ConvertFrom-Json
+          if (!$result.ok -or $result.data.version -ne $expected) {
+            throw 'Installed CLI version does not match the package'
+          }
+
+  required:
+    name: CI required
+    if: ${{ always() }}
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every platform to succeed
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+        run: test "$CHECK_RESULT" = success

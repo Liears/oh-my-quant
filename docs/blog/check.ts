@@ -1,5 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
+import { isOptionalPrivateEvidence } from "../../.github/scripts/documentation-links.mjs";
 
 const root = resolve(import.meta.dir, "../..");
 async function listFiles(directory: string): Promise<string[]> {
@@ -65,6 +66,7 @@ for (const file of current) {
 }
 let links = 0;
 let checkedExplicitAnchors = 0;
+let unavailablePrivateEvidence = 0;
 for (const file of current) {
   const source = await readFile(resolve(root, file), "utf8");
   const prose = source.replace(/^(```|~~~)[\s\S]*?^\1[^\n]*$/gm, "");
@@ -77,7 +79,10 @@ for (const file of current) {
     if (path) {
       links++;
       try { await stat(target); }
-      catch { failures.push(`${file}: ${href}`); }
+      catch {
+        if (isOptionalPrivateEvidence(root, target)) unavailablePrivateEvidence++;
+        else failures.push(`${file}: ${href}`);
+      }
     }
     const anchors = explicitAnchors.get(target);
     if (anchors && fragment) {
@@ -161,5 +166,6 @@ for (const file of docsFiles) {
   if (!navTargets.has(resolve(root, file))) failures.push(`File missing from docs navigation: ${file}`);
 }
 console.log(`Checked ${current.length} Markdown documents, ${docsFiles.length} catalogued files, ${links} local link targets, ${checkedExplicitAnchors} explicit anchor references, ${svgs.length} SVGs, the offline blog, and presentation links.`);
+if (unavailablePrivateEvidence) console.log(`${unavailablePrivateEvidence} private output evidence links are unavailable; historical results were not revalidated.`);
 if (failures.length) { console.error(failures.join("\n")); process.exit(1); }
 console.log("Documentation checks passed. This is not runtime or external-service validation.");
