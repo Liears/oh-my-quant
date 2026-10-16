@@ -14,6 +14,7 @@ const allowed = new Set([
   "icons.svg",
   "licenses",
   "fonts",
+  "workspace-preview.png",
 ]);
 const files = await readdir(source);
 const content = await loadContent();

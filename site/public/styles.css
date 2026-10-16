@@ -764,9 +764,14 @@ html[lang="en"] .answer p br {
   font-size: 11px;
   color: var(--muted);
 }
+.preview-footnote-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
 .preview-footnote a {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 .preview-footnote a:hover {
@@ -1637,6 +1642,11 @@ h2 {
   }
   .preview-footnote {
     font-size: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .preview-footnote-actions {
+    gap: 12px;
   }
   .section {
     padding-block: 56px;
