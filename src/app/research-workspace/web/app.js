@@ -230,7 +230,7 @@ function renderInspect(focus) {
     if (research) viewed = { ...viewed, ...research };
   }
   $("inspection-context").textContent = viewed
-    ? `本轮：${viewed.question.slice(0, 80)}`
+    ? `${viewed.scope.symbol} · ${viewed.scope.benchmark} · ${viewed.scope.start} — ${viewed.scope.end}。本轮：${viewed.question.slice(0, 80)}`
     : "与对话关联的研究结果";
   document
     .querySelectorAll("[data-tab]")
@@ -521,6 +521,7 @@ $("new").onclick = () => {
   inspection = null;
   $("question").value = "";
   $("composer-label").textContent = "和 WhyJ 聊聊你的研究问题";
+  $("question").placeholder = "输入一个明确的投资研究问题…";
   $("composer-hint").textContent = "Enter 发送 · Shift+Enter 换行";
   for (const id of ["symbol", "benchmark", "start", "end"])
     $(id).disabled = false;
@@ -545,7 +546,10 @@ try {
   const status = await api("/api/status");
   token = status.token;
   await studies();
-  if (status.current) follow(await api(`/api/runs/${status.current}`));
+  if (status.current) {
+    $("question").value = "";
+    follow(await api(`/api/runs/${status.current}`));
+  }
 } catch (e) {
   error(e);
 }

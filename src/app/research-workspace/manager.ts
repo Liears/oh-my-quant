@@ -515,7 +515,7 @@ export function createWorkspaceManager(ports: WorkspacePorts = {}) {
       );
       void execute(
         next,
-        `${question}\n这是同一研究的追问。沿用固定范围 ${JSON.stringify(next.scope)}，按需复用已有证据，不假装取得了更新行情。回答新问题并 publish_research；需要澄清则 ask_user。`,
+        `${question}\n这是同一研究的追问。沿用固定范围 ${JSON.stringify(next.scope)}，按需复用已有证据，不假装取得了更新行情。围绕追问自然作答；只有更新研究结论才 publish_research，需要澄清则 ask_user。`,
       );
       return structuredClone(next);
     },
