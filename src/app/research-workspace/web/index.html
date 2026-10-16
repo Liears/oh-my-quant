@@ -9,20 +9,43 @@
   </head>
   <body>
     <aside>
-      <a class="brand" href="/">▥ WhyJ <span>研究工作台</span></a
-      ><button id="new" class="primary">＋ 新建对话</button>
-      <p class="eyebrow">已保存的对话</p>
-      <div id="studies"></div>
+      <a class="brand" href="/">▥ WhyJ <span>投资研究工作台</span></a>
+      <div class="aside-actions">
+        <button id="new" class="primary" title="发起全局新研究">＋ 新建研究</button>
+        <button id="new-project" class="secondary" title="新建标的专题项目">＋ 新项目</button>
+      </div>
+      <form id="project-form" class="project-inline-form" hidden>
+        <div class="form-title">新建标的专题项目</div>
+        <input id="new-project-symbol" placeholder="标的代码，如 600519.SH" required maxlength="12" />
+        <input id="new-project-name" placeholder="项目名称（可选）" maxlength="30" />
+        <div class="form-btns">
+          <button type="submit" class="primary small">创建</button>
+          <button type="button" id="cancel-project" class="small">取消</button>
+        </div>
+      </form>
+      <div class="projects-meta-bar">
+        <span class="eyebrow">研究项目 · PROJECTS</span>
+        <span id="projects-count" class="badge-count">0</span>
+      </div>
+      <div id="studies" class="projects-tree" role="tree"></div>
       <footer>本机服务 · 单股日线研究<br />证据与版本保存在本机</footer>
     </aside>
     <main>
       <header>
         <div>
-          <span class="eyebrow">RESEARCH WORKSPACE</span>
+          <nav id="breadcrumb" class="breadcrumb" aria-label="路径导航">
+            <span class="bc-part">WhyJ</span>
+            <span class="bc-sep">/</span>
+            <span id="bc-project" class="bc-part">全部项目</span>
+            <span class="bc-sep">/</span>
+            <span id="bc-study" class="bc-part active">新研究</span>
+          </nav>
           <h1>把问题研究清楚。</h1>
         </div>
-        <span class="badge">真实 Agent · 实验版</span>
-        <button id="toggle-inspector" aria-expanded="false">研究面板</button>
+        <div class="header-tools">
+          <span class="badge">真实 Agent · 实验版</span>
+          <button id="toggle-inspector" aria-expanded="false">研究面板</button>
+        </div>
       </header>
       <div class="workspace">
         <section class="conversation">

@@ -6,7 +6,24 @@ let token,
   startedAt,
   elapsed,
   inspection,
-  submitting = false;
+  submitting = false,
+  currentProjectId = null,
+  activeStudyId = null;
+const collapsedProjects = new Set();
+function getCustomProjects() {
+  try {
+    const raw = localStorage.getItem("whyj_projects_v1");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [
+    { id: "002048.SZ", name: "002048.SZ 结构跟踪", symbol: "002048.SZ", benchmark: "000300.SH" }
+  ];
+}
+function saveCustomProjects(list) {
+  try {
+    localStorage.setItem("whyj_projects_v1", JSON.stringify(list));
+  } catch {}
+}
 const date = new Intl.DateTimeFormat("sv-SE", {
   timeZone: "Asia/Shanghai",
 }).format(new Date());
@@ -44,6 +61,7 @@ function error(e) {
 }
 function follow(value) {
   run = value;
+  activeStudyId = run.id;
   $("symbol").value = run.scope.symbol;
   $("benchmark").value = run.scope.benchmark;
   $("start").value = run.scope.start;
@@ -54,7 +72,9 @@ function follow(value) {
     run.events.findLast((e) => e.kind === "continue")?.at ?? run.createdAt,
   );
   clearInterval(elapsed);
+  updateBreadcrumb(null, run);
   render();
+  updateActiveStudyUi();
   if (run.status === "running") {
     const watchedId = run.id;
     events = new EventSource(`/api/runs/${run.id}/events`);
@@ -74,6 +94,75 @@ function follow(value) {
     elapsed = setInterval(renderProgress, 1000);
   }
 }
+function updateBreadcrumb(project, currentRun) {
+  if (!project && currentRun) {
+    const projects = getCustomProjects();
+    project = projects.find((p) => p.symbol === currentRun.scope.symbol);
+  }
+  if (project) {
+    if ($("bc-project")) $("bc-project").textContent = "📁 " + project.name;
+    currentProjectId = project.id;
+  } else {
+    if ($("bc-project")) $("bc-project").textContent = "全部项目";
+  }
+  if (currentRun) {
+    const q = currentRun.question.replace(/\s+/g, " ");
+    if ($("bc-study"))
+      $("bc-study").textContent = "📄 " + (q.length > 20 ? q.slice(0, 20) + "…" : q);
+  } else {
+    if ($("bc-study")) $("bc-study").textContent = "＋ 新建研究";
+  }
+}
+function updateActiveStudyUi() {
+  document.querySelectorAll(".study-item").forEach((btn) => {
+    const isAct =
+      run &&
+      (btn.dataset.studyId === run.id ||
+        btn.dataset.studyId === run.conversationId ||
+        activeStudyId === btn.dataset.studyId);
+    btn.classList.toggle("active-study", Boolean(isAct));
+  });
+  document.querySelectorAll(".project-folder").forEach((f) => {
+    const isAct = f.dataset.projectId === currentProjectId;
+    f.classList.toggle("active-project", Boolean(isAct));
+  });
+}
+function startNewResearchInProject(project) {
+  if (run?.status === "running") {
+    error(new Error("当前研究仍在运行，请先停止或等待完成。"));
+    return;
+  }
+  events?.close();
+  run = null;
+  inspection = null;
+  activeStudyId = null;
+  currentProjectId = project.id;
+  collapsedProjects.delete(project.id);
+
+  $("question").value = "";
+  $("composer-label").textContent = `在「${project.name}」项目中发起研究`;
+  $("question").placeholder = `针对 ${project.symbol} 提出研究问题（如回撤结构、量比或均线）…`;
+  $("composer-hint").textContent = "Enter 发送 · Shift+Enter 换行";
+
+  for (const id of ["symbol", "benchmark", "start", "end"])
+    $(id).disabled = false;
+  $("symbol").value = project.symbol;
+  if (project.benchmark) $("benchmark").value = project.benchmark;
+  $("end").value = date;
+
+  document.body.classList.remove("has-run");
+  $("answer").replaceChildren();
+  $("progress").replaceChildren();
+  $("alert").textContent = "";
+  for (const id of ["save", "review", "cancel", "continue"])
+    $(id).hidden = true;
+  $("submit").disabled = false;
+
+  updateBreadcrumb(project, null);
+  studies();
+  renderInspect();
+  $("question").focus();
+}
 async function studies() {
   const values = await api("/api/studies");
   $("studies").replaceChildren();
@@ -81,19 +170,119 @@ async function studies() {
   for (const value of values)
     if (!latest.has(value.conversationId ?? value.id))
       latest.set(value.conversationId ?? value.id, value);
-  for (const value of latest.values()) {
-    const b = el(
-      "button",
-      `${value.scope.symbol} · ${value.turns ?? 1} 轮对话\n${value.question.slice(0, 42)}`,
+  const allStudies = Array.from(latest.values());
+
+  const projects = getCustomProjects();
+  for (const s of allStudies) {
+    const sym = s.scope.symbol;
+    if (!projects.some((p) => p.symbol === sym)) {
+      projects.push({
+        id: sym,
+        name: `${sym} 专题跟踪`,
+        symbol: sym,
+        benchmark: s.scope.benchmark || "000300.SH",
+      });
+    }
+  }
+  saveCustomProjects(projects);
+  if ($("projects-count"))
+    $("projects-count").textContent = String(projects.length);
+
+  for (const project of projects) {
+    const projectStudies = allStudies.filter(
+      (s) => s.scope.symbol === project.symbol,
     );
-    b.onclick = () =>
-      api(`/api/runs/${value.id}/latest`)
-        .then((value) => {
-          $("question").value = "";
-          follow(value);
-        })
-        .catch(error);
-    $("studies").append(b);
+    const folder = el("div", undefined, "project-folder");
+    folder.dataset.projectId = project.id;
+    if (collapsedProjects.has(project.id)) {
+      folder.classList.add("collapsed");
+    }
+    if (currentProjectId === project.id) {
+      folder.classList.add("active-project");
+    }
+
+    const header = el("div", undefined, "project-header");
+    const titleGroup = el("div", undefined, "project-title-group");
+    const chevron = el("span", "▾", "project-chevron");
+    const icon = el(
+      "span",
+      collapsedProjects.has(project.id) ? "📁" : "📂",
+      "project-icon",
+    );
+    const name = el("span", project.name, "project-name");
+    name.title = `${project.name} (${project.symbol})`;
+    titleGroup.append(chevron, icon, name);
+
+    const actions = el("div", undefined, "project-actions");
+    const count = el("span", String(projectStudies.length), "folder-count");
+    const addBtn = el("button", "＋", "btn-add-study");
+    addBtn.title = `在「${project.name}」中发起新研究`;
+    addBtn.onclick = (e) => {
+      e.stopPropagation();
+      startNewResearchInProject(project);
+    };
+    actions.append(count, addBtn);
+    header.append(titleGroup, actions);
+
+    header.onclick = () => {
+      if (collapsedProjects.has(project.id)) {
+        collapsedProjects.delete(project.id);
+        folder.classList.remove("collapsed");
+        icon.textContent = "📂";
+      } else {
+        collapsedProjects.add(project.id);
+        folder.classList.add("collapsed");
+        icon.textContent = "📁";
+      }
+    };
+
+    const studiesContainer = el("div", undefined, "project-studies");
+    if (projectStudies.length === 0) {
+      const empty = el("div", "暂无研究 · 点击 ＋ 启动", "empty-project-hint");
+      empty.onclick = () => startNewResearchInProject(project);
+      empty.style.cursor = "pointer";
+      studiesContainer.append(empty);
+    } else {
+      for (const study of projectStudies) {
+        const isActive =
+          activeStudyId === study.id ||
+          (run && (run.id === study.id || run.conversationId === study.id));
+        const item = el(
+          "button",
+          undefined,
+          `study-item ${isActive ? "active-study" : ""}`,
+        );
+        item.dataset.studyId = study.id;
+        const titleText = study.question.replace(/\s+/g, " ");
+        const title = el("div", titleText, "study-title");
+        const meta = el("div", undefined, "study-meta");
+        const turns = el("span", `${study.turns ?? 1} 轮对话`);
+        const dateStr = new Date(study.createdAt).toLocaleDateString("zh-CN", {
+          month: "numeric",
+          day: "numeric",
+        });
+        const time = el("span", dateStr);
+        meta.append(turns, time);
+        item.append(title, meta);
+
+        item.onclick = (e) => {
+          e.stopPropagation();
+          currentProjectId = project.id;
+          activeStudyId = study.id;
+          api(`/api/runs/${study.id}/latest`)
+            .then((loaded) => {
+              $("question").value = "";
+              follow(loaded);
+              updateBreadcrumb(project, loaded);
+              updateActiveStudyUi();
+            })
+            .catch(error);
+        };
+        studiesContainer.append(item);
+      }
+    }
+    folder.append(header, studiesContainer);
+    $("studies").append(folder);
   }
 }
 function renderProgress() {
@@ -519,12 +708,16 @@ $("new").onclick = () => {
   events?.close();
   run = null;
   inspection = null;
+  activeStudyId = null;
+  currentProjectId = null;
   $("question").value = "";
   $("composer-label").textContent = "和 WhyJ 聊聊你的研究问题";
   $("question").placeholder = "输入一个明确的投资研究问题…";
   $("composer-hint").textContent = "Enter 发送 · Shift+Enter 换行";
   for (const id of ["symbol", "benchmark", "start", "end"])
     $(id).disabled = false;
+  $("symbol").value = "002048.SZ";
+  $("benchmark").value = "000300.SH";
   $("end").value = date;
   document.body.classList.remove("has-run");
   $("answer").replaceChildren();
@@ -533,8 +726,51 @@ $("new").onclick = () => {
   for (const id of ["save", "review", "cancel", "continue"])
     $(id).hidden = true;
   $("submit").disabled = false;
+  updateBreadcrumb(null, null);
+  updateActiveStudyUi();
   renderInspect();
   $("question").focus();
+};
+$("new-project").onclick = () => {
+  if (run?.status === "running") {
+    error(new Error("当前研究仍在运行，请先停止或等待完成。"));
+    return;
+  }
+  const form = $("project-form");
+  form.hidden = !form.hidden;
+  if (!form.hidden) {
+    $("new-project-symbol").value = "";
+    $("new-project-name").value = "";
+    $("new-project-symbol").focus();
+  }
+};
+$("cancel-project").onclick = () => {
+  $("project-form").hidden = true;
+};
+$("project-form").onsubmit = (e) => {
+  e.preventDefault();
+  const rawSymbol = $("new-project-symbol").value.trim().toUpperCase();
+  const rawName = $("new-project-name").value.trim();
+  const regex = /^(?:00[0-3]|60[0-3]|605)\d{3}\.(?:SH|SZ)$/;
+  if (!regex.test(rawSymbol)) {
+    error(new Error("标的代码须为沪深主板格式，如 002048.SZ 或 600519.SH"));
+    return;
+  }
+  const projects = getCustomProjects();
+  if (projects.some((p) => p.symbol === rawSymbol)) {
+    error(new Error(`标的 ${rawSymbol} 的项目已存在`));
+    return;
+  }
+  const newProj = {
+    id: rawSymbol,
+    name: rawName || `${rawSymbol} 专题跟踪`,
+    symbol: rawSymbol,
+    benchmark: "000300.SH",
+  };
+  projects.push(newProj);
+  saveCustomProjects(projects);
+  $("project-form").hidden = true;
+  startNewResearchInProject(newProj);
 };
 document.addEventListener("keydown", (e) => {
   if (e.ctrlKey && e.key.toLowerCase() === "g" && run?.status === "running") {
