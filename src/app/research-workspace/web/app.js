@@ -1,3 +1,5 @@
+import { renderMarkdown, parseInline } from "./markdown.js";
+
 const $ = (id) => document.getElementById(id);
 let token,
   run,
@@ -1005,14 +1007,15 @@ function render() {
     const assistant = el("article", undefined, "message assistant-message");
     assistant.append(el("div", "▥ WhyJ", "message-role"));
     if (turn.answer) {
-      assistant.append(el("p", turn.answer.summary, "reply-summary"));
+      assistant.append(renderMarkdown(turn.answer.summary, "reply-summary"));
       const detail = el("details"),
         list = el("ol");
       detail.append(
         el("summary", `展开 ${turn.answer.claims.length} 条论据与引用`),
       );
       for (const claim of turn.answer.claims) {
-        const li = el("li", claim.text);
+        const li = el("li");
+        li.innerHTML = parseInline(claim.text);
         for (const id of claim.evidence) {
           const button = el("button", id, "citation");
           button.onclick = () => {
@@ -1040,20 +1043,20 @@ function render() {
       );
     } else if (turn.reply) {
       assistant.append(
-        el("p", turn.reply, "reply-summary"),
+        renderMarkdown(turn.reply, "reply-summary"),
         el("p", "对话解释 · 沿用原证据，未发布新的研究结论。", "small"),
       );
-    } else
+    } else {
+      const noticeText =
+        turn.clarification ||
+        turn.error ||
+        (turn.status === "running"
+          ? "正在思考与回复，可以先在下面写好下一条问题。"
+          : "本轮已停止，已取得的证据仍保留。");
       assistant.append(
-        el(
-          "p",
-          turn.clarification ||
-            turn.error ||
-            (turn.status === "running"
-              ? "正在思考与回复，可以先在下面写好下一条问题。"
-              : "本轮已停止，已取得的证据仍保留。"),
-        ),
+        renderMarkdown(noticeText, "reply-summary reply-notice"),
       );
+    }
     if (turn.events.length && turn.id !== run.id) {
       const progress = el("details");
       progress.append(el("summary", "本轮过程"));
@@ -1084,7 +1087,7 @@ function showInspector() {
 }
 function card(title, text) {
   const c = el("div", undefined, "card");
-  c.append(el("h3", title), el("p", text));
+  c.append(el("h3", title), renderMarkdown(text, "card-summary"));
   return c;
 }
 function renderInspect(focus) {
@@ -1126,10 +1129,11 @@ function renderInspect(focus) {
       ),
     );
     root.append(el("h3", "下一步观察"));
-    for (const next of viewed.answer.next) root.append(el("p", next));
+    for (const next of viewed.answer.next)
+      root.append(renderMarkdown(next, "inspect-next-item"));
     root.append(el("h3", "证据边界"));
     for (const note of viewed.answer.limitations)
-      root.append(el("p", note, "small disclosure"));
+      root.append(renderMarkdown(note, "small disclosure"));
   }
   if (selected === "chart") {
     root.append(el("h2", "价格结构与相对表现"));

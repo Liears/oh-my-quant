@@ -20,6 +20,7 @@ export function startWorkspaceServer(
     "/": "index.html",
     "/app.js": "app.js",
     "/style.css": "style.css",
+    "/markdown.js": "markdown.js",
   };
   const headers = {
     "Cache-Control": "no-store",
