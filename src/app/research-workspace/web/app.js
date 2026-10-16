@@ -4,7 +4,9 @@ let token,
   events,
   selected = "conclusion",
   startedAt,
-  elapsed;
+  elapsed,
+  inspection,
+  submitting = false;
 const date = new Intl.DateTimeFormat("sv-SE", {
   timeZone: "Asia/Shanghai",
 }).format(new Date());
@@ -45,7 +47,8 @@ function follow(value) {
   $("symbol").value = run.scope.symbol;
   $("benchmark").value = run.scope.benchmark;
   $("start").value = run.scope.start;
-  $("question").value = run.question;
+  $("end").value = run.scope.end;
+  inspection = null;
   events?.close();
   startedAt = Date.parse(
     run.events.findLast((e) => e.kind === "continue")?.at ?? run.createdAt,
@@ -53,9 +56,12 @@ function follow(value) {
   clearInterval(elapsed);
   render();
   if (run.status === "running") {
+    const watchedId = run.id;
     events = new EventSource(`/api/runs/${run.id}/events`);
     events.onmessage = (e) => {
-      run = JSON.parse(e.data);
+      const value = JSON.parse(e.data);
+      if (run?.id !== watchedId || value.id !== watchedId) return;
+      run = value;
       render();
       if (run.status !== "running") {
         events.close();
@@ -71,12 +77,22 @@ function follow(value) {
 async function studies() {
   const values = await api("/api/studies");
   $("studies").replaceChildren();
-  for (const value of values) {
+  const latest = new Map();
+  for (const value of values)
+    if (!latest.has(value.conversationId ?? value.id))
+      latest.set(value.conversationId ?? value.id, value);
+  for (const value of latest.values()) {
     const b = el(
       "button",
-      `${value.scope.symbol} · ${value.scope.end}\n${value.parentId ? "复核版本" : "初次研究"}`,
+      `${value.scope.symbol} · ${value.turns ?? 1} 轮对话\n${value.question.slice(0, 42)}`,
     );
-    b.onclick = () => api(`/api/runs/${value.id}`).then(follow).catch(error);
+    b.onclick = () =>
+      api(`/api/runs/${value.id}/latest`)
+        .then((value) => {
+          $("question").value = "";
+          follow(value);
+        })
+        .catch(error);
     $("studies").append(b);
   }
 }
@@ -85,7 +101,7 @@ function renderProgress() {
   $("progress").replaceChildren();
   const state = el(
     "div",
-    `${{ running: "研究进行中", complete: run.saved ? "研究完成 · 已保存" : "研究完成", cancelled: "研究已停止", failed: "研究未完成", needs_input: "需要澄清" }[run.status]}${run.status === "running" ? ` · 已等待 ${Math.floor((Date.now() - startedAt) / 1000)} 秒` : ""}`,
+    `${{ running: "研究进行中", complete: `${run.answer ? "研究完成" : "回复完成"}${run.saved ? " · 已保存" : ""}`, cancelled: "研究已停止", failed: "研究未完成", needs_input: "需要澄清" }[run.status]}${run.status === "running" ? ` · 已等待 ${Math.floor((Date.now() - startedAt) / 1000)} 秒` : ""}`,
     "current",
   );
   $("progress").append(state);
@@ -97,10 +113,22 @@ function renderProgress() {
 function render() {
   if (!run) return;
   document.body.classList.add("has-run");
+  const thread = $("thread");
+  const nearBottom =
+    thread.scrollHeight - thread.scrollTop - thread.clientHeight < 90;
   renderProgress();
-  $("alert").textContent = run.error || run.clarification || "";
-  $("submit").disabled = run.status === "running";
+  $("alert").textContent = run.error || "";
+  $("submit").disabled =
+    submitting ||
+    run.status === "running" ||
+    ["cancelled", "failed"].includes(run.status);
   $("new").disabled = run.status === "running";
+  $("composer-label").textContent = "继续追问 · 沿用当前研究上下文";
+  $("composer-hint").textContent =
+    `证据截至 ${run.evidence.find((e) => e.result)?.result.end ?? run.scope.end} · Enter 发送`;
+  $("question").placeholder = "追问依据、补充条件，或请我解释某条结论…";
+  for (const id of ["symbol", "benchmark", "start", "end"])
+    $(id).disabled = true;
   document.querySelectorAll("#studies button").forEach((b) => {
     b.disabled = run.status === "running";
   });
@@ -109,39 +137,86 @@ function render() {
   $("save").hidden = run.status !== "complete" || run.saved;
   $("review").hidden = !run.saved;
   $("answer").replaceChildren();
-  if (run.answer) {
-    $("answer").append(
-      el(
-        "p",
-        `${run.scope.symbol} · ${run.scope.start} — ${run.scope.end} · ${run.model}`,
-        "small",
-      ),
-      el("h2", run.answer.summary),
-      el("p", `${run.answer.signal} · ${run.answer.classification}`, "status"),
+  const turns = [...(run.history ?? []), run];
+  turns.forEach((turn, index) => {
+    const user = el("article", undefined, "message user-message");
+    user.append(
+      el("div", `你 · 第 ${index + 1} 轮`, "message-role"),
+      el("p", turn.question),
     );
-    const list = el("ol");
-    for (const claim of run.answer.claims) {
-      const li = el("li", claim.text);
-      for (const id of claim.evidence) {
-        const b = el("button", id, "citation");
-        b.onclick = () => {
-          selected = "evidence";
-          renderInspect(id);
-        };
-        li.append(b);
+    const assistant = el("article", undefined, "message assistant-message");
+    assistant.append(el("div", "▥ WhyJ", "message-role"));
+    if (turn.answer) {
+      assistant.append(el("p", turn.answer.summary, "reply-summary"));
+      const detail = el("details"),
+        list = el("ol");
+      detail.append(
+        el("summary", `展开 ${turn.answer.claims.length} 条论据与引用`),
+      );
+      for (const claim of turn.answer.claims) {
+        const li = el("li", claim.text);
+        for (const id of claim.evidence) {
+          const button = el("button", id, "citation");
+          button.onclick = () => {
+            inspection = { ...run, ...turn };
+            selected = "evidence";
+            renderInspect(id);
+            showInspector();
+          };
+          li.append(button);
+        }
+        list.append(li);
       }
-      list.append(li);
+      detail.append(list);
+      assistant.append(detail);
+      const inspect = el("button", "查看本轮研究 →", "inspect-turn");
+      inspect.onclick = () => {
+        inspection = { ...run, ...turn };
+        selected = "conclusion";
+        renderInspect();
+        showInspector();
+      };
+      assistant.append(
+        inspect,
+        el("p", "模型解释 · 引用存在性已检查，语义未经独立核验。", "small"),
+      );
+    } else if (turn.reply) {
+      assistant.append(
+        el("p", turn.reply, "reply-summary"),
+        el("p", "对话解释 · 沿用原证据，未发布新的研究结论。", "small"),
+      );
+    } else
+      assistant.append(
+        el(
+          "p",
+          turn.clarification ||
+            turn.error ||
+            (turn.status === "running"
+              ? "正在思考与回复，可以先在下面写好下一条问题。"
+              : "本轮已停止，已取得的证据仍保留。"),
+        ),
+      );
+    if (turn.events.length && turn.id !== run.id) {
+      const progress = el("details");
+      progress.append(el("summary", "本轮过程"));
+      for (const event of turn.events)
+        progress.append(el("p", event.text, "small"));
+      assistant.append(progress);
     }
-    $("answer").append(
-      list,
-      el(
-        "p",
-        "模型解释 · 引用存在性已检查；不代表结论经过独立语义核验。",
-        "small",
-      ),
-    );
-  }
+    $("answer").append(user, assistant);
+  });
   renderInspect();
+  if (nearBottom)
+    requestAnimationFrame(() => {
+      thread.scrollTop = thread.scrollHeight;
+    });
+}
+function showInspector() {
+  if (matchMedia("(max-width: 900px)").matches) {
+    document.querySelector(".workspace").classList.add("inspector-open");
+    $("toggle-inspector").textContent = "回到对话";
+    $("toggle-inspector").setAttribute("aria-expanded", "true");
+  }
 }
 function card(title, text) {
   const c = el("div", undefined, "card");
@@ -149,6 +224,14 @@ function card(title, text) {
   return c;
 }
 function renderInspect(focus) {
+  let viewed = inspection ?? run;
+  if (!inspection && viewed && !viewed.answer) {
+    const research = viewed.history?.findLast((turn) => turn.answer);
+    if (research) viewed = { ...viewed, ...research };
+  }
+  $("inspection-context").textContent = viewed
+    ? `本轮：${viewed.question.slice(0, 80)}`
+    : "与对话关联的研究结果";
   document
     .querySelectorAll("[data-tab]")
     .forEach((b) =>
@@ -156,14 +239,14 @@ function renderInspect(focus) {
     );
   const root = $("inspect");
   root.replaceChildren();
-  if (!run) {
+  if (!viewed) {
     root.append(el("h2", "研究将从这里展开"));
     return;
   }
-  const calc = run.evidence.find((e) => e.result)?.result;
+  const calc = viewed.evidence.find((e) => e.result)?.result;
   if (selected === "conclusion") {
     root.append(el("h2", "判断与边界"));
-    if (!run.answer) {
+    if (!viewed.answer) {
       root.append(
         el(
           "p",
@@ -174,19 +257,19 @@ function renderInspect(focus) {
     }
     root.append(
       card(
-        `${run.answer.signal} · ${run.answer.classification}`,
-        run.answer.summary,
+        `${viewed.answer.signal} · ${viewed.answer.classification}`,
+        viewed.answer.summary,
       ),
     );
     root.append(el("h3", "下一步观察"));
-    for (const next of run.answer.next) root.append(el("p", next));
+    for (const next of viewed.answer.next) root.append(el("p", next));
     root.append(el("h3", "证据边界"));
-    for (const note of run.answer.limitations)
+    for (const note of viewed.answer.limitations)
       root.append(el("p", note, "small disclosure"));
   }
   if (selected === "chart") {
     root.append(el("h2", "价格结构与相对表现"));
-    const data = run.evidence.find((e) => e.symbol === run.scope.symbol);
+    const data = viewed.evidence.find((e) => e.symbol === viewed.scope.symbol);
     if (!data) {
       root.append(el("p", "等待真实日线证据。"));
       return;
@@ -206,7 +289,7 @@ function renderInspect(focus) {
       svg = document.createElementNS(ns, "svg");
     svg.setAttribute("viewBox", "0 0 600 240");
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", `${run.scope.symbol} 历史收盘价曲线`);
+    svg.setAttribute("aria-label", `${viewed.scope.symbol} 历史收盘价曲线`);
     const p = document.createElementNS(ns, "polyline");
     p.setAttribute(
       "points",
@@ -259,7 +342,7 @@ function renderInspect(focus) {
   }
   if (selected === "evidence") {
     root.append(el("h2", "可追溯、可复算的证据"));
-    for (const evidence of run.evidence) {
+    for (const evidence of viewed.evidence) {
       const c = card(
         `${evidence.id} · ${evidence.symbol || "确定性计算"}`,
         `${evidence.source} · 获取于 ${new Date(evidence.fetchedAt).toLocaleString()}`,
@@ -308,10 +391,23 @@ function renderInspect(focus) {
   }
   if (selected === "review") {
     root.append(el("h2", "保存判断，复核变化"));
+    const label = el("label", "复核截至日期");
+    const cutoff = el("input");
+    cutoff.id = "review-end";
+    cutoff.type = "date";
+    cutoff.value = date;
+    cutoff.max = date;
+    cutoff.min = viewed.scope.end;
+    label.append(cutoff);
+    root.append(label);
     root.append(
       card(
-        run.saved ? "本版本已保存" : "本版本尚未保存",
-        `研究 ID ${run.id}。${run.parentId ? `关联原版本 ${run.parentId}；原版本保持不变。` : "首次研究，尚无历史版本对照。"}`,
+        viewed.id !== run.id
+          ? "历史研究轮次"
+          : viewed.saved
+            ? "本版本已保存"
+            : "本版本尚未保存",
+        `研究 ID ${viewed.id}。${viewed.parentId ? `关联原版本 ${viewed.parentId}；原版本保持不变。` : "首次研究，尚无历史版本对照。"}`,
       ),
     );
     if (calc) {
@@ -344,24 +440,55 @@ function renderInspect(focus) {
     );
   }
 }
-$("research").onsubmit = async (e) => {
-  e.preventDefault();
+$("research").onsubmit = async (event) => {
+  event.preventDefault();
+  if (submitting || run?.status === "running") return;
+  const question = $("question").value;
+  if (!question.trim()) return;
   $("alert").textContent = "";
+  submitting = true;
+  $("submit").disabled = true;
   try {
-    follow(
-      await api("/api/runs", {
-        question: $("question").value,
-        scope: {
-          symbol: $("symbol").value,
-          benchmark: $("benchmark").value,
-          start: $("start").value,
-          end: $("end").value,
-        },
-      }),
-    );
+    const value = run
+      ? await api(`/api/runs/${run.id}/followup`, { question })
+      : await api("/api/runs", {
+          question,
+          scope: {
+            symbol: $("symbol").value,
+            benchmark: $("benchmark").value,
+            start: $("start").value,
+            end: $("end").value,
+          },
+        });
+    if ($("question").value === question) $("question").value = "";
+    follow(value);
+    $("thread").scrollTop = $("thread").scrollHeight;
   } catch (e) {
     error(e);
+  } finally {
+    submitting = false;
+    $("submit").disabled =
+      run?.status === "running" ||
+      ["cancelled", "failed"].includes(run?.status);
   }
+};
+$("question").addEventListener("keydown", (event) => {
+  if (
+    event.key === "Enter" &&
+    !event.shiftKey &&
+    !event.isComposing &&
+    event.keyCode !== 229
+  ) {
+    event.preventDefault();
+    $("research").requestSubmit();
+  }
+});
+$("toggle-inspector").onclick = () => {
+  const open = document
+    .querySelector(".workspace")
+    .classList.toggle("inspector-open");
+  $("toggle-inspector").textContent = open ? "回到对话" : "研究面板";
+  $("toggle-inspector").setAttribute("aria-expanded", String(open));
 };
 for (const action of ["cancel", "continue", "save", "review"])
   $(action).onclick = async () => {
@@ -369,7 +496,7 @@ for (const action of ["cancel", "continue", "save", "review"])
       follow(
         await api(
           `/api/runs/${run.id}/${action}`,
-          action === "review" ? { end: $("end").value } : {},
+          action === "review" ? { end: $("review-end")?.value ?? date } : {},
         ),
       );
       if (action === "save") await studies();
@@ -391,6 +518,13 @@ $("new").onclick = () => {
   }
   events?.close();
   run = null;
+  inspection = null;
+  $("question").value = "";
+  $("composer-label").textContent = "和 WhyJ 聊聊你的研究问题";
+  $("composer-hint").textContent = "Enter 发送 · Shift+Enter 换行";
+  for (const id of ["symbol", "benchmark", "start", "end"])
+    $(id).disabled = false;
+  $("end").value = date;
   document.body.classList.remove("has-run");
   $("answer").replaceChildren();
   $("progress").replaceChildren();

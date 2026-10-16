@@ -34,7 +34,10 @@ export function createWorkspaceStore(
       envelope.run.id !== id ||
       envelope.run.status !== "complete" ||
       !envelope.run.saved ||
-      !envelope.run.answer ||
+      !(
+        envelope.run.answer ||
+        (envelope.run.reply && envelope.run.history?.length)
+      ) ||
       workspaceHash(envelope.run) !== envelope.hash
     ) {
       throw new Error("Research integrity check failed; original preserved.");
@@ -44,7 +47,10 @@ export function createWorkspaceStore(
   return {
     load,
     save(run: WorkspaceRun): WorkspaceRun {
-      if (run.status !== "complete" || !run.answer)
+      if (
+        run.status !== "complete" ||
+        !(run.answer || (run.reply && run.history?.length))
+      )
         throw new Error("Only completed research can be saved.");
       if (!existsSync(root)) {
         mkdirSync(root, { recursive: true });

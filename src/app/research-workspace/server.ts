@@ -66,6 +66,8 @@ export function startWorkspaceServer(
               scope: r.scope,
               createdAt: r.createdAt,
               parentId: r.parentId,
+              conversationId: r.conversationId ?? r.id,
+              turns: (r.history?.length ?? 0) + 1,
             })),
           );
         if (request.method === "POST") {
@@ -81,11 +83,13 @@ export function startWorkspaceServer(
           if (url.pathname === "/api/runs")
             return json(manager.start(body.question, body.scope), 202);
           const match =
-            /^\/api\/runs\/([a-f0-9-]{36})\/(cancel|continue|save|review)$/.exec(
+            /^\/api\/runs\/([a-f0-9-]{36})\/(cancel|continue|save|review|followup)$/.exec(
               url.pathname,
             );
           if (match) {
             const id = match[1]!;
+            if (match[2] === "followup")
+              return json(manager.followup(id, body.question), 202);
             if (match[2] === "review") {
               const old = manager.get(id);
               if (!old.saved)
@@ -95,7 +99,7 @@ export function startWorkspaceServer(
                 );
               return json(
                 manager.start(
-                  old.question,
+                  old.history?.[0]?.question ?? old.question,
                   { ...old.scope, end: body.end ?? old.scope.end },
                   id,
                 ),
@@ -107,13 +111,14 @@ export function startWorkspaceServer(
             );
           }
         }
-        const match = /^\/api\/runs\/([a-f0-9-]{36})(\/events)?$/.exec(
+        const match = /^\/api\/runs\/([a-f0-9-]{36})(\/events|\/latest)?$/.exec(
           url.pathname,
         );
         if (request.method === "GET" && match) {
           const id = match[1]!,
             run = manager.get(id);
           if (!match[2]) return json(run);
+          if (match[2] === "/latest") return json(manager.latest(id));
           const encoder = new TextEncoder();
           let unsubscribe = () => {};
           let heartbeat: ReturnType<typeof setInterval> | undefined;

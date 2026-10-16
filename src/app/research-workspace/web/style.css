@@ -354,6 +354,163 @@ code {
   font-size: 10px;
   word-break: break-all;
 }
+/* The conversation owns scrolling; the composer remains in view. */
+html,
+body {
+  height: 100%;
+}
+body {
+  height: 100dvh;
+  overflow: hidden;
+}
+aside {
+  overflow: auto;
+}
+main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+header {
+  flex-shrink: 0;
+  margin-bottom: 20px;
+}
+.workspace {
+  flex: 1;
+  min-height: 0;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 1fr);
+}
+.conversation {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+#thread {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 12px 18px 0;
+  scroll-behavior: smooth;
+}
+.intro {
+  padding: 40px 10px;
+}
+.intro h2 {
+  font-size: 27px;
+}
+#research {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  max-height: 45dvh;
+  overflow: auto;
+}
+textarea,
+.has-run #research textarea {
+  min-height: 64px;
+  max-height: 130px;
+  font-size: 14px;
+  margin: 8px 0;
+}
+.compose-actions {
+  margin-top: 10px;
+}
+.actions {
+  flex-shrink: 0;
+  gap: 7px;
+  margin: 5px 0 10px;
+}
+.actions button {
+  font-size: 11px;
+  padding: 7px 10px;
+}
+.actions:has(button:not([hidden])) {
+  min-height: 29px;
+}
+.message {
+  margin-bottom: 24px;
+  overflow-wrap: anywhere;
+}
+.message-role {
+  color: #b7b7b7;
+  font-size: 11px;
+  margin-bottom: 9px;
+}
+.message p {
+  margin: 0 0 12px;
+  color: #e5e5e5;
+  line-height: 1.85;
+}
+.user-message {
+  margin-left: 35px;
+  border: 1px solid #343026;
+  border-radius: 12px 12px 3px 12px;
+  background: #191813;
+  padding: 14px 16px;
+}
+.user-message p {
+  margin-bottom: 0;
+}
+.assistant-message {
+  padding: 4px 4px 0;
+}
+.assistant-message .message-role {
+  color: #d4af37;
+}
+.reply-summary {
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+.assistant-message details {
+  margin-top: 12px;
+}
+.assistant-message .small {
+  font-size: 11px;
+  color: #a6a6a6;
+}
+.inspect-turn {
+  margin: 12px 0;
+  color: #d4af37;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: 12px;
+}
+#progress,
+.has-run #progress {
+  margin: 10px 0;
+}
+.inspector {
+  min-height: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#inspect {
+  min-height: 0;
+  overflow: auto;
+  flex: 1;
+}
+#inspection-context {
+  padding: 10px 20px 0;
+  margin: 0;
+  font-size: 11px;
+}
+.footnote {
+  flex-shrink: 0;
+  margin: 12px 0 0;
+  padding-top: 10px;
+  font-size: 10px;
+}
+#alert {
+  margin: 4px 0;
+  font-size: 12px;
+}
+#toggle-inspector {
+  display: none;
+}
 @media (max-width: 1100px) {
   aside {
     width: 190px;
@@ -362,15 +519,42 @@ code {
     padding: 24px;
   }
   .workspace {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.85fr);
   }
   .inspector {
-    min-height: 350px;
+    min-height: 0;
+  }
+}
+@media (max-width: 900px) {
+  .workspace {
+    display: flex;
+    flex-direction: column;
+  }
+  .conversation {
+    flex: 1;
+  }
+  .inspector {
+    display: none;
+  }
+  .workspace.inspector-open .conversation {
+    display: none;
+  }
+  .workspace.inspector-open .inspector {
+    display: flex;
+    flex: 1;
+  }
+  #toggle-inspector {
+    display: block;
+    font-size: 12px;
+  }
+  header .badge {
+    display: none;
   }
 }
 @media (max-width: 650px) {
   body {
-    display: block;
+    display: flex;
+    flex-direction: column;
   }
   aside {
     width: 100%;
@@ -378,6 +562,8 @@ code {
     border-bottom: 1px solid #242424;
     padding: 16px;
     gap: 12px;
+    flex-shrink: 0;
+    max-height: 160px;
   }
   aside footer {
     display: none;
@@ -392,6 +578,7 @@ code {
   }
   main {
     padding: 20px 16px;
+    min-height: 0;
   }
   header {
     align-items: start;
@@ -405,10 +592,10 @@ code {
     white-space: nowrap;
   }
   .workspace {
-    display: block;
+    display: flex;
   }
   .inspector {
-    margin-top: 24px;
+    margin-top: 0;
   }
   .compose-actions {
     align-items: end;

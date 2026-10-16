@@ -54,6 +54,9 @@ export interface WorkspaceAnswer {
   limitations: string[];
 }
 export interface WorkspaceRun {
+  /** Optional for snapshots saved before conversations were introduced. */
+  conversationId?: string;
+  history?: WorkspaceTurn[];
   version: 1;
   id: string;
   studyId: string;
@@ -68,6 +71,21 @@ export interface WorkspaceRun {
   events: Array<{ at: string; kind: string; text: string }>;
   evidence: WorkspaceEvidence[];
   answer: WorkspaceAnswer | null;
+  /** Conversation only; not a newly verified research artifact. */
+  reply?: string;
   clarification: string | null;
   error: string | null;
 }
+
+export type WorkspaceTurn = Pick<
+  WorkspaceRun,
+  | "id"
+  | "question"
+  | "createdAt"
+  | "status"
+  | "answer"
+  | "reply"
+  | "clarification"
+  | "events"
+  | "error"
+>;

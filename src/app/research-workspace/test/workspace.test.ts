@@ -63,6 +63,8 @@ async function fixture(mode = "normal") {
   roots.push(root);
   let requests = 0,
     reads = 0;
+  let compositions = 0;
+  const payloads: unknown[] = [];
   const names = [
     "get_market_evidence",
     "calculate_research",
@@ -75,10 +77,61 @@ async function fixture(mode = "normal") {
       const body = (await request.json()) as {
         tools: Array<{ function: { name: string } }>;
       };
+      payloads.push(body);
       expect(body.tools.map((t) => t.function.name).sort()).toEqual(
         [...names, "ask_user"].sort(),
       );
       const n = requests++;
+      if (mode === "followup-stall" && n === 3) {
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                new TextEncoder().encode(
+                  'data: {"id":"stall","object":"chat.completion.chunk","created":0,"model":"fixture","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}\n\n',
+                ),
+              );
+            },
+          }),
+          { headers: { "Content-Type": "text/event-stream" } },
+        );
+      }
+      if (
+        mode === "plain-first" ||
+        ((mode === "plain-followup" || mode === "bad-plain-followup") && n >= 3)
+      ) {
+        const content =
+          mode === "bad-plain-followup"
+            ? "错误引用 E99。"
+            : "根据 E3，缩量仅描述成交量变化，不能证明交易者意图；需结合结构与后续证据。";
+        const chunk = {
+          id: `plain-${n}`,
+          object: "chat.completion.chunk",
+          created: 0,
+          model: "fixture",
+        };
+        return new Response(
+          [
+            {
+              ...chunk,
+              choices: [
+                {
+                  index: 0,
+                  delta: { role: "assistant", content },
+                  finish_reason: null,
+                },
+              ],
+            },
+            {
+              ...chunk,
+              choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+            },
+          ]
+            .map((value) => `data: ${JSON.stringify(value)}\n\n`)
+            .join("") + "data: [DONE]\n\n",
+          { headers: { "Content-Type": "text/event-stream" } },
+        );
+      }
       const answer = {
         summary: "固定样本结构观察",
         classification: "上涨后观察",
@@ -92,8 +145,16 @@ async function fixture(mode = "normal") {
         next: ["跟踪后续日线"],
         limitations: [],
       };
-      const name = names[Math.min(n, 2)]!;
-      const args = n < 2 ? {} : answer;
+      const name =
+        mode === "clarify" && n === 0
+          ? "ask_user"
+          : names[Math.min(mode === "clarify" ? n - 1 : n, 2)]!;
+      const args =
+        name === "ask_user"
+          ? { question: "请说明想进一步了解量比还是均线。" }
+          : name === "publish_research"
+            ? answer
+            : {};
       const chunk = {
         id: "fixture",
         object: "chat.completion.chunk",
@@ -147,30 +208,36 @@ async function fixture(mode = "normal") {
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   };
   const env = new NodeExecutionEnv({ cwd: root });
-  const dependencies = (): QuantAgentDependencies => ({
-    env,
-    sessions: new JsonlSessionRepo({
-      fs: env,
-      sessionsRoot: join(root, "sessions"),
-    }),
-    tools: [],
-    readConnection: () => ({
-      model,
-      thinkingLevel: "off",
-      compactTriggerTokens: 100000,
-      getAuth: async () => ({ apiKey: "fixture-key" }),
-    }),
-    loadSkills: async () => [],
-    prompts: { system: () => "", turn: (s) => s, skill: () => "" },
-    verifyResearch: buildResearchReport,
-  });
+  const dependencies = (): QuantAgentDependencies => {
+    compositions++;
+    return {
+      env,
+      sessions: new JsonlSessionRepo({
+        fs: env,
+        sessionsRoot: join(root, "sessions"),
+      }),
+      tools: [],
+      readConnection: () => ({
+        model,
+        thinkingLevel: "off",
+        compactTriggerTokens: 100000,
+        getAuth: async () => ({ apiKey: "fixture-key" }),
+      }),
+      loadSkills: async () => [],
+      prompts: { system: () => "", turn: (s) => s, skill: () => "" },
+      verifyResearch: buildResearchReport,
+    };
+  };
   const store = createWorkspaceStore(join(root, "saved"));
-  const app = startWorkspaceServer({
-    port: 0,
+  const ports = {
     dependencies,
     store,
     timeoutMs: mode === "timeout" ? 100 : 5000,
-    async fetchPrices(symbol, _scope, signal) {
+    async fetchPrices(
+      symbol: string,
+      _scope: typeof scope,
+      signal: AbortSignal,
+    ) {
       reads++;
       if (
         ((mode === "slow" || mode === "timeout") && reads === 1) ||
@@ -195,7 +262,8 @@ async function fixture(mode = "normal") {
         adjustment: e.adjustment!,
       };
     },
-  });
+  };
+  const app = startWorkspaceServer({ port: 0, ...ports });
   servers.push(app.server);
   const url = app.server.url;
   const { token } = (await (
@@ -225,6 +293,9 @@ async function fixture(mode = "normal") {
     root,
     url,
     store,
+    ports,
+    payloads,
+    compositions: () => compositions,
     reads: () => reads,
     reset: () => {
       requests = 0;
@@ -262,6 +333,155 @@ test("real Pi loop → tools → citations → immutable save → reload → lin
   expect(f.store.load(run.id)).toEqual(before);
   expect(createWorkspaceStore(join(f.root, "saved")).list()).toHaveLength(1);
 }, 10000);
+test("follow-up retains real Agent context and evidence without rewriting a saved turn", async () => {
+  const f = await fixture();
+  const first = (await (
+    await f.post("api/runs", {
+      question: "记录研究代号 ORBIT-ALPHA，再研究样本",
+      scope,
+    })
+  ).json()) as WorkspaceRun;
+  await f.wait(first.id);
+  await f.post(`api/runs/${first.id}/save`);
+  const original = f.store.load(first.id);
+  const next = (await (
+    await f.post(`api/runs/${first.id}/followup`, {
+      question: "解释刚才的量比和研究代号",
+    })
+  ).json()) as WorkspaceRun;
+  const reply = await f.wait(next.id);
+  expect(reply.status).toBe("complete");
+  expect(reply.id).not.toBe(first.id);
+  expect(reply.conversationId).toBe(first.id);
+  expect(reply.history).toHaveLength(1);
+  expect(reply.history![0]!.question).toContain("ORBIT-ALPHA");
+  expect(reply.evidence).toEqual(original.evidence);
+  expect(f.reads()).toBe(2);
+  expect(f.compositions()).toBe(1);
+  expect(JSON.stringify(f.payloads.at(-1))).toContain("ORBIT-ALPHA");
+  expect(JSON.stringify(f.payloads.at(-1))).toContain("固定样本结构观察");
+  expect(f.store.load(first.id)).toEqual(original);
+  expect((await f.post(`api/runs/${next.id}/save`)).status).toBe(200);
+  expect(f.store.load(next.id).history![0]!.answer).toEqual(original.answer);
+  expect(f.manager.latest(first.id).id).toBe(next.id);
+  expect(f.manager.latest(first.id).saved).toBe(true);
+}, 10000);
+
+test("a clarification is part of the conversation and the next message can answer it", async () => {
+  const f = await fixture("clarify");
+  const first = (await (
+    await f.post("api/runs", { question: "请帮我研究", scope })
+  ).json()) as WorkspaceRun;
+  const asked = await f.wait(first.id);
+  expect(asked.status).toBe("needs_input");
+  expect(asked.clarification).toContain("量比");
+  const next = (await (
+    await f.post(`api/runs/${first.id}/followup`, { question: "请先解释量比" })
+  ).json()) as WorkspaceRun;
+  const reply = await f.wait(next.id);
+  expect(reply.status).toBe("complete");
+  expect(reply.history![0]!.clarification).toBe(asked.clarification);
+  expect(f.compositions()).toBe(1);
+  expect(f.reads()).toBe(2);
+}, 10000);
+
+test("saved conversations reconstruct context after restart with no fresh price fetch", async () => {
+  const f = await fixture();
+  const first = (await (
+    await f.post("api/runs", { question: "研究代号 REOPEN-BETA", scope })
+  ).json()) as WorkspaceRun;
+  await f.wait(first.id);
+  await f.post(`api/runs/${first.id}/save`);
+  f.server.stop(true);
+  const restarted = startWorkspaceServer({ port: 0, ...f.ports });
+  servers.push(restarted.server);
+  const next = restarted.manager.followup(first.id, "继续解释原结论的证据边界");
+  for (
+    let i = 0;
+    i < 150 && restarted.manager.get(next.id).status === "running";
+    i++
+  )
+    await Bun.sleep(20);
+  const reply = restarted.manager.get(next.id);
+  expect(reply.status).toBe("complete");
+  expect(reply.history![0]!.question).toContain("REOPEN-BETA");
+  expect(reply.events[0]!.kind).toBe("context_restore");
+  expect(f.reads()).toBe(2);
+  expect(f.compositions()).toBe(2);
+  expect(JSON.stringify(f.payloads.at(-1))).toContain("REOPEN-BETA");
+}, 10000);
+
+test("ordinary follow-up prose is kept as conversation, saved and restored without inventing a new research artifact", async () => {
+  const f = await fixture("plain-followup");
+  const first = (await (
+    await f.post("api/runs", { question: "样本研究", scope })
+  ).json()) as WorkspaceRun;
+  await f.wait(first.id);
+  const next = (await (
+    await f.post(`api/runs/${first.id}/followup`, {
+      question: "解释缩量的含义",
+    })
+  ).json()) as WorkspaceRun;
+  const reply = await f.wait(next.id);
+  expect(reply.status).toBe("complete");
+  expect(reply.reply).toContain("不能证明");
+  expect(reply.answer).toBeNull();
+  expect(reply.history![0]!.answer).not.toBeNull();
+  expect(f.reads()).toBe(2);
+  await f.post(`api/runs/${reply.id}/save`);
+  expect(f.store.load(reply.id).reply).toBe(reply.reply);
+  const original = f.store.load(reply.id);
+  const third = (await (
+    await f.post(`api/runs/${reply.id}/followup`, {
+      question: "延续上一条解释",
+    })
+  ).json()) as WorkspaceRun;
+  const final = await f.wait(third.id);
+  expect(final.status).toBe("complete");
+  expect(final.history![1]!.reply).toBe(reply.reply);
+  expect(JSON.stringify(f.payloads.at(-1))).toContain("不能证明");
+  expect(f.store.load(reply.id)).toEqual(original);
+}, 10000);
+
+test("first-task prose and invented references cannot be saved as a completed conversation", async () => {
+  const f = await fixture("plain-first");
+  const first = (await (
+    await f.post("api/runs", { question: "研究", scope })
+  ).json()) as WorkspaceRun;
+  expect((await f.wait(first.id)).status).toBe("failed");
+  expect((await f.post(`api/runs/${first.id}/save`)).status).toBe(400);
+  const bad = await fixture("bad-plain-followup");
+  const base = (await (
+    await bad.post("api/runs", { question: "研究", scope })
+  ).json()) as WorkspaceRun;
+  await bad.wait(base.id);
+  const next = (await (
+    await bad.post(`api/runs/${base.id}/followup`, { question: "解释" })
+  ).json()) as WorkspaceRun;
+  expect((await bad.wait(next.id)).status).toBe("failed");
+  expect((await bad.post(`api/runs/${next.id}/save`)).status).toBe(400);
+}, 10000);
+
+test("an old turn cannot cancel a live follow-up; the current turn can cancel and continue", async () => {
+  const f = await fixture("followup-stall");
+  const first = (await (
+    await f.post("api/runs", { question: "研究", scope })
+  ).json()) as WorkspaceRun;
+  await f.wait(first.id);
+  const next = (await (
+    await f.post(`api/runs/${first.id}/followup`, { question: "追问" })
+  ).json()) as WorkspaceRun;
+  for (let i = 0; i < 80 && f.payloads.length < 4; i++) await Bun.sleep(20);
+  expect((await f.post(`api/runs/${first.id}/cancel`)).status).toBe(400);
+  expect(f.manager.get(next.id).status).toBe("running");
+  expect((await f.post(`api/runs/${next.id}/cancel`)).status).toBe(200);
+  expect((await f.wait(next.id)).status).toBe("cancelled");
+  expect((await f.post(`api/runs/${next.id}/continue`)).status).toBe(200);
+  expect((await f.wait(next.id)).status).toBe("complete");
+  expect(f.manager.get(first.id).status).toBe("complete");
+  expect(f.reads()).toBe(2);
+}, 10000);
+
 test("unknown citations never become a saved completed report", async () => {
   const f = await fixture("bad-citation");
   const r = (await (
