@@ -114,14 +114,14 @@ export const searchExtension: ExtensionDefinition = {
 
 ```powershell
 bun test src/extensions/test/host.test.ts src/runtime/test/extension-session.test.ts
-bun test src/runtime/test/extensions.test.ts src/test/app/app-extensions.test.ts
+bun test src/runtime/test/extensions.test.ts tests/app/app-extensions.test.ts
 bun run typecheck
 bun run check:architecture
 bun run test
 bun run build
 ```
 
-回归分三层：[扩展宿主](../../src/extensions/test/host.test.ts)检查 manifest/API、名称预留、初始化/重载失败、取消与资源清理；[会话接线](../../src/runtime/test/extension-session.test.ts)检查真实 Pi 循环里的工具增删、技能资格、任务子集、原会话保留；[应用管理](../../src/test/app/app-extensions.test.ts)检查实际 CLI/Composer 入口、设置冲突回滚、启动取消与 shutdown 等待。
+回归分三层：[扩展宿主](../../src/extensions/test/host.test.ts)检查 manifest/API、名称预留、初始化/重载失败、取消与资源清理；[会话接线](../../src/runtime/test/extension-session.test.ts)检查真实 Pi 循环里的工具增删、技能资格、任务子集、原会话保留；[应用管理](../../tests/app/app-extensions.test.ts)检查实际 CLI/Composer 入口、设置冲突回滚、启动取消与 shutdown 等待。
 
 能力声明不能伪造 shell；基础名称冲突在激活前拒绝，绑定工具退出活动集合后资格撤销。禁用选择跨重启保留，未知 ID 不被偷偷删除；忙碌时只读查看。异步启动中的提交须等待启动完成，不能吞掉用户紧接的输入；补全检查应读取真实建议列表，不只统计刷新回调。
 

@@ -90,7 +90,7 @@ bun run build
 报告合成样例（无网络或模型请求，输出目录必须尚不存在）：
 
 ```powershell
-bun run scripts/check-portfolio-report.ts output/portfolio-report-synthetic
+bun run src/artifact/dev/check-portfolio-report.ts output/portfolio-report-synthetic
 ```
 
 生成 `report.html`、带合成标识的 `share.html` 和 `evidence.json`，可以直接打开；测试数据临时目录会清理。对应 [当前分享样例](../../output/portfolio-report-2026-09-14-r05-final/share.html) 使用上述再平衡样例，FX 为 `[7,7.7,8.4]`，独立期望末值为 A `1.875`、B `1.2`、基准 `1.452`。这是人工 fixture，provider 标签只用于测试归档契约，不是实际市场收益。
@@ -98,7 +98,7 @@ bun run scripts/check-portfolio-report.ts output/portfolio-report-synthetic
 真实公开数据 smoke（需 Python + AKShare 与网络，输出文件必须尚不存在）：
 
 ```powershell
-bun run scripts/check-portfolio-comparison.ts output/portfolio-comparison-live.json
+bun run src/runtime/dev/check-portfolio-comparison.ts output/portfolio-comparison-live.json
 ```
 
 脚本在独立临时工作区创建两只公开基金的测试分组，以沪深 300 为基准比较固定历史窗口，检查原组文件未改和记录输入重算一致；另请求 USD/HKD 对 CNY 的汇率。结束清理临时市场数据和观察组，无模型、账户或订单调用。结果中的 DatasetRef 来自已清理的临时工作区，完整比较输入仍保存在输出 JSON 中。

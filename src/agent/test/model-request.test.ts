@@ -7,7 +7,7 @@ import { type QuantAgentSession } from "../src/session.ts";
 import { collectDoctor } from "../../cli/doctor.ts";
 import { loadSettings, saveSettings } from "../../storage/index.ts";
 import { DEFAULT_SETTINGS, type OhQuantSettings } from "../../types/config.ts";
-import { buildSettingsCase, runCase } from "../../../scripts/provider-smoke.ts";
+import { buildSettingsCase, runCase } from "../../cli/dev/provider-smoke.ts";
 import { AppRuntime } from "../../app-runtime.ts";
 
 // A local request still includes cold SDK/session setup on hosted Windows.

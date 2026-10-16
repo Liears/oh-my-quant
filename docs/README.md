@@ -37,13 +37,13 @@ docs/
 
 Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/runtime/quant-harness.ts` 实现其中的任务装配与守卫；Source、Quant、Storage、Execution、Artifact 和 UI/UX 是这一应用体系内职责不同的组成部分。归入同一目录不抹平模块边界，不表示执行能力已经接入默认研究 Agent，也不放宽账户授权。
 
-当前共 **63 个文件**：41 份 Markdown、2 份 HTML、2 个 TypeScript、5 张 PNG、13 张 SVG。23 份原顶层文档已迁入两个目录；桌面宿主设计也归入 Quant Harness。顶层 Markdown 只保留本页。
+当前共 **64 个文件**：41 份 Markdown、2 份 HTML、3 个 TypeScript、5 张 PNG、13 张 SVG。23 份原顶层文档已迁入两个目录；桌面宿主设计也归入 Quant Harness。顶层 Markdown 只保留本页。
 
 | 位置 | 文件数 | 内容 |
 |---|---:|---|
 | `agent-runtime/` | 2 | 通用运行时与扩展契约 |
 | `quant-harness/` | 23 | 完整量化应用的设计、产品、使用与仓库维护文档 |
-| `blog/` | 30 | 12 篇系列正文、1 篇工程补篇、目录与编辑说明、12 张 SVG、构建/检查脚本和离线 HTML |
+| `blog/` | 31 | 12 篇系列正文、1 篇工程补篇、目录与编辑说明、12 张 SVG、构建/检查脚本、私有证据路径规则和离线 HTML |
 | `assets/` | 6 | 共用产品与设计素材 |
 | 顶层 | 2 | 本页和讲解演示 |
 
@@ -153,6 +153,7 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 | [blog/editorial-notes.md](./blog/editorial-notes.md) | 当前编辑约定、来源与证据边界，不保存整理流水 |
 | [blog/build.ts](./blog/build.ts) | 从 Markdown/SVG 重建离线图文版 |
 | [blog/check.ts](./blog/check.ts) | 文件覆盖、链接、锚点及生成物检查 |
+| [blog/evidence-path.ts](./blog/evidence-path.ts) | 区分必须存在的公开文件与可选的本地私有回执；缺少回执不代表证据通过 |
 | [blog/index.html](./blog/index.html) | 生成物，不维护第二套正文 |
 
 <a id="assets"></a>
@@ -206,7 +207,7 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 
 发布只采用显式内容与资产白名单，不把整个仓库、`output/`、`.ohquant/`、完整研究会话、私有报告或凭证打包上线。指向本地测试与输出的证据链接需要转换为可公开的说明或保留在仓库，不制造站点死链。演示与帮助是否离线、会否调用服务及产生用量，都应在入口说明。
 
-终端讲解配图由 [现有渲染脚本](../scripts/render-terminal-audit.ts)生成：使用隔离内存数据，得到 SVG 字符单元与 ANSI 输出，再在浏览器捕获 `120x32-research-red-up` 帧。它展示绘制逻辑，不证明宿主字体、输入法或真实市场研究。项目首页另使用上表的网站合成工作台素材；图片和链接不能代替部署或在线服务验收，本轮不判断站点交付状态。
+终端讲解配图由 [现有渲染脚本](../src/tui/dev/render-terminal-audit.ts)生成：使用隔离内存数据，得到 SVG 字符单元与 ANSI 输出，再在浏览器捕获 `120x32-research-red-up` 帧。它展示绘制逻辑，不证明宿主字体、输入法或真实市场研究。项目首页另使用上表的网站合成工作台素材；图片和链接不能代替部署或在线服务验收，本轮不判断站点交付状态。
 
 
 ## 后续不再按每次修复新增顶层文档

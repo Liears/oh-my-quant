@@ -89,9 +89,9 @@ bun run build
 独立真实新闻检查（公开网络，不调用模型、行情或本地设置）：
 
 ```powershell
-bun run scripts/check-news.ts 000001.SZ A 2026-09-01 2026-09-14 eastmoney
-bun run scripts/check-news.ts AAPL US 2026-09-01 2026-09-14 yahoo
-bun run scripts/check-news.ts 00700.HK HK 2026-09-01 2026-09-14 yahoo
+bun run src/source/dev/check-news.ts 000001.SZ A 2026-09-01 2026-09-14 eastmoney
+bun run src/source/dev/check-news.ts AAPL US 2026-09-01 2026-09-14 yahoo
+bun run src/source/dev/check-news.ts 00700.HK HK 2026-09-01 2026-09-14 yahoo
 ```
 
 Exit 0 表示本次存在合格新闻，2 表示源不可用，3 表示空/窗口外；重新运行会随上游新闻改变。2026-09-14 14:24 UTC 的实际 Source 调用记录如下，不能扩展为全市场验收：

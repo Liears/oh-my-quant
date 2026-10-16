@@ -168,7 +168,7 @@ storage
   -> market/types
 ```
 
-避免反向依赖：`source` 和 `storage` 不应互相依赖，`tui` 不应直接依赖 provider adapter，也不应手工拼 `.ohquant` 路径。`scripts/architecture-boundary-baseline.json` 当前为空，新增违规由 `bun run check:architecture` 阻止。
+避免反向依赖：`source` 和 `storage` 不应互相依赖，`tui` 不应直接依赖 provider adapter，也不应手工拼 `.ohquant` 路径。`tests/architecture/architecture-boundary-baseline.json` 当前为空，新增违规由 `bun run check:architecture` 阻止。
 
 ## 测试布局
 
@@ -183,11 +183,34 @@ storage
 - `src/quant/test/`（合成数据与独立数值参考在 `test/fixtures/`）
 - `src/insight/test/`
 - `src/cli/test/`（handler 测试在 `test/handlers/`）
-- `src/test/`（仓库级架构门禁回归）
+- `tests/architecture/`（仓库级依赖边界、测试发现与开发入口回归）
+- `tests/app/`（跨模块应用入口、启动、配置、研究、报告与恢复集成）
 
-全部模块的测试布局由 `bun run test:fence` 强制检查：使用模块内 `test/`，现有 `source/tests/` 保留；app 内独立适配器使用各自的 `test/`。runtime、tools、research、market 的测试已集中，入口集成测试位于 `src/test/app/`。测试进程与数据夹具归各自测试目录；评测运行器的合成场景仍属于可选 evaluation 功能，不作为单元测试夹具混入应用服务。
+全部模块的测试布局由 `bun run test:fence` 强制检查：使用模块内 `test/`，现有 `source/tests/` 保留；app 内独立适配器使用各自的 `test/`。runtime、tools、research、market 的测试已集中，入口集成测试位于 `tests/app/`。测试进程与数据夹具归各自测试目录；评测运行器的合成场景仍属于可选 evaluation 功能，不作为单元测试夹具混入应用服务。
 
 对于 provider bug，在修复之前或同时，在模块测试文件夹中添加回归测试。
+
+## 开发入口与 npm 命令
+
+2026-10-15 将原根目录脚本按职责迁入模块；跨模块测试放在根目录 `tests/`，不是发布代码的一部分。构建后的 npm 包仍只包含 `dist/` 和发布说明等公开文件，消费者运行 `whyj` 不需要这些开发入口。
+
+| 位置 | 责任 |
+|---|---|
+| `src/cli/dev/` | CLI 构建、模型连接 smoke、Skill 命令和 reviewed 上游的显式核验 |
+| `src/runtime/dev/` | 研究评测、数据编排、模型测量与 AKShare 参数签名生成；`overview/` 与 `chart/` 维护对应应用输入路径 |
+| `src/tui/dev/`、`src/artifact/dev/` | 终端绘制/流写入/合成长对话 CPU 测量与合成报告生成；测量不证明实体终端输入延迟 |
+| `src/source/dev/`、`src/quant/dev/` | 公共新闻 adapter 检查、独立 Decimal 数值参考复核 |
+| `src/alpha/dev/`、`src/performance/dev/` | 显式真实引擎核验和合成账户计算示例 |
+| `src/storage/dev/`、`src/skill/dev/`、`src/insight/dev/` | 会话 IO 基准、已留存证据包重算、Insight 生成 |
+| `tests/architecture/`、`tests/app/` | 仓库工程门槛及跨模块回归，不承担产品功能 |
+
+开发探针是模块的可选消费者，可能注入生产 adapter、合成夹具或显式请求真实服务。架构检查不把 `dev/` 按生产依赖规则约束，但禁止生产文件反向导入 `dev/` 或任意测试目录；[反向依赖回归](../../tests/architecture/module-boundaries.test.ts)和[打包闭包检查](../../tests/architecture/development-entrypoints.test.ts)分别核对源码边界与实际 CLI 构建。它们不获得 Agent 默认执行资格。
+
+`npm test` 显式运行 `src` 与 `tests` 两个测试根，`npm run test:modules` 和 `npm run test:integration` 可分别执行。默认 Bun 发现同样排除 module dev、手动 Artifact 生成器、reference、desktop、site 和内部 output 等目录；不能为了检查文件迁移，顺带执行付费模型或真实市场脚本。根目录 `scripts/` 已退役，测试围栏要求目录不存在；迁移后未清理的旧缓存也会使该门槛失败。
+
+跨模块子进程回归固定仓库入口与工作目录，不能依赖其他用例留下的 `process.cwd()`。Doctor CLI 测试只继承宿主进程必需变量，显式设置合成凭证、禁用网络并指定不存在的 Python；验证 Tools 缺依赖时仍返回结构化诊断，不要求维护者或 CI 预先安装 AKShare。真实依赖可用性另由显式 Doctor/探针验证。
+
+常用入口为 `npm run dev`、`npm run build`、`npm start`、`npm test` 和 `npm run check`，具体范围及开发依赖见[英文 README](../../README.md#development)。npm 统一调度，底层构建和测试继续使用 Bun；本轮没有更换测试框架，也没有把脚本移动当成真实性验收。
 
 ## 当前文档
 

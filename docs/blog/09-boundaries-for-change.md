@@ -16,7 +16,7 @@ Agent Engineering / oh-my-quant · 初稿 2026-10-13 · 修订 2026-10-13 · 技
 
 一个方便的实现是让 Source 自己读取本地配置和缓存。另一个方便的实现是让 TUI 在需要报价时直接调用 provider。每条路径都很短，但它们会把宿主选择藏进较低层：取数模块开始知道 `.ohquant`，界面开始决定回退和错误分类。
 
-当前源码采用了相反的约束：Source 和 Storage 不互相导入，TUI 不直接调用 provider，`session.ts` 不直接导入 Storage、Tools、Source 或 TUI。这些是[架构检查](../../scripts/check-architecture.ts)中的具体规则，不只是模块图上的理想箭头。
+当前源码采用了相反的约束：Source 和 Storage 不互相导入，TUI 不直接调用 provider，`session.ts` 不直接导入 Storage、Tools、Source 或 TUI。这些是[架构检查](../../tests/architecture/check-architecture.ts)中的具体规则，不只是模块图上的理想箭头。
 
 规则本身仍不够。如果一次只读历史归档的请求，也必须先加载当前供应商的凭证，它虽然没有违反目录规则，却仍把两种生命周期绑在了一起。接口存在只是起点；数据路径是否会被无关的配置阻断，才是边界需要回答的具体问题。
 
@@ -54,7 +54,7 @@ Alpha/AKQuant 的旧 roadmap 还留下另一种错误：早期“尚未接入”
 
 ## 实现索引
 
-- [模块架构](../quant-harness/module-architecture.md)、[依赖约束](../../scripts/check-architecture.ts)。
+- [模块架构](../quant-harness/module-architecture.md)、[依赖约束](../../tests/architecture/check-architecture.ts)。
 - [Source 组装](../../src/runtime/data/source-runtime.ts)、[Source 公共入口](../../src/source/index.ts)、[存储规则](../quant-harness/ohquant-storage-policy.md)。
 - [Session 端口](../../src/agent/src/session-contracts.ts)、[独立宿主回归](../../src/agent/test/session-dependencies.test.ts)、[共享研究核验](../../src/research/input.ts)。
 

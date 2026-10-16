@@ -48,7 +48,7 @@ Shell 参数、slash 和自然语言各有入口；catalog 是 help、CLI 与建
 
 行情涨跌色与成功/失败色分开；Market Colors 可切换，零值和缺失值保持中性。TUI 立即应用外观设置，新报告固定生成时的颜色约定，旧报告不重写。结果表格保留结构，长文本和长模型名不挤占输入/操作提示。
 
-必要说明、思考文本和表格/图表注释采用 `#A6A6A6`，不叠加 ANSI faint。Conversation 为每个仍存活的消息缓存一个宽度及渲染输入快照；文字、工具/技能展示字段或宽度变化时重新排版。历史、选择和复制仍完整保留，冷排版和 resize 仍随历史增长。`bun run scripts/measure-conversation-render.ts --check` 单独测量合成历史的冷排版、热重绘、末条更新及宽度变化，只代表布局/ANSI CPU 耗时。
+必要说明、思考文本和表格/图表注释采用 `#A6A6A6`，不叠加 ANSI faint。Conversation 为每个仍存活的消息缓存一个宽度及渲染输入快照；文字、工具/技能展示字段或宽度变化时重新排版。历史、选择和复制仍完整保留，冷排版和 resize 仍随历史增长。`bun run src/tui/dev/measure-conversation-render.ts --check` 单独测量合成历史的冷排版、热重绘、末条更新及宽度变化，只代表布局/ANSI CPU 耗时。
 
 
 <a id="structured-render"></a>

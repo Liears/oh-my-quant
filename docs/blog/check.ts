@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
-import { isOptionalPrivateEvidence } from "../../.github/scripts/documentation-links.mjs";
+import { isOptionalPrivateEvidence } from "./evidence-path.ts";
 
 const root = resolve(import.meta.dir, "../..");
 async function listFiles(directory: string): Promise<string[]> {
@@ -166,6 +166,6 @@ for (const file of docsFiles) {
   if (!navTargets.has(resolve(root, file))) failures.push(`File missing from docs navigation: ${file}`);
 }
 console.log(`Checked ${current.length} Markdown documents, ${docsFiles.length} catalogued files, ${links} local link targets, ${checkedExplicitAnchors} explicit anchor references, ${svgs.length} SVGs, the offline blog, and presentation links.`);
-if (unavailablePrivateEvidence) console.log(`${unavailablePrivateEvidence} private output evidence links are unavailable; historical results were not revalidated.`);
+if (unavailablePrivateEvidence) console.log(`${unavailablePrivateEvidence} private output evidence links are unavailable locally; they are not required clone artifacts and were not revalidated.`);
 if (failures.length) { console.error(failures.join("\n")); process.exit(1); }
 console.log("Documentation checks passed. This is not runtime or external-service validation.");
