@@ -650,12 +650,16 @@ body {
   overflow: hidden;
 }
 aside {
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 main {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding: 24px 32px 18px 32px;
 }
 header {
   flex-shrink: 0;
