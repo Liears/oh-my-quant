@@ -98,6 +98,7 @@ async function fixture(mode = "normal") {
       }
       if (
         mode === "plain-first" ||
+        (mode === "clarify-plain" && n > 0) ||
         ((mode === "plain-followup" || mode === "bad-plain-followup") && n >= 3)
       ) {
         const content =
@@ -146,9 +147,9 @@ async function fixture(mode = "normal") {
         limitations: [],
       };
       const name =
-        mode === "clarify" && n === 0
+        mode.startsWith("clarify") && n === 0
           ? "ask_user"
-          : names[Math.min(mode === "clarify" ? n - 1 : n, 2)]!;
+          : names[Math.min(mode.startsWith("clarify") ? n - 1 : n, 2)]!;
       const args =
         name === "ask_user"
           ? { question: "请说明想进一步了解量比还是均线。" }
@@ -480,6 +481,27 @@ test("an old turn cannot cancel a live follow-up; the current turn can cancel an
   expect((await f.wait(next.id)).status).toBe("complete");
   expect(f.manager.get(first.id).status).toBe("complete");
   expect(f.reads()).toBe(2);
+}, 10000);
+
+test("clarification history alone cannot turn first-research prose into an archivable completed task", async () => {
+  const f = await fixture("clarify-plain");
+  const first = (await (
+    await f.post("api/runs", { question: "研究", scope })
+  ).json()) as WorkspaceRun;
+  expect((await f.wait(first.id)).status).toBe("needs_input");
+  const next = (await (
+    await f.post(`api/runs/${first.id}/followup`, {
+      question: "解释量比并完成研究",
+    })
+  ).json()) as WorkspaceRun;
+  const reply = await f.wait(next.id);
+  expect(reply.status).toBe("failed");
+  expect(reply.answer).toBeNull();
+  expect(reply.evidence).toHaveLength(0);
+  expect((await f.post(`api/runs/${reply.id}/save`)).status).toBe(400);
+  expect(() => f.store.save({ ...reply, status: "complete" })).toThrow(
+    "Only completed",
+  );
 }, 10000);
 
 test("unknown citations never become a saved completed report", async () => {

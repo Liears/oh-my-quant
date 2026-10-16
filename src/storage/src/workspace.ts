@@ -9,6 +9,26 @@ import type { WorkspaceRun } from "../../types/workspace.ts";
 export function workspaceHash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
+/** A clarification alone is not a completed research basis for archiving explanations. */
+export function canArchiveWorkspaceReply(run: WorkspaceRun): boolean {
+  const answer = run.history?.findLast(
+    (turn) => turn.status === "complete" && turn.answer,
+  )?.answer;
+  return (
+    !!run.reply &&
+    !(run.reply.match(/\bE\d+\b/g) ?? []).some(
+      (id) => !run.evidence.some((e) => e.id === id),
+    ) &&
+    !!answer &&
+    answer.claims.length > 0 &&
+    answer.claims.every(
+      (claim) =>
+        claim.evidence.length > 0 &&
+        claim.evidence.every((id) => run.evidence.some((e) => e.id === id)),
+    ) &&
+    run.evidence.some((e) => e.kind === "calculation" && !!e.result)
+  );
+}
 export function createWorkspaceStore(
   root = join(resolveOhquantDir(), "research", "workspace"),
 ) {
@@ -36,7 +56,7 @@ export function createWorkspaceStore(
       !envelope.run.saved ||
       !(
         envelope.run.answer ||
-        (envelope.run.reply && envelope.run.history?.length)
+        (envelope.run.reply && canArchiveWorkspaceReply(envelope.run))
       ) ||
       workspaceHash(envelope.run) !== envelope.hash
     ) {
@@ -49,7 +69,7 @@ export function createWorkspaceStore(
     save(run: WorkspaceRun): WorkspaceRun {
       if (
         run.status !== "complete" ||
-        !(run.answer || (run.reply && run.history?.length))
+        !(run.answer || (run.reply && canArchiveWorkspaceReply(run)))
       )
         throw new Error("Only completed research can be saved.");
       if (!existsSync(root)) {

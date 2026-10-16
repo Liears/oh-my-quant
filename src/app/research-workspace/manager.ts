@@ -12,7 +12,11 @@ import {
   validateWorkspaceScope,
   type WorkspacePrices,
 } from "../../source/index.ts";
-import { createWorkspaceStore, workspaceHash } from "../../storage/index.ts";
+import {
+  createWorkspaceStore,
+  workspaceHash,
+  canArchiveWorkspaceReply,
+} from "../../storage/index.ts";
 import type {
   WorkspaceAnswer,
   WorkspaceRun,
@@ -39,7 +43,7 @@ const answerSchema = Type.Object({
   limitations: Type.Array(Type.String(), { maxItems: 12 }),
 });
 const SYSTEM = `你是单股日线研究 Agent，中文回答。只做用户明确范围内的收盘结构观察，不能交易、承诺收益或认证买点。
-必须依次调用 get_market_evidence、calculate_research、publish_research。模型负责解释，价格/均线/量比/相对表现只能引用工具结果，不自行编造数值。
+首次研究必须依次调用 get_market_evidence、calculate_research、publish_research。已有已发布研究后的解释型追问可以直接自然语言回答并引用现有 E 编号，不必重复发布完整报告；新增或修改研究结论才用 publish_research。模型负责解释，价格/均线/量比/相对表现只能引用工具结果，不自行编造数值。
 先判断结构，不能机械把跌破 MA60 等同失效。单凭缩量不能判定洗盘。20 日低点只是观察边界，不是已确认支撑。
 缺少板块与交易所终态证据，最多给“观察”或“证据不足”。“失效”仅限复核原观察边界、数据未修订且收盘跌破它。
 每条结论引用实际 E 编号；区分工具计算与你的解释。说明证据覆盖日期和缺口。summary 用约 100–160 字讲清核心判断，claims 保留 3–5 条关键论据，不在多处重复整段指标。publish_research 发布最终结果并结束任务。
@@ -295,14 +299,7 @@ export function createWorkspaceManager(ports: WorkspacePorts = {}) {
         run.status = "failed";
         run.error = "模型请求失败，请检查连接后重试。";
       } else if (run.answer) run.status = "complete";
-      else if (
-        run.reply &&
-        run.history?.length &&
-        !(run.reply.match(/\bE\d+\b/g) ?? []).some(
-          (id) => !run.evidence.some((e) => e.id === id),
-        )
-      )
-        run.status = "complete";
+      else if (canArchiveWorkspaceReply(run)) run.status = "complete";
       else if (run.clarification) run.status = "needs_input";
       else {
         run.status = "failed";
