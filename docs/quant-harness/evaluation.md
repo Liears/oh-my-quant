@@ -42,11 +42,13 @@ bun run eval:research -- --case all --timeout-ms 180000 --max-requests 12 --outp
 
 ## CI 测试生命周期
 
-集成测试的业务期限应先于测试框架的外层期限到达；外层超时不等于异步工作已经停止。[research-evaluation.test.ts](../../src/runtime/test/research-evaluation.test.ts) 使用 10 秒 fixture 操作预算和 30 秒测试预算，显式超时反例保留自己的期限，生产默认值不变。清理先取消并等待所有在途评测，再停止服务器、恢复环境和移除临时目录；清理 hook 有独立 15 秒预算。
+集成测试的业务期限应先于测试框架的外层期限到达；外层超时不等于异步工作已经停止。[research-evaluation.test.ts](../../src/runtime/test/research-evaluation.test.ts) 使用 10 秒 fixture 操作预算和 30 秒测试预算，显式超时反例保留自己的期限，生产默认值不变。清理开始后拒绝新评测，先取消并等待所有在途评测，再停止服务器、恢复环境和移除临时目录；清理 hook 有独立 15 秒预算。
 
 [research-decisions.test.ts](../../src/runtime/test/research-decisions.test.ts) 多次写入真实锁定归档并生成报告，使用 30 秒测试预算。夹具持有完整测试 Promise；超时后的清理也先等待写入和其后续步骤结算，再恢复环境、删除工作目录，避免迟到写入报 ENOENT。预算不是性能目标；仍保留全部报告范围与证据断言。
 
 [skill-command-cancellation.test.ts](../../src/runtime/test/skill-command-cancellation.test.ts) 等待 provider 实际收到请求后取消，并用受控响应 barrier 验证取消先于正常回答完成。启动时间不计入取消性能断言；测试仍要求原始取消原因、无成功结果、无正常 assistant stop、streaming=false 和未取消路径成功。外层期限只负责发现挂死，不把放宽机器速度要求当作放宽取消契约。
+
+[Doctor handler 测试](../../src/cli/test/handlers/system.test.ts) 通过现有 collector/dependency 注入口固定 Python 状态，保留真实格式化与面板状态推送；仅设置 skip-network 并不能阻止本机 Python 探针。真实依赖检查由 Doctor 依赖矩阵和 CLI 进程测试承担。
 
 完整历史、首次失败 attempt 与相应取舍见 [Agentic / Vibe Repo Ops](../blog/agentic/vibe-repo-ops.md)。这些合成测试不调用真实市场或模型。
 

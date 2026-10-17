@@ -21,6 +21,8 @@ let cancellationTimer: ReturnType<typeof setTimeout> | undefined;
 let onRequest: () => void;
 
 function runResearchEvaluation(...[id, deps, options = {}]: Parameters<typeof evaluateResearch>) {
+  // A timed-out test continuation must not start more work during teardown.
+  fixtureController.signal.throwIfAborted();
   const signal = options.signal ? AbortSignal.any([options.signal, fixtureController.signal]) : fixtureController.signal;
   const operation = evaluateResearch(id, deps, { timeoutMs: 10_000, ...options, signal });
   const owned = pending;
@@ -87,6 +89,7 @@ it("fixture teardown cancels an active provider stream before releasing its work
   expect((await operation).outcome).toBe("cancelled");
   expect(pending.size).toBe(0);
   expect(process.env.OHQUANT_DIR).toBe(root);
+  expect(() => runResearchEvaluation("stock", dependencies())).toThrow();
 });
 
 function dependencies(id: ResearchEvaluationCase = "stock") {

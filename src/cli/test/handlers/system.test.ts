@@ -3,12 +3,20 @@ import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadPanelPortfolio, loadSettings, savePanelPortfolio } from "../../../storage/index.ts";
-import { compactHandler, configHandler, createDoctorHandler, doctorHandler, portfolioHandler, resumeHandler, sessionHandler } from "../../handlers/system.ts";
+import { compactHandler, configHandler, createDoctorHandler, portfolioHandler, resumeHandler, sessionHandler } from "../../handlers/system.ts";
+import { collectDoctor } from "../../doctor.ts";
 import { skillHandler } from "../../handlers/skill.ts";
 import type { QuantAgentSession } from "../../../agent/src/session.ts";
 import { projectResearchState } from "../../../research/state.ts";
 
 const OHQ = join(tmpdir(), `whyj-portfolio-handler-${Date.now()}`);
+
+// Handler tests exercise real collection/formatting with an explicit dependency
+// fixture. Skipping network probes alone still launches host Python/AKShare.
+const doctorHandler = createDoctorHandler((settings, env, options) => collectDoctor(settings, env, {
+  ...options, skipNetwork: true, writeLog: false,
+  checkDependency: async () => ({ status: "ready", python: "fixture", akshare: "fixture" }),
+}));
 
 function withTempOhq<T>(fn: () => Promise<T> | T): Promise<T> | T {
   const prev = process.env.OHQUANT_DIR;
@@ -194,15 +202,7 @@ describe("sessionHandler", () => {
 
 describe("doctorHandler", () => {
   it("renders doctor output with structured report data", async () => {
-    const previous = process.env.WHYJ_DOCTOR_SKIP_NETWORK;
-    process.env.WHYJ_DOCTOR_SKIP_NETWORK = "1";
-    let result;
-    try {
-      result = await doctorHandler({}, [], {});
-    } finally {
-      if (previous === undefined) delete process.env.WHYJ_DOCTOR_SKIP_NETWORK;
-      else process.env.WHYJ_DOCTOR_SKIP_NETWORK = previous;
-    }
+    const result = await doctorHandler({}, [], {});
     expect(result.success).toBe(true);
     expect(result.renderAs).toBe("text");
     expect(result.message).toContain("WhyJ Doctor");
@@ -213,20 +213,15 @@ describe("doctorHandler", () => {
       auth: expect.any(Object),
       config: expect.any(Object),
       hints: expect.any(Array),
+      phases: expect.arrayContaining([expect.objectContaining({
+        phase: "tools", dependency: { status: "ready", python: "fixture", akshare: "fixture" },
+      })]),
     }));
   });
 
   it("opens the doctor panel in TUI contexts", async () => {
-    const previous = process.env.WHYJ_DOCTOR_SKIP_NETWORK;
-    process.env.WHYJ_DOCTOR_SKIP_NETWORK = "1";
     const seen: unknown[] = [];
-    let result;
-    try {
-      result = await doctorHandler({}, [], { openDoctor: (doctor) => { seen.push(doctor); } });
-    } finally {
-      if (previous === undefined) delete process.env.WHYJ_DOCTOR_SKIP_NETWORK;
-      else process.env.WHYJ_DOCTOR_SKIP_NETWORK = previous;
-    }
+    const result = await doctorHandler({}, [], { openDoctor: (doctor) => { seen.push(doctor); } });
     expect(result.success).toBe(true);
     expect(result.message).toBe("");
     expect(result.effects).toBeUndefined();

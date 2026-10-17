@@ -1,6 +1,6 @@
 # Agentic / Vibe Repo Ops：让 AGENTS.md、Skills 与 CI 对同一次交付负责
 
-初稿 2026-10-15 · 修订 2026-10-17 · oh-my-quant 工程实践
+初稿 2026-10-15 · 修订 2026-10-18 · oh-my-quant 工程实践
 
 本文扩写自《Agent Repo 的基础建设：从工作约定到可核验的交付》。原文解释为什么建立规则；这次进一步追问：规则已经写下、工作流已经运行，为什么仍然频繁失败，又为什么检查失败没有阻止合并？
 
@@ -182,7 +182,7 @@ workflow run ID + run attempt + 平台
 
 本次修复限定在测试夹具：操作预算 10 秒，文件内测试预算 30 秒，清理预算 15 秒；部分用例会执行两轮评测，因此外层还要容纳两轮及断言。生产评测默认值没有修改。显式测试 100ms 业务超时的场景仍使用 100ms，不会被新默认值覆盖。[测试实现](../../../src/runtime/test/research-evaluation.test.ts)
 
-时间预算之外，还增加 fixture 自己的 AbortController 和在途 Promise 集合。清理先 abort，再等待所有拥有的评测结束，最后停止服务器、清除定时器、恢复环境与删除临时目录。新增回归先等服务器实际收到请求，再触发清理，验证评测返回 cancelled、在途集合为空、工作目录仍在，然后才释放环境。
+时间预算之外，还增加 fixture 自己的 AbortController 和在途 Promise 集合。清理先 abort，再等待所有拥有的评测结束，最后停止服务器、清除定时器、恢复环境与删除临时目录。退出状态下拒绝启动新评测，防止已超时测试的后续步骤重新创建工作。新增回归先等服务器实际收到请求，再触发清理，验证评测返回 cancelled、在途集合为空、工作目录仍在，然后才释放环境。
 
 ```text
 测试结束 / 外层失败
@@ -377,7 +377,7 @@ Desktop 本次增加发布前的 main 分支、稳定版本与 CLI/Desktop 版�
 
 ## 14. 本次验证：正向通过，还要证明检查仍能拒绝错误
 
-配套修复由 [Issue #40](https://github.com/yangjingo/oh-my-quant/issues/40) 跟踪。2026-10-17 在独立 Windows worktree、Bun 1.3.14、Node v25.8.1 上，`bun run check:release` 完成：2,686 tests / 299 files / 0 failures，26 项 policy/实际 YAML guard 检查通过，类型、架构、CLI 和文档构建/链接检查通过。网站单独构建得到 4 个本地化页面和 6 个公开内容入口。CI 使用 Node 24，最终平台结果必须查交付 PR，不能由这次本地 Node 25 结果代替。
+配套修复由 [Issue #40](https://github.com/yangjingo/oh-my-quant/issues/40) 跟踪。2026-10-17–18 在独立 Windows worktree、Bun 1.3.14、Node v25.8.1 上，`bun run check:release` 完成：2,686 tests / 299 files / 0 failures，26 项 policy/实际 YAML guard 检查通过，类型、架构、CLI 和文档构建/链接检查通过。网站单独构建得到 4 个本地化页面和 6 个公开内容入口。CI 使用 Node 24，最终平台结果必须查交付 PR，不能由这次本地 Node 25 结果代替。
 
 为避免把“在快机器上又通过一次”当作修复证据，另做了六组对照。旧用例取自 main `1d4488f`；修改版取自本次分支；负控仅修改临时验证副本，生产源码没有改动。
 
@@ -395,3 +395,15 @@ Desktop 本次增加发布前的 main 分支、稳定版本与 CLI/Desktop 版�
 慢请求可以用 Bun preload 包装 `Bun.serve` 的 `fetch` 重现，等待插在调用原 fixture 之前；慢归档则在 preload 中包装 `annualComparisonFixture`，保留原存储代码与断言。临时测试副本位于忽略的 `output/`，单独执行时显式覆盖测试路径过滤；正式 `check:release` 的发现范围与断言没有因此改变。原始日志留作本地诊断，公开文章保留实验条件和结果，不发布完整环境日志。
 
 本次没有发布 npm 或 GitHub Release，没有启用 main ruleset，也没有新增定时 provider 探针。可信 policy 的线上代码切换要等修复进入默认分支；本 PR 的 `pull_request_target` 成功只能证明当时默认分支版本的检查成功。这些边界和最终 CI 链接应留在交付说明中，避免下一轮又把“本地已实现”“PR 已通过”和“main 已生效”合并成一个完成状态。
+
+### 远端首轮又暴露了一个遗漏：skip network 不等于隔离机器环境
+
+[PR #41 的首次 CI](https://github.com/yangjingo/oh-my-quant/actions/runs/39047623864) 中，Ubuntu 通过，Windows 的两项 Doctor handler 测试分别在约 5009ms 和 5001ms 超时，日志记录 killed dangling process。同一 head 的 [Desktop 安装与交互验收](https://github.com/yangjingo/oh-my-quant/actions/runs/39047623704) 成功。这是交付过程新增证据，不混进前述 61 次历史运行的分母。
+
+两项测试设置 `WHYJ_DOCTOR_SKIP_NETWORK=1`，却直接调用默认 `doctorHandler`。这个开关只跳过网络阶段，Tools 阶段仍通过 `checkAkshareDependency` 启动真实 Python。收集器允许探针 30 秒，单元测试外层只有 5 秒。它们的验收目标其实是文本报告和 TUI 状态推送；宿主机进程不属于这个目标。早先修过独立 Doctor 测试与 CLI 子进程 fixture，并不能推出所有 Doctor 入口都完成了隔离。
+
+后续修复使用已有 `createDoctorHandler` 和 `checkDependency` 注入口，显式提供 ready/Python fixture，保留真实 collect、format 和 onState 通路，并断言报告确实包含这个依赖状态；关闭该测试的日志写入，移除对全局 skip-network 环境变量的临时修改。[handler 测试](../../../src/cli/test/handlers/system.test.ts) · [Doctor 依赖测试](../../../src/cli/test/doctor-tools.test.ts) · [实际 CLI 进程测试](../../../tests/app/index.test.ts)
+
+这里的教训与增加超时不同：先确认正在测试哪一层，再决定哪些环境应真实、哪些依赖应显式控制。生产 Doctor 的 Python 行为没有改，已有进程与缺失依赖矩阵仍保留；修复后要重新跑完整 gate 和最终提交的远端 CI，不能拿前一提交的 Desktop 成功作为最终验收。
+
+补充对照将 `runPython` 替换为永不结算的测试 Promise：旧 handler 测试在 5 秒处稳定失败；修复版仍通过，并验证报告包含显式 dependency fixture。这个故障注入没有启动真实挂死进程，证明的是格式化测试不再依赖宿主探针，不证明生产 Python 的任意挂死都已解决。
