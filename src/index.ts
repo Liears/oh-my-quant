@@ -137,8 +137,7 @@ if (cmdArg) {
   const { commandPreflight } = await import("./runtime/workspace/command-preflight.ts");
   const { isInstalledToolProbeSchemaQuery } = await import("./runtime/data/tool-probe-schema.ts");
   const parsed = parseCommand(cmdArg);
-  if (parsed && (parsed.command === "help" || commandPreflight(parsed) || isInstalledToolProbeSchemaQuery(parsed)
-    || parsed.command === "skill" && parsed.positional[0] === "audit"))
+  if (parsed && (parsed.command === "help" || commandPreflight(parsed) || isInstalledToolProbeSchemaQuery(parsed)))
     await runOneShot(cmdArg, json);
 }
 
@@ -214,8 +213,7 @@ async function runOneShot(input: string, json: boolean) {
     const envelope: CliEnvelope = result.success
       ? { ok: true, command: parsed.command, message: result.message, data: result.data }
       : { ok: false, command: parsed.command, error: { code: "command_failed", message: result.message },
-        ...((parsed.command === "doctor" && parsed.flags.tool !== undefined
-          || parsed.command === "skill" && parsed.positional[0] === "audit") && result.data !== undefined ? { data: result.data } : {}) };
+        ...(parsed.command === "doctor" && parsed.flags.tool !== undefined && result.data !== undefined ? { data: result.data } : {}) };
     writeJson(envelope);
   } else if (result.success) {
     console.log(result.message);

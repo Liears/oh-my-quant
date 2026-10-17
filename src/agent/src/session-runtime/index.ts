@@ -54,7 +54,6 @@ export {
 } from "./harness/compaction/compaction.ts";
 export { convertToLlm } from "./harness/messages.ts";
 export { formatSkillsForSystemPrompt } from "./harness/system-prompt.ts";
-export { loadSourcedSkills, type SkillDiagnostic } from "./harness/skills.ts";
 export { JsonlSessionRepo } from "./harness/session/jsonl-repo.ts";
 export { Session as SessionImpl } from "./harness/session/session.ts";
 export { executeShellWithCapture } from "./harness/utils/shell-output.ts";

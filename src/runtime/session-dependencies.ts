@@ -8,11 +8,6 @@ import { buildResearchReport } from "../research/input.ts";
 import { discoverSkills, skillDiscoveryRevision } from "../agent/src/skills.ts";
 import { configuredThinking, resolveConfiguredAuth, resolveConfiguredModel, resolveCompactTriggerTokens, resolveModel } from "../agent/src/model-config.ts";
 import type { QuantAgentDependencies, QuantAgentOptions, QuantModelConnection } from "../agent/src/session-contracts.ts";
-import { prepareRuntimeSkills } from "./skills/skill-readiness.ts";
-import { skillPythonRevision } from "../skill/index.ts";
-import { skillNetworkRevision } from "../skill/index.ts";
-import { skillEtfRevision } from "../skill/index.ts";
-import { skillFileRevision } from "../skill/index.ts";
 
 function thinkingLevel(level: string): ThinkingLevel {
   return ["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(level) ? level as ThinkingLevel : "off";
@@ -22,7 +17,6 @@ function thinkingLevel(level: string): ThinkingLevel {
 export function createDefaultSessionDependencies(options: QuantAgentOptions): QuantAgentDependencies {
   const cwd = options.cwd ?? process.cwd();
   const env = new NodeExecutionEnv({ cwd });
-  const skillCapabilities = options.skillCapabilities;
   const override = structuredClone(options.settings);
   const paths = options.skillPaths;
   const fixedPaths = typeof paths === "function" ? [] : [...(paths ?? [])];
@@ -58,11 +52,7 @@ export function createDefaultSessionDependencies(options: QuantAgentOptions): Qu
       };
       return connection;
     },
-    readSkillRevision: () => JSON.stringify([skillDiscoveryRevision(), skillPythonRevision(cwd), skillNetworkRevision(cwd), skillEtfRevision(cwd), skillFileRevision(cwd),
-      skillCapabilities?.revision?.() ?? "", skillPaths(), settings().skillIntegrations]),
-    ...(skillCapabilities ? { readSkillCapabilities: () => skillCapabilities.read() } : {}),
-    prepareSkills: (skills, tools, capabilities = skillCapabilities?.read() ?? {}) => prepareRuntimeSkills(skills, tools, cwd,
-      { readCapabilities: () => capabilities }),
+    readSkillRevision: () => JSON.stringify([skillDiscoveryRevision(), skillPaths(), settings().skillIntegrations]),
     async loadSkills() { return (await discoverSkills({ cwd, env, extraPaths: skillPaths(), integrations: settings().skillIntegrations })).skills; },
     prompts: { system: ({ tools, skills }) => buildSystemPrompt(undefined, skills, tools), turn: injectTurnContext, skill: injectSkillContext },
     verifyResearch: buildResearchReport,

@@ -242,6 +242,7 @@ describe("createAgent", () => {
       },
       skillPaths: [TEST_SKILLS_DIR],
     });
+    await agent.waitForIdle();
     expect(agent).not.toBeNull();
     expect(agent.state.model.id).toBe("openai/gpt-5.5");
   });

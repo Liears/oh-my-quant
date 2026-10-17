@@ -1,7 +1,6 @@
 import type { DoctorResult } from "./doctor.ts";
 import type { ReportProvenance } from "./research-evidence.ts";
 import type { ResearchTaskSnapshot } from "./research-task.ts";
-import type { SkillReadiness } from "./skills.ts";
 import type { ImageContent } from "@earendil-works/pi-ai";
 
 export interface ParsedCommand {
@@ -27,7 +26,6 @@ export type CommandEffect =
   | { type: "portfolioChanged" };
 
 export interface CommandSkill {
-  readiness?: SkillReadiness;
   name: string;
   description: string;
   filePath: string;

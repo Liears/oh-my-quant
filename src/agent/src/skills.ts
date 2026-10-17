@@ -1,20 +1,19 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
-import { FileError, loadSourcedSkills, type ExecutionEnv, type FileInfo, type Result, type Skill, type SkillDiagnostic } from "./session-runtime/index.ts";
+import { loadSkills, parseFrontmatter, type ResourceDiagnostic } from "./pi-skills.ts";
+import type { Skill } from "./session-runtime/index.ts";
 import type { NodeExecutionEnv } from "./session-runtime/node.ts";
 import type { SkillIntegrationSettings } from "../../types/config.ts";
 import { perfLog, perfNow } from "../../perf.ts";
-import type { SkillReadiness } from "../../types/skills.ts";
 
 export interface QuantSkill extends Skill {
-  readiness?: SkillReadiness;
   scope: "project" | "user";
   source: "agents" | "claude" | "codex" | "pi" | "extension";
   sourcePath: string;
 }
 
-export interface QuantSkillDiagnostic extends SkillDiagnostic {
+export interface QuantSkillDiagnostic extends ResourceDiagnostic {
   scope: "project" | "user";
   source: "agents" | "claude" | "codex" | "pi";
   sourcePath: string;
@@ -61,8 +60,7 @@ export async function discoverSkills(
   }
 
   const startedAt = perfNow();
-  const env = createPosixSkillEnv(options.env);
-  const loading = loadDiscoveredSkills(env, sources)
+  const loading = loadDiscoveredSkills(sources)
     .then((result) => {
       perfLog("skills.load", startedAt, { skills: result.skills.length, sources: result.sources.length });
       return result;
@@ -75,30 +73,23 @@ export async function discoverSkills(
   return cloneDiscoveryResult(await loading);
 }
 
-async function loadDiscoveredSkills(env: ExecutionEnv, sources: SkillSource[]): Promise<DiscoverSkillsResult> {
-  const loaded = await loadSourcedSkills(
-    env,
-    sources.map((source) => ({ path: source.path, source })),
-    (skill, source) => ({ ...skill, sourcePath: source.path, scope: source.scope, source: source.source }),
-  );
-  const seenNames = new Set<string>();
-  const dedupedSkills = loaded.skills
-    .map((entry) => entry.skill)
-    .filter((skill) => {
-      if (seenNames.has(skill.name)) return false;
-      seenNames.add(skill.name);
-      return true;
-    });
-  return {
-    skills: dedupedSkills,
-    diagnostics: loaded.diagnostics.map((diagnostic) => ({
-      ...diagnostic,
-      sourcePath: diagnostic.source.path,
-      scope: diagnostic.source.scope,
-      source: diagnostic.source.source,
-    })),
-    sources,
-  };
+/** Pi owns traversal, frontmatter validation and ignore rules; JQ adds provenance and a session snapshot. */
+async function loadDiscoveredSkills(sources: SkillSource[]): Promise<DiscoverSkillsResult> {
+  const skills: QuantSkill[] = [], diagnostics: QuantSkillDiagnostic[] = [];
+  const seen = new Set<string>();
+  for (const source of sources) {
+    const loaded = loadSkills({ cwd: dirname(source.path), agentDir: homedir(), skillPaths: [source.path], includeDefaults: false });
+    diagnostics.push(...loaded.diagnostics.map(item => ({ ...item, sourcePath: source.path, scope: source.scope, source: source.source })));
+    for (const skill of loaded.skills) {
+      if (seen.has(skill.name)) continue;
+      const { body } = parseFrontmatter(readFileSync(skill.filePath, "utf8"));
+      skills.push({ name: skill.name, description: skill.description, filePath: skill.filePath,
+        content: body, disableModelInvocation: skill.disableModelInvocation,
+        sourcePath: source.path, scope: source.scope, source: source.source });
+      seen.add(skill.name);
+    }
+  }
+  return { skills, diagnostics, sources };
 }
 
 function cloneDiscoveryResult(result: DiscoverSkillsResult): DiscoverSkillsResult {
@@ -163,107 +154,4 @@ function collectAncestorRoots(cwd: string): string[] {
     current = parent;
   }
   return roots;
-}
-
-function createPosixSkillEnv(env: NodeExecutionEnv): ExecutionEnv {
-  return {
-    ...env,
-    cwd: toPosixPath(env.cwd),
-    async absolutePath(path) {
-      return mapPathResult(await env.absolutePath(fromPosixPath(path)));
-    },
-    async joinPath(parts) {
-      return mapPathResult(await env.joinPath(parts.map(fromPosixPath)));
-    },
-    async readTextFile(path, abortSignal) {
-      return await env.readTextFile(fromPosixPath(path), abortSignal);
-    },
-    async readTextLines(path, options) {
-      return await env.readTextLines(fromPosixPath(path), options);
-    },
-    async readBinaryFile(path, abortSignal) {
-      return await env.readBinaryFile(fromPosixPath(path), abortSignal);
-    },
-    async writeFile(path, content, abortSignal) {
-      return await env.writeFile(fromPosixPath(path), content, abortSignal);
-    },
-    async appendFile(path, content) {
-      return await env.appendFile(fromPosixPath(path), content);
-    },
-    async fileInfo(path) {
-      return mapInfoResult(await env.fileInfo(fromPosixPath(path)));
-    },
-    async listDir(path, abortSignal) {
-      return mapListResult(await env.listDir(fromPosixPath(path), abortSignal));
-    },
-    async canonicalPath(path) {
-      return mapPathResult(await env.canonicalPath(fromPosixPath(path)));
-    },
-    async exists(path) {
-      return await env.exists(fromPosixPath(path));
-    },
-    async createDir(path, options) {
-      return await env.createDir(fromPosixPath(path), options);
-    },
-    async remove(path, options) {
-      return await env.remove(fromPosixPath(path), options);
-    },
-    async createTempDir(prefix) {
-      return mapPathResult(await env.createTempDir(prefix));
-    },
-    async createTempFile(options) {
-      return mapPathResult(await env.createTempFile(options));
-    },
-    async exec(command, options) {
-      return await env.exec(command, options);
-    },
-    async cleanup() {
-      await env.cleanup();
-    },
-  };
-}
-
-function mapPathResult(result: Result<string, FileError>): Result<string, FileError> {
-  return result.ok ? { ok: true, value: toPosixPath(result.value) } : result;
-}
-
-function mapInfoResult(result: Result<FileInfo, FileError>): Result<FileInfo, FileError> {
-  return result.ok
-    ? {
-        ok: true,
-        value: {
-          ...result.value,
-          name: basenamePosix(toPosixPath(result.value.path)),
-          path: toPosixPath(result.value.path),
-        },
-      }
-    : result;
-}
-
-function mapListResult(result: Result<FileInfo[], FileError>): Result<FileInfo[], FileError> {
-  return result.ok
-    ? {
-        ok: true,
-        value: result.value.map((entry) => {
-          const normalizedPath = toPosixPath(entry.path);
-          return {
-            ...entry,
-            name: basenamePosix(normalizedPath),
-            path: normalizedPath,
-          };
-        }),
-      }
-    : result;
-}
-
-function toPosixPath(path: string): string {
-  return path.replace(/\\/g, "/");
-}
-
-function fromPosixPath(path: string): string {
-  return process.platform === "win32" ? path.replace(/\//g, "\\") : path;
-}
-
-function basenamePosix(path: string): string {
-  return path.replace(/\/+$/, "").split("/").pop() ?? path;
 }

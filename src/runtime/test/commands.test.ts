@@ -52,7 +52,7 @@ function commandContext() {
 
 describe("runtime command helpers", () => {
   it("classifies skill invocations separately from local skill commands", () => {
-    expect(getRuntimeCommandInvocation(parsed("skill", ["install", "owner/repo"]))).toMatchObject({ isSkillInvoke: false, localOnly: false });
+    expect(getRuntimeCommandInvocation(parsed("skill", ["install", "owner/repo"]))).toMatchObject({ isSkillInvoke: false, localOnly: true });
     expect(getRuntimeCommandInvocation(parsed("skill", ["list"]))).toEqual({
       isSkillInvoke: false,
       isCompactCommand: false,
@@ -73,6 +73,14 @@ describe("runtime command helpers", () => {
   it("builds compacting status text for idle and active turns", () => {
     expect(compactingStatusText(false)).toBe("Compacting the current session context...");
     expect(compactingStatusText(true)).toBe("Waiting for the active turn to settle before compacting the session context...");
+  });
+
+  it("keeps skill selection and MCP configuration local while actual skill invocations use the session", () => {
+    for (const action of ["catalog", "install", "remove", "reload"]) {
+      expect(getRuntimeCommandInvocation(parsed("skill", [action, "technical-analyst"]))).toMatchObject({ localOnly: true, isSkillInvoke: false });
+    }
+    expect(getRuntimeCommandInvocation(parsed("mcp", ["install", "web-reader"]))).toMatchObject({ localOnly: true, isSkillInvoke: false });
+    expect(getRuntimeCommandInvocation(parsed("skill", ["run", "technical-analyst"]))).toMatchObject({ localOnly: false, isSkillInvoke: true, skillName: "technical-analyst" });
   });
 
   it("applies conversation reset effects through the runtime context", () => {

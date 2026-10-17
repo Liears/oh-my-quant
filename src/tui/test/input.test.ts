@@ -81,7 +81,7 @@ describe("buildSuggestions", () => {
   ];
 
   it("suggests slash commands", () => {
-    expect(buildSuggestions("/mc", watchlist)).toEqual([]);
+    expect(buildSuggestions("/mc", watchlist)).toEqual([{ fill: "/mcp", label: "/mcp  Choose and manage MCP presets for Pi" }]);
   });
 
   it("suggests command actions for exact command names", () => {
