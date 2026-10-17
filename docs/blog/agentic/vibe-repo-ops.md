@@ -304,6 +304,8 @@ GitHub 对有 merge conflict 的 PR 不运行普通 `pull_request` 工作流；`
 
 因此，界面显示“受保护”不等于 CI 门禁已接通；PR 显示 blocked 也不等于 CI 正在阻止它。#41 当时已有通过的检查，却仍需要 review，而且存在未签名提交。核验时必须分别读取状态检查、审查、签名和管理员适用范围，不能凭一个总状态推断唯一原因。本文没有通过实际合并或强推来试探这些限制。
 
+北京时间 01:03 再次读取时，维护者已经保存 `CI required` 和 `PR policy`，两项来源均为 GitHub Actions（app ID 15368），`strict=true`。这说明第一阶段检查约束已接通；`Desktop required` 尚未加入，1 人批准与签名要求仍保留，#41 仍为 `REVIEW_REQUIRED`。保留前后两份观察，是为了说明“用户完成选择 → 保存平台规则 → API 确认 → 查看 PR 具体阻塞项”的核验链，而不是把配置过渡状态写成永久缺陷。
+
 ### 搜索框里填的是检查名称，而不是工作流名称
 
 在 **Settings → Branches → main 的保护规则 → Require status checks to pass before merging** 下，逐个搜索、选中检查，最后保存。应使用 Actions 实际报告的 job 名称：
@@ -323,6 +325,8 @@ GitHub 对有 merge conflict 的 PR 不运行普通 `pull_request` 工作流；`
 个人维护阶段可以要求所有修改通过 PR，但不强制另一位 reviewer 批准：PR 作者不能批准自己的 PR。如果确实有第二位维护者承担审查，则保留至少一人批准有明确价值。agent 用同一账号代替作者操作，并不会成为独立审查者。
 
 签名提交要求同样有独立目的。需要先确认贡献者和 agent 的签名方式，以及待合并提交的 GitHub Verified 状态；SSH 推送认证成功并不表示 Git commit 已签名。本次如实报告未签名状态，没有为绕过规则而改写历史、关闭签名要求或尝试管理员合并。[GitHub 提交签名验证](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification)
+
+维护者随后选择个人维护阶段不强制另一人批准，也不把签名作为 Agent 提交的必需门槛，保留 CI、最新基线与管理员约束。这是当前协作成本的取舍，不表示 Agent 无法签名。签名验证来源，CI 检查规定行为，review 判断修改是否合适，三者不能互相替代；平台操作仍要读取保存后的实际值，不能把这个选择本身当作设置已经生效。
 
 这几个层次各自回答一个问题：PR 让修改可审查，review 指定谁批准，签名验证提交来源，CI 验证规定行为，strict 约束验收基线。AGENTS 和 Skills 组织执行过程，分支保护在 GitHub 接收合并时执行限制。一个层次开启，不能替代另一个层次。
 
@@ -448,3 +452,48 @@ Desktop 本次增加发布前的 main 分支、稳定版本与 CLI/Desktop 版�
 这里的教训与增加超时不同：先确认正在测试哪一层，再决定哪些环境应真实、哪些依赖应显式控制。生产 Doctor 的 Python 行为没有改，已有进程与缺失依赖矩阵仍保留；修复后要重新跑完整 gate 和最终提交的远端 CI，不能拿前一提交的 Desktop 成功作为最终验收。
 
 补充对照将 `runPython` 替换为永不结算的测试 Promise：旧 handler 测试在 5 秒处稳定失败；修复版仍通过，并验证报告包含显式 dependency fixture。这个故障注入没有启动真实挂死进程，证明的是格式化测试不再依赖宿主探针，不证明生产 Python 的任意挂死都已解决。
+
+## 15. References：分支设计与 Agent Repo Ops 的学习路径
+
+以下资料于 2026-10-18 核对。项目链接尽量固定到本文读过的提交；演讲链接优先使用主办方、原始发布频道或承载原演讲的 InfoQ 页面。推荐理由与练习是 **WhyJ 分析**，不是演讲者对本仓库的评价。它们分别帮助理解分支设计、检查实现、Agent 协作与权限；不能从一个公开仓库的 YAML 推断其私有保护规则。
+
+### 15.1 先理解分支为什么存在，再选择工作流
+
+| 原始资料 | 推荐理由与阅读入口 | 带回本仓库的问题 |
+| --- | --- | --- |
+| Martin Fowler，2020：[Patterns for Managing Source Code Branches](https://martinfowler.com/articles/branching-patterns.html) | 优先读 Mainline、Healthy Branch、Integration Frequency、Pre-Integration Review，再比较 Git-flow、GitHub Flow 与 Trunk-Based Development。文章把多人集成和走向发布分成不同问题 | main 的职责是稳定集成还是某个已发布版本？短期 issue 分支怎样尽早集成？为何文本无冲突仍可能有语义冲突？ |
+| GitHub 官方：[GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow) | 从创建分支、提交、PR 审查到合并和删除分支的最小流程，适合作为个人或小团队的操作起点 | 一项工作怎样对应 Issue、分支和 PR？合并后远端删分支与本地 worktree 清理为何需要分别确认？后一个问题需要结合本仓库 Skill，官方流程不替我们保管本地证据 |
+| Will Smythe、Lawrence Gripper，2024：[How GitHub uses merge queue to ship hundreds of changes every day](https://github.blog/engineering/engineering-principles/how-github-uses-merge-queue-to-ship-hundreds-of-changes-every-day/) | 进阶材料。看手动合并列车的等待与冲突如何推动分组验证和队列自动化，而不只看吞吐数字 | 多个 PR 单独为绿，组合后为什么仍需验证？我们何时真的有足够的并发集成压力，需要承担队列配置与构建成本？ |
+
+对 oh-my-quant，目前更合适的是短期 issue 分支、可审查 PR、最新 main 上的必需检查和明确的合并后清理。这个判断来自当前维护规模与已有故障，不是上述作者为本项目规定的唯一流程。merge queue 是未来选项，采用前还要确认仓库资格与 `merge_group` 触发覆盖；本文没有启用它。
+
+### 15.2 五个值得打开源码学习的项目
+
+| 学习项目与固定入口 | 重点观察的机制 | 可做的小练习与边界 |
+| --- | --- | --- |
+| **OpenAI Codex**：[Workflow Strategy](https://github.com/openai/codex/blob/4eb4a65407d98cebc4c83bf13be440b9fbc78a7c/.github/workflows/README.md) → [blocking-ci.yml](https://github.com/openai/codex/blob/4eb4a65407d98cebc4c83bf13be440b9fbc78a7c/.github/workflows/blocking-ci.yml) | 合并候选、合并前与合并后检查分工、可复用 workflow、单一聚合入口 | 手画 `needs` 依赖图，核对聚合结果实际覆盖哪些检查。借鉴组织方式，不照搬 Rust/Bazel 矩阵或后置测试的风险取舍 |
+| **DeepSeek Harness（DSH）**：[dsh-ci-test-reliability](https://github.com/deepseek-ai/deepseek-harness/blob/1517a4dbca0a2789ff1d41ba439600f8547d23fa/.agents/skills/dsh-ci-test-reliability/SKILL.md) → [CI](https://github.com/deepseek-ai/deepseek-harness/blob/1517a4dbca0a2789ff1d41ba439600f8547d23fa/.github/workflows/ci.yml) | 把端口、临时目录、全局环境、子进程退出等可靠性经验写成可操作 Skill | 选一个失败 fixture，标出资源的创建、使用、取消、等待退出和清理。不要把更大 timeout 当成完整修复；聚合覆盖边界见第 10 节 |
+| **ZCode**：[architecture-policy.yaml](https://github.com/zai-org/ZCode/blob/aac4755666d09fdcd70272fcf063c077a639015f/architecture-policy.yaml) → [architecture-governance Skill](https://github.com/zai-org/ZCode/blob/aac4755666d09fdcd70272fcf063c077a639015f/.agents/skills/architecture-governance/SKILL.md) | 模块边界、managed/legacy 范围、公共入口和架构治理程序 | 为未来 Desktop/apps 迁移写一条具体依赖规则，说明旧问题基线和新增违规怎么区分。这是架构治理学习项目，本文没有证据把它称为 GitHub Actions 范本 |
+| **rhysd/actionlint**：[README 与错误示例](https://github.com/rhysd/actionlint/blob/011a6d15e749bb3f2d771eed9c7aa0e7e3e10ee7/README.md) | workflow 语法、表达式、matrix 属性、action 输入以及部分不可信输入用法的静态检查 | 在临时 YAML 副本中写错一个 matrix 属性，观察诊断。它可作为 CI 的静态预检候选，但不能证明权限已配置、安装器可运行或异步清理正确；本次只推荐学习，尚未接入 |
+| **Anthropic Claude Code Action**：[README](https://github.com/anthropics/claude-code-action/blob/f27be6b65a4652f08a2ba3cff79114829b588967/README.md) → [Security](https://github.com/anthropics/claude-code-action/blob/f27be6b65a4652f08a2ba3cff79114829b588967/docs/security.md) | 把代码 Agent 接入 Issue/PR 事件时的触发身份、token 范围、bot 例外与提交签名 | 为“让 Agent 审查 PR”画出事件 → 调用者 → checkout → token → 写操作的链。重点比较它与本仓库只读 policy 的职责；不要直接把带写权限的 Agent 放进读取不可信 PR 内容的流程 |
+
+阅读顺序建议是 Codex → DSH → actionlint；正在讨论 Desktop 架构时再读 ZCode；确定需要 GitHub 内运行代码 Agent 时再读 Claude Code Action。前面三个能直接帮助理解本次 CI 故障，后两个处理不同的扩展需求。
+
+### 15.3 四场演讲：从交付原则到可复用的 Agent 经验
+
+视频的标题、讲者和推荐入口已按原发布页或主办方页面核对；推荐依据为这些页面的摘要及可读转录，没有把未逐帧观看的视频包装成完整观看笔记。InfoQ 标注的日期按发布页记载，不能一概当作现场录制日期。
+
+| 演讲、讲者与原始入口 | 为什么推荐 | 观看时要回答的问题 |
+| --- | --- | --- |
+| **The Process, Technology & Practice of Continuous Delivery** — Dave Farley，InfoQ / QCon，页面日期 2014-05-21，54:04。[演讲页](https://www.infoq.com/presentations/technology-practice-continuous-delivery/) | 用真实项目讨论持续交付的日常过程、技术与实践。适合先建立“持续保持可交付状态”的整体认识，再看具体 YAML | 我们的反馈链在哪里才发现错误？哪一项发布步骤仍依赖人工记忆？CI 报告成功与可交付之间还有什么距离？ |
+| **It's Not Continuous Delivery if You Can't Deploy Right Now** — Ken Mugrage，Agile India 2018，InfoQ 页面日期 2018-07-20，46:16。[演讲页](https://www.infoq.com/presentations/cd-deployment-pipelines/) | 将讨论推进到代码管理、部署模式与交付流水线。它特别适合对照“build 成功、安装成功、发布成功”三个不同声明 | 若现在必须交付，哪个尚未验证的环节会阻止我们？为什么 npm dry-run 或生成 exe 还不能证明用户收到的版本可用？ |
+| **How We Build Effective Agents** — Barry Zhang（Anthropic），AI Engineer Summit 2025。[原视频](https://www.youtube.com/watch?v=D7_ipDqhtwk) · [主办方页面与转录](https://ai.engineer/talks/D7_ipDqhtwk-effective-ai-agents) | 讨论何时值得使用 Agent、保持设计简单，以及从 Agent 所见的信息理解行为。建议和确定性 CI 脚本一起看 | 文档路径校验、读取 check 状态等确定步骤，是否真的需要模型决定？哪些需要判断的工作适合交给 Agent？ |
+| **Don't Build Agents, Build Skills Instead** — Barry Zhang、Mahesh Murag（Anthropic），AI Engineer Code 2025，16:22。[原视频](https://www.youtube.com/watch?v=CEvIs9y1uog) · [主办方页面与转录](https://ai.engineer/talks/CEvIs9y1uog-agent-skills) | 讨论如何用指令、脚本和资源组织可复用的领域经验。主办方章节中 2:18 介绍 Skill 目录，7:12 讨论把复杂 Skills 当作软件维护 | 一次 CI 故障应沉淀成可执行脚本、Skill 诊断步骤，还是 AGENTS 中的原则？这个经验如何版本化、测试和退出？ |
+
+### 15.4 两篇配套阅读，以及怎样把资料变成练习
+
+Anthropic 的 [Effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents) 讨论初始化与后续增量工作如何衔接，如何借助进度记录、Git 和验证减少跨会话失忆。适合对照我们保留 Issue、PR、最终 SHA 和运行编号的做法：持久文件提供线索，但新的 Agent 仍需要主动读取和核对状态，不能把“写过记录”当成“下一轮一定已恢复”。
+
+[Equipping agents for the real world with Agent Skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills) 则补充 Skills 的目录组织和按需加载机制。适合配合上一场演讲阅读，理解为何操作步骤与脚本可以一起维护。本文进一步主张把判断依据、失败反例和验证边界写清；这是本项目的实践归纳，不是读取一个 SKILL.md 就自动获得的能力。
+
+如果只安排一次学习，我建议完成三个小产物：先用 Fowler 的分支模式画出本仓库的 Issue → 分支 → PR → main → 发布关系；再参照 Codex 和 DSH，标出每个阶段实际执行的检查与资源清理责任；最后选一个历史失败，说明应该改测试、workflow、平台规则还是 Skill，并写出证明修复有效的反例。四场演讲用于检验这些选择的理由，不必全部看完才开始改善仓库。

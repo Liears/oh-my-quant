@@ -43,6 +43,10 @@ Enable **Require branches to be up to date before merging**, conversation resolu
 
 The 2026-10-17 audit found main unprotected. At 2026-10-18 00:45 Asia/Shanghai, a follow-up API audit confirmed classic protection was enabled, administrators were included, conversations had to be resolved, and force pushes/deletion were disabled. However, `required_status_checks.contexts` and `checks` were empty, and `strict` was false. One approving review and signed commits were required. PR #41 reported `REVIEW_REQUIRED` with no reviews; its then-head `ae684b1` was unsigned. This is a dated snapshot, not a claim that the incomplete settings remain current. The [blog](../blog/agentic/vibe-repo-ops.md) explains the distinction between configured protection and enforced CI.
 
+At 01:03 the maintainer's saved configuration was confirmed: `CI required` and `PR policy`, both sourced from GitHub Actions (app ID 15368), with `strict=true`. `Desktop required` was not yet required; approval and signature requirements remained enabled. See the blog's [learning references](../blog/agentic/vibe-repo-ops.md#15-references分支设计与-agent-repo-ops-的学习路径) for branch-design material, five source projects, and four talks; recommendations there are not newly installed repository automation.
+
+The maintainer subsequently chose zero mandatory approving reviews and no mandatory commit signatures for the current solo/agent workflow, while retaining required CI checks, strict base synchronization, and administrator enforcement. This is the chosen configuration, not proof that every setting has been saved; read back live values before evaluating merge readiness. Agents can sign commits once signing is configured, and CI/review remain distinct from signature verification.
+
 Read-only verification commands (requires repository access):
 
 ```sh
