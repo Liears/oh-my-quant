@@ -28,6 +28,7 @@ For substantial work, briefly communicate **Assumption**, **Changed**, **Verifie
 - Update the relevant current `docs/` pages. README, CHANGELOG, and PR descriptions do not replace module documentation.
 - Provide actual screenshots for visible UI changes, with environment and reproduction details. Use recordings for interactions; label mockups separately.
 - Tie verification evidence to acceptance criteria and the final revision. Distinguish proposed, implemented, verified, and unverified behavior.
+- Final review includes checks triggered by the final PR description, not only the final code SHA. Keep lifecycle-specific verification steps in `pr-skill`.
 - For major changes, consider a focused `docs/blog/` article explaining alternatives, decisions, evidence, and limits.
 
 ### Writing Style

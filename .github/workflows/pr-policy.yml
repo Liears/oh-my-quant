@@ -19,14 +19,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      # Run only trusted base-branch policy. Never check out or execute PR code here.
+      # Match the trusted workflow revision; a stale PR base may predate this script.
+      # Never check out or execute PR code in pull_request_target.
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/github-script@v8
         with:
           script: |
             const { checkPullRequest } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/pr-policy.mjs`);
+            core.info(`Trusted policy revision: ${context.sha}; event PR head: ${context.payload.pull_request.head.sha}`);
             const issue = await checkPullRequest({ github, ...context.repo, number: context.issue.number });
-            core.info(`Validated issue #${issue}; scope and evidence still require human review.`);
+            core.info(issue === null ? 'PR is already closed or merged; policy is no longer applicable.'
+              : `Validated issue #${issue}; scope and evidence still require human review.`);

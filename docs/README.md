@@ -12,7 +12,7 @@
 | 当前范围、缺口与实施顺序 | [GOALS](./quant-harness/GOALS.md) → [PRD](./quant-harness/PRD.md) → [Roadmap](./quant-harness/roadmap.md) |
 | 配置、数据源与工具为何不同步 | [配置](./quant-harness/configuration.md) → [数据源](./quant-harness/source-data-providers.md) → [UI/UX](./quant-harness/quant-uiux.md) |
 | 怎样验证，哪些结论尚未得到证明 | [评测指南](./quant-harness/evaluation.md) · [测试与反例](./blog/05-evaluation-beyond-green.md) |
-| 仓库质量管理、PR 评审与 npm 发布 | [维护规范](./quant-harness/ci-release.md) · [Agent Repo 基础建设与 Review 实践](./blog/agent-repo-infrastructure.md) |
+| 仓库质量管理、PR 评审与 npm 发布 | [维护规范](./quant-harness/ci-release.md) · [Agentic / Vibe Repo Ops](./blog/agentic/vibe-repo-ops.md) |
 | 产品、架构与 UI/UX 的选择理由 | [技术博客](./blog/README.md) · [离线版](./blog/index.html) |
 
 当前工作区不等于发布版。产品完成度由 PRD 维护；代码和测试链接定位可重复检查，不把旧验证记成本轮成绩。这里的“归档整理”是把现行文档归入责任目录，不恢复 archive、旧稿汇编或重定向页面。
@@ -44,7 +44,7 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 | `agent-runtime/` | 通用运行时与扩展契约 |
 | `quant-harness/` | 完整量化应用的设计、产品、使用与仓库维护文档 |
 | `blog/` | 系列正文、工程补篇、目录与编辑说明、配图、构建/检查脚本、私有证据路径规则和离线 HTML |
-| `assets/` | 共用产品与设计素材、实际博客阅读视图及社区工具命令渲染证据 |
+| `assets/` | 共用产品与设计素材、实际博客阅读视图、社区工具命令渲染证据及历史 CI 失败截图 |
 | 顶层 | 本页和讲解演示 |
 
 <a id="agent-design"></a>
@@ -175,6 +175,9 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 | [assets/blog-product-plan-narrow-20261015.png](./assets/blog-product-plan-narrow-20261015.png) | 同一博客的 390×844 阅读视图 | 同上；正文不溢出，机制图沿用带提示、可键盘横滚的容器 |
 | [assets/community-tools-60x20.png](./assets/community-tools-60x20.png) | Skills/MCP 选择与移除的窄终端连续帧 | 当前命令与 QuantTui 字符缓冲区的浏览器截图；隔离合成输入，不证明原生终端或外部服务可用 |
 | [assets/community-tools-120x32.png](./assets/community-tools-120x32.png) | 同一命令流程的宽终端连续帧 | 同上；复现步骤见 Skills 与 MCP 指南 |
+
+| [assets/ci-panel-transition-failure.png](./assets/ci-panel-transition-failure.png) | Desktop 面板切换的历史失败截图 | Actions 38156420320 原始 artifact；不是当前产品验收 |
+| [assets/ci-multiline-paste-failure.png](./assets/ci-multiline-paste-failure.png) | Desktop 多行粘贴的历史失败截图 | Actions 38234986954 原始 artifact；不是当前产品验收 |
 
 ### 博客机制图（12）
 
