@@ -82,6 +82,8 @@ Article link and the design question it explains; omit when unused.
 
 ## Review and Completion
 
+Use [review-skill](../review-skill/SKILL.md) for findings, integration checks, and feedback convergence; this skill remains the source for delivery and cleanup requirements.
+
 - Close only the primary issue; link dependencies without closing them. Add the PR link to the issue.
 - Use `gh` to verify applicable workflows against the final head SHA. Trigger available non-publishing checks within existing authorization when needed.
 - Inspect failed job logs and fix confirmed causes; repeated reruns are not a substitute. Require all applicable checks and mandatory manual acceptance before declaring merge readiness.

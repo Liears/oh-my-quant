@@ -36,7 +36,8 @@ For substantial work, briefly communicate **Assumption**, **Changed**, **Verifie
 | --- | --- | --- |
 | `issue-skill` | [SKILL.md](.agents/skills/issue-skill/SKILL.md) | Defining issues, scope, and acceptance criteria. |
 | `pr-skill` | [SKILL.md](.agents/skills/pr-skill/SKILL.md) | Implementing issues and preparing or reviewing PRs. |
+| `review-skill` | [SKILL.md](.agents/skills/review-skill/SKILL.md) | Reviewing correctness, simplicity, integration conflicts, and evidence with convergent feedback. |
 
-Read applicable skills first; use both for issue-to-PR work. Reuse an existing compliant issue. Drafting and review requests do not authorize publication or implementation.
+Read applicable skills first; use issue-skill and pr-skill for issue-to-PR work, and review-skill for review. Reuse an existing compliant issue. Drafting and review requests do not authorize publication or implementation.
 
 Maintain finalized procedures in `.agents/skills/<name>/SKILL.md` and their index here. Avoid duplicated rules and active draft skills. Current automation and setup requirements live in [CI and npm Releases](docs/quant-harness/ci-release.md); these instructions alone do not enforce GitHub merge rules.

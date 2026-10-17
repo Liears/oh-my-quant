@@ -18,6 +18,10 @@ Run policy and documentation-link regression cases with `bun run check:quality`.
 
 ## Continuous Integration
 
+PR review uses [review-skill](../../.agents/skills/review-skill/SKILL.md) to distinguish code defects, merge conflicts, and final-revision verification. Record the remote base and head SHAs, inspect interacting changes, and separate confirmed findings from optional suggestions. An old green check or a clean textual merge does not establish readiness of the latest integrated revision. This is a contributor procedure, not an additional configured GitHub rule. The [review article](../blog/review-for-shared-understanding.md) explains the observed cases and tradeoffs.
+
+For each applicable check, record its workflow/job, trigger event, PR head/base and actual tested revision, environment, status, and run link. Keep failed, pending, cancelled, skipped, and absent checks distinct from success. Inspect triggers and logs before classifying a failure as a product regression, a baseline failure, an infrastructure problem, or unresolved. Preserve the first failure when rerunning and explain what the rerun establishes; a timeout alone does not establish flakiness.
+
 [CI](../../.github/workflows/ci.yml) runs on pull requests, pushes to `main`, manual dispatch, and calls from the release workflow. Both Windows and Linux use Bun 1.3.14 and Node 24:
 
 ```sh
@@ -28,6 +32,8 @@ bun run check:release
 The release gate covers types, architecture, quality-policy regressions, test organization, all automated tests, the CLI build, and documentation build/checks. CI then packs the npm artifact, installs it outside the checkout, and checks its version using Node. Install scripts are disabled for this smoke test. It proves package startup, not live providers, interactive behavior, or every supported Node version. Missing ignored `output/` receipts are reported as unavailable historical evidence; source, current docs, navigation, and anchors remain strict.
 
 The existing Desktop workflow remains responsible for installers. After these workflows reach the default branch, configure `CI required` and `PR policy` as required checks in GitHub branch protection. The CI aggregate fails unless every platform succeeds. Workflow files alone do not enable branch protection. Add Desktop checks separately where installer validation is required.
+
+Desktop currently runs on qualifying pushes to `main` or manual dispatch, not on `pull_request`; inspect its path filters and inputs before treating an absent PR check as coverage. A successful PR CI run does not establish post-merge Desktop success. After an authorized merge, inspect the applicable runs on the merge revision and report any failures separately. For stacked PRs, record the remaining dependency and verify against the updated base before the next merge; retain a parent branch/worktree while an open child still depends on it, following [PR cleanup](../../.agents/skills/pr-skill/SKILL.md#post-merge-cleanup).
 
 ## npm Setup
 
