@@ -26,6 +26,13 @@ Prefer one dedicated branch and worktree per implementation issue. Start from th
 
 Keep implementation changes out of the primary checkout and preserve its existing work. When an authorized PR merge delivers the issue to `main`, finish by deleting the delivered remote branch, local branch, and completed worktree using the checks in [pr-skill](../pr-skill/SKILL.md#post-merge-cleanup). Do not ask again for routine cleanup already covered by that task. An issue assignment alone does not authorize merging or cleanup, and merge authorization does not permit discarding local data. Preserve private state and verification receipts before removal; keep worktrees with unfinished work.
 
+## Description
+
+- Follow [shared writing conventions](../../../AGENTS.md#writing-style) for language, length, and formatting.
+- Open with the affected scenario, observed behavior, impact, and intended outcome. Distinguish a reported symptom, a suspected cause, and a confirmed cause; support each claim at its actual certainty.
+- Describe a proposed solution separately from the problem, with its mechanism, scope, and relevant tradeoff. Keep acceptance criteria observable; replace vague goals such as "improve stability" with the behavior that must change.
+- Maintain one current description as scope evolves. Update affected sections instead of appending contradictory conclusions; keep earlier evidence tied to its revision.
+
 ## Issue Template
 
 Title: `[type][module] Observable problem or capability`

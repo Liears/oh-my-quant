@@ -30,13 +30,21 @@ For substantial work, briefly communicate **Assumption**, **Changed**, **Verifie
 - Tie verification evidence to acceptance criteria and the final revision. Distinguish proposed, implemented, verified, and unverified behavior.
 - For major changes, consider a focused `docs/blog/` article explaining alternatives, decisions, evidence, and limits.
 
+### Writing Style
+
+- Prefer English for Issue/PR titles and descriptions; use another language when the task or audience calls for it. Preserve code identifiers, commands, and quoted errors in their original form. Existing documents keep their established language.
+- Aim for no more than 1,000 words per Issue or PR description, counted as English words. This is guidance, not a target, hard limit, or CI gate. Keep necessary evidence and link longer logs or background; do not omit essential reasoning to meet the recommendation.
+- Lead with the concrete problem or outcome, then explain the mechanism, reason, and evidence. Use short paragraphs with one main point, precise terms, and observable behavior. Avoid unsupported claims, repeated summaries, and a chronological work diary.
+- Use the existing templates and meaningful headings. Remove placeholder instructions, explain inapplicable sections briefly, and avoid deep nesting or decorative formatting. Use tables for comparisons, code fences for commands or short logs, and descriptive links for supporting evidence.
+
 ### Skill Index
 
 | Skill | Instructions | Use when |
 | --- | --- | --- |
 | `issue-skill` | [SKILL.md](.agents/skills/issue-skill/SKILL.md) | Defining issues, scope, and acceptance criteria. |
 | `pr-skill` | [SKILL.md](.agents/skills/pr-skill/SKILL.md) | Implementing issues and preparing or reviewing PRs. |
+| `review-skill` | [SKILL.md](.agents/skills/review-skill/SKILL.md) | Reviewing correctness, simplicity, integration conflicts, and evidence with convergent feedback. |
 
-Read applicable skills first; use both for issue-to-PR work. Reuse an existing compliant issue. Drafting and review requests do not authorize publication or implementation.
+Read applicable skills first; use issue-skill and pr-skill for issue-to-PR work, and review-skill for review. Reuse an existing compliant issue. Drafting and review requests do not authorize publication or implementation.
 
 Maintain finalized procedures in `.agents/skills/<name>/SKILL.md` and their index here. Avoid duplicated rules and active draft skills. Current automation and setup requirements live in [CI and npm Releases](docs/quant-harness/ci-release.md); these instructions alone do not enforce GitHub merge rules.

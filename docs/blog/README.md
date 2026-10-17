@@ -10,7 +10,7 @@
 
 ## 系列文章
 
-工程实践补篇：[Agent Repo 的基础建设：从工作约定到可核验的交付](./agent-repo-infrastructure.md)。这篇独立 Markdown 说明 Issue、PR、CI、npm 发布与 Agent 指南的分工，不加入下方十二篇离线合集。
+工程实践补篇：[Agent Repo 的基础建设：从工作约定到可核验的交付](./agent-repo-infrastructure.md)。统一说明 AGENTS、Skills、Issue、PR 评审、CI、合并与 npm 发布的分工；结合冲突、验证漂移和元数据反例讨论简洁与协作，配套仓库 review-skill。这篇独立 Markdown 不加入下方十二篇离线合集。
 
 | 篇章 | 核心问题 | 主要取舍 |
 |---|---|---|
