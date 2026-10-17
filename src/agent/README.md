@@ -17,7 +17,7 @@ WhyJ uses the pinned pi-agent-core / pi-ai runtime through `src/kernel/`; exact 
 | `session-runtime/` | WhyJ JSONL v3 tree, compaction, navigation, queues and execution helpers |
 | `dispatch.ts` | prompt / steer / followUp routing |
 | `context.ts` | System prompt and per-turn context injection |
-| `skills.ts` | Project and optional external skill discovery |
+| `skills.ts` | Thin adapter over Pi Coding Agent skill loading; project paths, provenance and session snapshots |
 
 Application code should use `createAgent()` and the `QuantAgentSession` interface. Update recent research context through that instance's `updateContext()` method. There is no shared session-memory singleton.
 
@@ -38,3 +38,5 @@ bun run build
 ```
 
 Tests use isolated temporary directories or an independent in-memory repo, with model requests intercepted before transmission or served by local HTTP/SSE fixtures. Real provider authentication is a separate opt-in smoke check (`bun run test:providers`).
+
+Skills reuse the pinned `@earendil-works/pi-coding-agent` loading and prompt-formatting helpers. The [Pi adapter](src/pi-skills.ts) imports their shipped modules to avoid pulling the entire application SDK into standalone bundles; these internal paths must be checked when upgrading the exact package version. Bun and Node split-bundle tests exercise discovery and formatting without an installed SDK at runtime. JQ supplies selectable `/skill install NAME` presets, `/skill remove NAME`, and `/skill reload`; startup does not download repositories. The adjacent `pi-mcp.ts` adapter reuses Pi configuration add/remove APIs for the `/mcp` preset entry; it does not start transports. Per-skill readiness probes and report audits were removed. The existing session keeps a small explicit-invocation wrapper because Pi does not export its private command expander.

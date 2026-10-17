@@ -1,164 +1,52 @@
-import type { CommandHandler, CommandSkill } from "../../types/commands.ts";
-import { installSkills, curatedSkillInfo } from "../../runtime/skills/skill-store.ts";
+import type { CommandHandler } from "../../types/commands.ts";
+import { installSkills, installSelectedSkills, managedSkillCatalog, removeSelectedSkills } from "../../runtime/skills/skill-store.ts";
+import { CURATED_SKILL_REPOSITORIES } from "../../skill/index.ts";
 import { discoverRuntimeSkills } from "../../runtime/skills/skill-discovery.ts";
-import { checkSkillPython, checkSkillNetwork, checkEtfNetwork } from "../../runtime/skills/skill-probes.ts";
-import { SKILL_PYTHON_PACKAGES, BREADTH_NETWORK_REQUIREMENT, ETF_NETWORK_REQUIREMENT, checkSkillFiles } from "../../skill/index.ts";
-import { auditMacroCommand } from "./skill-macro-audit.ts";
-import { auditPositionCommand } from "./skill-position-audit.ts";
+import { invalidateSkillDiscovery } from "../../agent/src/skills.ts";
 import { readChartImage } from "../../runtime/models/chart-image-input.ts";
-
-function sourceLabel(skill: CommandSkill): string {
-  return `${skill.scope}/${skill.source}`;
-}
-
-async function loadSkillsFromContext(ctx: Parameters<CommandHandler>[2]): Promise<CommandSkill[]> {
-  if (ctx.agentSession) return await ctx.agentSession.getSkills();
-  return discoverRuntimeSkills();
-}
-
-const SUBCOMMANDS = new Set(["list", "info", "run", "trigger", "install", "audit"]);
 
 export const skillHandler: CommandHandler = async (flags, positional, ctx) => {
   const action = positional[0] || "list";
-
-  if (action === "audit") return positional[1] === "position-sizer"
-    ? auditPositionCommand(flags, ctx.commandSignal) : auditMacroCommand(flags, ctx.commandSignal);
-
+  ctx.commandSignal?.throwIfAborted();
+  if (action === "catalog" || action === "install" && positional.length === 1 && !flags.repo && !flags.all) {
+    const catalog = managedSkillCatalog();
+    return { success: true, data: catalog, message: ["Choose skills to install (nothing is downloaded by this listing):",
+      ...catalog.map(skill => `${skill.name} [${skill.selected ? "selected" : skill.downloaded ? "cached" : "available"}]: ${skill.repo}`),
+      "Use /skill install NAME [NAME ...], /skill install --all, or /skill remove NAME [NAME ...].",
+    ].join("\n") };
+  }
   if (action === "install") {
-    const repo = positional[1] || String(flags.repo || "");
-    if (!repo) {
-      return {
-        success: false,
-        message: [
-          "Use /skill install <owner/repo>",
-          "",
-          "Examples",
-          "  /skill install LLMQuant/skills",
-          "  /skill install tradermonty/claude-trading-skills",
-        ].join("\n"),
-      };
-    }
-    return installSkills(repo, ctx.commandSignal);
+    const repo = flags.repo || (positional[1]?.includes("/") ? positional[1] : undefined);
+    if (repo) return installSkills(String(repo), ctx.commandSignal);
+    const names = flags.all ? CURATED_SKILL_REPOSITORIES.flatMap(repo => repo.skills.map(skill => skill.name)) : positional.slice(1);
+    return installSelectedSkills(names, { signal: ctx.commandSignal });
   }
-
-  let skills = await loadSkillsFromContext(ctx);
-
-  if (action === "info") {
-    const name = positional[1] || String(flags.name || flags.skill || "");
-    if (!name) return { success: false, message: "Choose a skill with /skill info <name>." };
-    let skill = skills.find((entry) => entry.name === name);
-    if (!skill) return { success: false, message: `Unknown skill "${name}". Run /skill to list available skills.` };
-    const curated = curatedSkillInfo(skill.filePath);
-    const networkRequirement = curated?.modes.flatMap(mode => mode.requires)
-      .find(requirement => requirement === BREADTH_NETWORK_REQUIREMENT || requirement === ETF_NETWORK_REQUIREMENT);
-    if (flags["check-network"] !== undefined && (flags["check-network"] !== true || !networkRequirement)) {
-      return { success: false, message: "--check-network supports only curated market-breadth-analyzer or macro-regime-detector inputs and takes no value." };
-    }
-    const needsPython = curated?.modes.some(mode => mode.requires.some(requirement => requirement.startsWith("python"))) ?? false;
-    const importPackages = SKILL_PYTHON_PACKAGES.filter(name => curated?.modes.some(mode => mode.requires
-      .some(requirement => new RegExp(`^python:${name}(?:[>=]|$)`, "u").test(requirement))));
-    if (flags["check-imports"] !== undefined && (flags["check-imports"] !== true || !importPackages.length))
-      return { success: false, message: "--check-imports takes no value and supports curated skills with declared Python packages." };
-    if ((flags.check || flags["check-imports"]) && curated && (needsPython || curated.reviewedFiles)) {
-      if (needsPython) await checkSkillPython(process.cwd(), ctx.commandSignal, flags["check-imports"] ? importPackages : []);
-      if (curated.reviewedFiles) checkSkillFiles(process.cwd(), skill.filePath, curated.reviewedFiles, ctx.commandSignal);
-      skills = await loadSkillsFromContext(ctx);
-      skill = skills.find(entry => entry.name === name);
-      if (!skill) return { success: false, message: `Skill ${name} is no longer discovered.` };
-    }
-    if (flags["check-network"]) {
-      if (networkRequirement === ETF_NETWORK_REQUIREMENT) await checkEtfNetwork(process.cwd(), ctx.commandSignal);
-      else await checkSkillNetwork(process.cwd(), ctx.commandSignal);
-      skills = await loadSkillsFromContext(ctx);
-      skill = skills.find(entry => entry.name === name);
-      if (!skill) return { success: false, message: `Skill ${name} is no longer discovered.` };
-    }
-    return {
-      success: true,
-      message: [
-        skill.name,
-        `Source      ${sourceLabel(skill)}`,
-        `Visible     ${skill.readiness?.status === "blocked" || skill.readiness?.status === "unverified" ? "discovery only; invocation unavailable" : skill.disableModelInvocation ? "explicit only" : "model + explicit"}`,
-        `Location    ${skill.filePath}`,
-        `Summary     ${skill.description}`,
-        ...(skill.readiness ? [
-          `Readiness   ${skill.readiness.status}${skill.readiness.checkedAt ? ` · local check ${skill.readiness.checkedAt}` : ""}`,
-          ...skill.readiness.modes.flatMap(mode => [`  ${mode.name}: ${mode.status}`, ...mode.requirements.map(item => `    ${item.requirement}: ${item.status} — ${item.reason}`)]),
-          "Check declared local dependencies with /skill info <name> --check. Local metadata and file matches do not verify network access or workflow results.",
-          ...(importPackages.length ? ["Use --check-imports to load the declared installed packages in the selected Python; metadata alone does not satisfy package readiness."] : []),
-          ...(curated?.reviewedFiles ? ["--check also compares the installed entry and reviewed local files; recheck after edits or upgrades."] : []),
-          ...(networkRequirement === BREADTH_NETWORK_REQUIREMENT ? ["Use --check-network to check the fixed public CSV inputs; results expire after five minutes."] : []),
-          ...(networkRequirement === ETF_NETWORK_REQUIREMENT ? ["Use --check-network to check the nine public ETF histories; results expire after five minutes."] : []),
-          ...(skill.name === "macro-regime-detector" ? ["Audit one report with /skill audit macro-regime-detector --json REPORT.json --markdown REPORT.md; a pinned verification bundle uses --record PATH."] : []),
-          ...(skill.name === "position-sizer" ? ["Audit a selected private report locally with /skill audit position-sizer --json REPORT.json --markdown REPORT.md; values and paths are omitted from the receipt."] : []),
-        ] : []),
-        ...(curated ? [
-          `Catalog pin ${curated.expectedRevision} (installed revision not checked here)`,
-          "Requirements by mode (declared, not verified)",
-          ...curated.modes.map(mode => `  ${mode.name}: ${mode.requires.join(", ")}${mode.optional.length ? `; optional: ${mode.optional.join(", ")}` : ""}`),
-          `Limits      ${curated.limitations}`,
-        ] : []),
-      ].join("\n"),
-      data: curated ? { ...skill, curated } : skill,
-    };
+  if (action === "remove") return removeSelectedSkills(positional.slice(1));
+  if (action === "reload") invalidateSkillDiscovery();
+  const skills = ctx.agentSession ? await ctx.agentSession.getSkills() : await discoverRuntimeSkills();
+  if (action === "list" || action === "reload") {
+    const filter = String(flags.scope || flags.source || "");
+    const filtered = skills.filter(skill => !filter || `${skill.scope}/${skill.source}`.includes(filter));
+    return { success: true, data: filtered, message: [
+      filtered.length ? `Skills (${filtered.length})` : "No skills found. Use /skill install to choose presets.",
+      ...filtered.map(skill => `${skill.name.padEnd(24)} ${skill.scope}/${skill.source}  ${skill.description}`),
+      "Use /skill catalog, /skill install NAME, /skill remove NAME, /skill info NAME, /skill:NAME, or /skill reload.",
+    ].join("\n") };
   }
-
-  if (action === "run" || action === "trigger") {
-    const name = positional[1] || String(flags.name || flags.skill || "");
-    if (!name) return { success: false, message: "Choose a skill with /skill:<name> or /skill run <name> [instructions]." };
-    const extra = positional.slice(2).join(" ").trim() || undefined;
-    if (!ctx.agentSession) return { success: false, message: "Running a skill needs an active agent session. Send any AI message first, then try again." };
-    if (flags.image !== undefined && !skills.some(skill => skill.name === name)) return { success: false, message: `Unknown skill "${name}". Run /skill to list available skills.` };
-    const images = flags.image !== undefined ? [await readChartImage(String(flags.image), ctx.commandSignal)] : undefined;
-    await ctx.agentSession.skill(name, extra, { images, signal: ctx.commandSignal });
-    ctx.commandSignal?.throwIfAborted();
-    return {
-      success: true,
-      message: `Running ${name}${extra ? " with extra instructions." : "."}`,
-    };
-  }
-
-  // Direct invocation: /skill:name [extra instructions]
-  if (!SUBCOMMANDS.has(action)) {
-    const name = action;
-    const skill = skills.find((entry) => entry.name === name);
-    if (!skill) return { success: false, message: `Unknown skill "${name}". Run /skill to list available skills.` };
-    const extra = positional.slice(1).join(" ").trim() || undefined;
-    if (!ctx.agentSession) return { success: false, message: "Running a skill needs an active agent session. Send any AI message first, then try again." };
-    const images = flags.image !== undefined ? [await readChartImage(String(flags.image), ctx.commandSignal)] : undefined;
-    await ctx.agentSession.skill(name, extra, { images, signal: ctx.commandSignal });
-    ctx.commandSignal?.throwIfAborted();
-    return {
-      success: true,
-      message: `Running ${name}${extra ? " with extra instructions." : "."}`,
-    };
-  }
-
-  const filter = String(flags.scope || flags.source || "");
-  const filtered = filter
-    ? skills.filter((skill) => sourceLabel(skill).includes(filter) || skill.source === filter || skill.scope === filter)
-    : skills;
-  if (filtered.length === 0) {
-    return {
-      success: true,
-      message: [
-        "No skills found.",
-        "",
-        "Install skills:",
-        "  /skill install LLMQuant/skills",
-        "  /skill install tradermonty/claude-trading-skills",
-      ].join("\n"),
-    };
-  }
-
-  const lines = [
-    `Skills (${filtered.length})`,
-    ...filtered.map((skill) => `${skill.name.padEnd(24)} ${sourceLabel(skill).padEnd(12)} ${skill.readiness ? `[${skill.readiness.status}] ` : ""}${skill.description}`),
-    "",
-    "Use /skill info <name> for details",
-    "Use /skill:<name> to invoke one",
-    "Use /skill audit to check a macro or position-sizing report without running its skill",
-    "Use /skill install <owner/repo> to install more",
-  ];
-  return { success: true, message: lines.join("\n"), data: filtered };
+  const explicit = ["info", "run", "trigger"].includes(action);
+  const name = explicit ? positional[1] || String(flags.name || flags.skill || "") : action;
+  if (!name) return { success: false, message: "Choose a skill with /skill info NAME or /skill run NAME." };
+  const skill = skills.find(entry => entry.name === name);
+  if (!skill) return { success: false, message: `Unknown skill "${name}". Run /skill to list available skills.` };
+  if (action === "info") return { success: true, data: skill, message: [skill.name,
+    `Source      ${skill.scope}/${skill.source}`, `Location    ${skill.filePath}`,
+    `Visible     ${skill.disableModelInvocation ? "explicit only" : "model + explicit"}`,
+    `Summary     ${skill.description}`, "Follow the upstream SKILL.md for inputs, credentials and dependencies.",
+  ].join("\n") };
+  if (!ctx.agentSession) return { success: false, message: "Running a skill needs an active agent session. Send any AI message first, then try again." };
+  const extra = positional.slice(explicit ? 2 : 1).join(" ").trim() || undefined;
+  const images = flags.image !== undefined ? [await readChartImage(String(flags.image), ctx.commandSignal)] : undefined;
+  await ctx.agentSession.skill(name, extra, { images, signal: ctx.commandSignal });
+  ctx.commandSignal?.throwIfAborted();
+  return { success: true, message: `Running ${name}${extra ? " with extra instructions." : "."}` };
 };

@@ -20,7 +20,8 @@ Shell 层级使用 `whyj --help`、`whyj --version` 或 `whyj --json --version` 
 | `/portfolio` | Manage observation portfolios | 创建、重命名、删除组合，以及增删标的。 |
 | `/config` | Configure models and research data | TUI 中打开 Settings；非 TUI 中输出规范化设置摘要。 |
 | `/doctor` | Check model and market data readiness | 未配置时进入配置流程；已配置时诊断模型、工具链和数据源。 |
-| `/skill` | Discover, audit, and run skills | 发现、查看、只读核验、安装或通过当前 agent session 运行 skill。 |
+| `/skill` | Download, load, and run skills | 选择、安装、移除、查看或通过当前 agent session 运行 skill。 |
+| `/mcp` | Choose and manage MCP presets for Pi | 选择 MCP 预制项，调用 Pi 接口添加或移除配置，或导出模板。 |
 | `/help` | Browse commands and shortcuts | TUI 中打开 Help；非 TUI 中输出命令目录和快捷键。 |
 | `/clear` | Reset the current research session | 清空对话显示并重置当前 agent/session runtime。 |
 | `/artifact` | Browse and restore research reports | 浏览有效报告；选中后恢复来源 session，并在浏览器打开报告。 |
@@ -28,7 +29,7 @@ Shell 层级使用 `whyj --help`、`whyj --version` 或 `whyj --json --version` 
 
 一级目录只有 `name` 和 `desc`，不承载二级菜单、示例或说明段落。参数只在命令已经明确后由 parser/handler 处理；composer 不为 `/artifact` 展开任何二级选项。
 
-查看用法可输入 `/help portfolio`、`/help /portfolio` 或 `/portfolio --help`（也支持 `-h`）。所有十个一级命令均支持；帮助在业务处理之前返回，即使是 `/portfolio delete Core --help` 也不会修改组合。带值的错误帮助参数会返回错误而不会执行原操作。TUI 将详细用法显示在对话区，Help 面板中可按 `?` 查询选中命令；没有安装技能时 `/ski` 仍可补全为 `/skill`。
+查看用法可输入 `/help portfolio`、`/help /portfolio` 或 `/portfolio --help`（也支持 `-h`）。所有一级命令均支持；帮助在业务处理之前返回，即使是 `/portfolio delete Core --help` 也不会修改组合。带值的错误帮助参数会返回错误而不会执行原操作。TUI 将详细用法显示在对话区，Help 面板中可按 `?` 查询选中命令；没有安装技能时 `/ski` 仍可补全为 `/skill`。
 
 非交互示例：`whyj --json -c "/clear --help"`，成功结果含 `data.name`、`data.desc` 和 `data.usage`。命令用法在读取或迁移配置前处理，损坏设置不会阻止此查询。查看帮助不等于执行权限、数据依赖或网络可用性检查。入口取舍见[功能发现博客](../blog/11-discoverable-interactions.md)；参数行为以本页为准。
 
@@ -139,7 +140,13 @@ Doctor 报告支持 ↑/↓ 逐行、PageUp/PageDown 翻页、Home/End 到首尾
 
 ### `/skill`
 
-`/skill` 用于发现 skills。实现还支持 `/skill info <name>`、`/skill run <name>`、`/skill install <owner/repo>` 和 `/skill:<name>`；后者是 composer 中唯一的上下文型 skill 展开流程。详细规则见 [Skills 文档](./trader-skills.md)。
+`/skill` 查看已加载技能；`/skill catalog` 或不带名称的 `/skill install` 先展示选择，不下载。使用 `/skill install <name> [name ...]` 按需下载并加载，`/skill install --all` 才选择整个预制合集。`/skill remove <name> [name ...]` 从 JQ 加载列表中移除，保留共享仓库文件和本地修改；以后可按名称恢复。仍支持 `/skill install <owner/repo>`、`/skill info <name>`、`/skill reload`、`/skill run <name>` 和 `/skill:<name>`。Pi 负责技能扫描与模型索引。详细规则见 [Skills 文档](./trader-skills.md)。
+
+### `/mcp`
+
+`/mcp` 列出五项预制服务与当前配置；`/mcp info <name>` 查看依赖和官方链接。`/mcp install <name> [name ...]` 和 `/mcp remove <name> [name ...]` 复用 Pi 的配置接口，默认编辑 Pi 用户目录的 `mcp.json`；加 `--local` 选择当前项目的 `.pi/mcp.json`。同名已有配置保留。`/mcp export <name> [name ...]` 仅输出所选模板 JSON，不读取或导出本地凭证。
+
+安装表示添加连接配置，实际连接、认证与 stdio 包启动交给 Pi；在 Pi 中 `/reload` 或重启生效。移除项目项可能重新显露用户级同名服务；包缓存与 OAuth 凭证由 Pi 管理。Tushare 模板默认禁用，需填写账号提供的完整 URL 后启用。详见 [MCP 指南](./trader-skills.md#mcp)。
 
 `/skill:technical-analyst --image "C:\Charts\weekly.png" 分析周线` 或 `/skill run technical-analyst --image PATH [instructions]` 显式附加一张本地公开图表。PNG/JPEG/WebP 最大 8 MiB，当前模型须声明图片输入。图片像素只用于本次模型操作及工具续轮，不进入 JSONL、缓存或后续独立请求；恢复后需要重新附图。分析文字仍按普通研究规则保存，账户截图没有因此获得私有输出权限。文件、模型、取消及验证边界见 [图表图片输入](./README.md#images)。
 

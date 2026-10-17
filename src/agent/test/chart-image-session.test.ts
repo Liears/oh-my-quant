@@ -7,7 +7,6 @@ import type { ImageContent } from "@earendil-works/pi-ai";
 import { createAgent, type QuantAgentDependencies, type QuantAgentSession } from "../src/session.ts";
 import { JsonlSessionRepo } from "../src/session-runtime/index.ts";
 import { NodeExecutionEnv } from "../src/session-runtime/node.ts";
-import { prepareRuntimeSkills } from "../../runtime/skills/skill-readiness.ts";
 import { buildResearchReport } from "../../research/input.ts";
 
 const image: ImageContent = { type: "image", mimeType: "image/png", data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jf1sAAAAASUVORK5CYII=" };
@@ -41,7 +40,6 @@ beforeEach(() => {
       thinkingLevel: "off", compactTriggerTokens: 100000, getAuth: async () => { if (failAuth) throw new Error("Fixture authentication failure"); return { apiKey: "fixture" }; } }),
     loadSkills: async () => [{ name: "technical-analyst", description: "Chart fixture", content: "Read the attached weekly chart. Do not execute FMP scripts.",
       filePath: join(root, "tradermonty-claude-trading-skills", "skills", "technical-analyst", "SKILL.md"), sourcePath: root, source: "pi", scope: "project" }],
-    prepareSkills: (skills, tools, capabilities) => prepareRuntimeSkills(skills, tools, root, { readCapabilities: () => capabilities ?? {} }),
     prompts: { system: () => "Fixture chart research", turn: text => text, skill: (_name, extra) => extra ?? "" },
     verifyResearch: buildResearchReport };
 });
@@ -75,15 +73,11 @@ it("sends images through actual Pi across tool and queued turns without journali
   agent.reset(); await agent.waitForIdle(); await agent.prompt("Fresh session"); expect(JSON.stringify(requests.at(-1))).not.toContain("whyj-chart-input");
 });
 
-it("admits weekly chart mode only for an active image model and keeps script dependencies separate", async () => {
+it("loads skill instructions and still rejects images for a text-only model", async () => {
   agent = createAgent({ dependencies: deps });
   const skill = (await agent.getSkills())[0]!;
-  expect(skill.readiness?.modes[0]).toMatchObject({ name: "weekly chart analysis", status: "needs-input" });
-  expect(skill.readiness?.modes[1]?.status).toBe("unverified");
   await agent.skill(skill.name, "Weekly only", { images: [image] });
   expect(JSON.stringify(requests[0])).toContain("data:image/png;base64");
-  expect(JSON.stringify(requests[0])).toContain("weekly chart analysis (needs-input)");
-  expect(JSON.stringify(requests[0])).not.toContain("contrarian confirmation script (requirements-met)");
   vision = false; const entries = await agent.getSessionEntries();
   await expect(agent.skill(skill.name, "Weekly only", { images: [image] })).rejects.toThrow();
   await expect(agent.prompt("Text-only model", { images: [image] })).rejects.toThrow("image-capable");

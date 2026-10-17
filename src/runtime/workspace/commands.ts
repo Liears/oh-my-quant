@@ -33,11 +33,11 @@ export interface CommandResultRuntimeContext {
 }
 
 export function getRuntimeCommandInvocation(parsed: ParsedCommand): RuntimeCommandInvocation {
-  const isSkillInvoke = parsed.command === "skill" && Boolean(parsed.positional[0]) && !["list", "info", "install"].includes(parsed.positional[0]!);
+  const isSkillInvoke = parsed.command === "skill" && getSkillIsInvocation(parsed);
   return {
     isSkillInvoke,
     isCompactCommand: parsed.command === "compact",
-    skillName: isSkillInvoke ? parsed.positional[0]! : "",
+    skillName: isSkillInvoke ? (["run", "trigger"].includes(parsed.positional[0]!) ? parsed.positional[1] || String(parsed.flags.name || parsed.flags.skill || "") : parsed.positional[0]!) : "",
     localOnly: isPureLocalCommand(parsed),
   };
 }
@@ -112,6 +112,10 @@ function applyCommandEffect(effect: CommandEffect, ctx: CommandResultRuntimeCont
 
 function isPureLocalCommand(parsed: ParsedCommand): boolean {
   if (parsed.command === "config" && parsed.flags.extensions !== undefined && parsed.flags.extensions !== true && parsed.flags.extensions !== "list") return false;
-  if (parsed.command === "skill" && parsed.positional[0] && !["list", "info"].includes(parsed.positional[0])) return false;
+  if (parsed.command === "skill" && getSkillIsInvocation(parsed)) return false;
   return isLocalSlashCommand(parsed.command);
+}
+
+function getSkillIsInvocation(parsed: ParsedCommand): boolean {
+  return Boolean(parsed.positional[0]) && !["list", "info", "catalog", "install", "remove", "reload"].includes(parsed.positional[0]!);
 }

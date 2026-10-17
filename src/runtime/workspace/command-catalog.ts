@@ -11,7 +11,8 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
   { name: "/portfolio", desc: "Manage observation portfolios" },
   { name: "/config", desc: "Configure models and research data" },
   { name: "/doctor", desc: "Check model and market data readiness" },
-  { name: "/skill", desc: "Discover, audit, and run skills" },
+  { name: "/skill", desc: "Download, load, and run skills" },
+  { name: "/mcp", desc: "Choose and manage MCP presets for Pi" },
   { name: "/help", desc: "Browse commands and shortcuts" },
   { name: "/clear", desc: "Reset the current research session" },
   { name: "/artifact", desc: "Browse and restore research reports" },
@@ -20,7 +21,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
 
 export const SLASH_COMMANDS = COMMAND_CATALOG.map((command) => command.name);
 
-const LOCAL_COMMANDS = new Set(["help", "clear", "config", "doctor", "portfolio", "resume", "compact", "skill", "artifact"]);
+const LOCAL_COMMANDS = new Set(["help", "clear", "config", "doctor", "portfolio", "resume", "compact", "skill", "mcp", "artifact"]);
 
 export function isLocalSlashCommand(command: string): boolean {
   return LOCAL_COMMANDS.has(command);

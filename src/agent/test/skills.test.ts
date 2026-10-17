@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { discoverSkills, invalidateSkillDiscovery } from "../src/skills.ts";
 import { NodeExecutionEnv } from "../src/session-runtime/node.ts";
+import { formatSkillsForSystemPrompt } from "../src/session-runtime/index.ts";
 
 let TEST_DIR = "";
 
@@ -25,6 +26,26 @@ afterEach(() => {
 });
 
 describe("discoverSkills", () => {
+  it("uses Pi ignore rules and explicit-only metadata while preserving project precedence", async () => {
+    TEST_DIR = mkdtempSync(join(tmpdir(), "whyj-skills-"));
+    mkdirSync(join(TEST_DIR, ".git"));
+    const project = join(TEST_DIR, ".agents", "skills"), installed = join(TEST_DIR, "installed");
+    writeSkill(project, "shared");
+    writeSkill(installed, "shared");
+    writeSkill(installed, "ignored");
+    writeSkill(installed, "explicit-only");
+    writeFileSync(join(installed, ".gitignore"), "ignored/\n");
+    writeFileSync(join(installed, "explicit-only", "SKILL.md"),
+      "---\nname: explicit-only\ndescription: Manual workflow\ndisable-model-invocation: true\n---\nMANUAL_BODY");
+    const result = await discoverSkills({ cwd: TEST_DIR, env: new NodeExecutionEnv({ cwd: TEST_DIR }), extraPaths: [installed] });
+    expect(result.skills.map(skill => skill.name).sort()).toEqual(["explicit-only", "shared"]);
+    expect(result.skills.find(skill => skill.name === "shared")?.sourcePath).toBe(project);
+    expect(result.skills.find(skill => skill.name === "explicit-only")).toMatchObject({ disableModelInvocation: true, content: "MANUAL_BODY" });
+    const prompt = formatSkillsForSystemPrompt(result.skills);
+    expect(prompt).toContain("<name>shared</name>");
+    expect(prompt).not.toContain("<name>explicit-only</name>");
+    expect(prompt).not.toContain("MANUAL_BODY");
+  });
   it("reloads updated content at the same path after installation invalidates discovery", async () => {
     TEST_DIR = mkdtempSync(join(tmpdir(), "whyj-skills-"));
     mkdirSync(join(TEST_DIR, ".git"));

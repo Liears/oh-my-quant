@@ -143,14 +143,7 @@ class QuantAgentHarnessSession implements QuantAgentSession {
     try {
       await this.syncModelSettings();
       await this.syncSkills();
-      const readiness = (await this.requestResources(this.session!, this.state.tools, this.skills)).skills.find(skill => skill.name === name)?.readiness;
-      if (readiness && (readiness.status === "blocked" || readiness.status === "unverified")) {
-        throw new Error(`Skill ${name} is ${readiness.status}. Inspect /skill info ${name} --check; missing or unverified dependencies must be resolved before invocation.`);
-      }
       const instructions = [this.dependencies.prompts.skill(name, additionalInstructions)];
-      if (readiness) instructions.push("Skill preflight: use only these permitted modes: "
-        + readiness.modes.filter(mode => mode.status === "requirements-met" || mode.status === "needs-input").map(mode => `${mode.name} (${mode.status})`).join(", ")
-        + ". Ask for missing task inputs before analysis or script execution. Never infer private account values. Other modes remain unavailable; installed package versions do not verify network data or script output.");
       options?.signal?.throwIfAborted();
       if (options?.images !== undefined) {
         if (!this.harness.isIdle) throw new Error("Wait for the current request to finish before attaching a chart image.");

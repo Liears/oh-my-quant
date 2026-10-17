@@ -82,7 +82,7 @@ export async function installSkillRepository(root: string, repo: string, git: Sk
       staging = undefined;
     }
     return { success: true, source, revision,
-      message: `${updating ? "Updated" : "Installed"} ${repo}\nLocation  ${target}\nRevision  ${revision}\nNext      Run /skill after the current response finishes to discover installed skills. Runtime dependencies are checked separately.` };
+      message: `${updating ? "Updated" : "Installed"} ${repo}\nLocation  ${target}\nRevision  ${revision}\nNext      Run /skill after the current response finishes to discover installed skills. Follow the upstream skill instructions for credentials and dependencies.` };
   } catch (error) {
     return { success: false, message: `Could not install or update ${repo}.\nLocation: ${target}\nCause: ${error instanceof Error ? error.message : String(error)}\nExisting installation preserved. Check local changes and GitHub access, then retry /skill install ${repo}.` };
   } finally {

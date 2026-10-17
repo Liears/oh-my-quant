@@ -30,7 +30,6 @@ import { resolveConfiguredModel } from "./agent/src/model-config.ts";
 import type { OhQuantSettings } from "./types/config.ts";
 import { DEFAULT_TERMINAL_OPERATION_KEYBINDINGS } from "./types/config.ts";
 import { skillPaths } from "./runtime/skills/skill-store.ts";
-import { ensureDefaultSkills } from "./runtime/skills/skill-store.ts";
 import { ensureDirs, loadSettings, loadPanelPortfolio } from "./storage/index.ts";
 import type { AppState, PanelSection, UIMessage } from "./types/ui.ts";
 import type { CurrentSessionMeta } from "./tui/src/panel.ts";
@@ -122,7 +121,6 @@ export class AppRuntime {
   private readonly overview: OverviewRefresh;
   private disposed = false;
   private readonly lifetime = new AbortController();
-  private skillInstallation: Promise<void> | undefined;
   private readonly localOperations = new Set<Promise<void>>();
   private currentDoctor: DoctorResult | null = null;
   private doctorRun: AbortController | null = null;
@@ -206,19 +204,6 @@ export class AppRuntime {
   async getSkillSuggestions() {
     if (this.disposed) return [];
     return this.agent ? toSkillEntries(await this.agent.getSkills()) : loadRuntimeSkillSuggestions();
-  }
-
-  /** Start explicitly from the interactive host; headless bootstrap never installs packages. */
-  startSkillInstallation(install: typeof ensureDefaultSkills = ensureDefaultSkills): Promise<void> {
-    if (this.disposed) return Promise.resolve();
-    this.skillInstallation ??= install({ signal: this.lifetime.signal, onProgress: progress => {
-      if (this.disposed || progress.status === "present") return;
-      this.pushLocalCommandMessage(progress.message, progress.status === "failed" ? "error" : "assistant");
-      if (progress.status === "installed") this.callbacks.onSkillsChanged?.();
-    } }).catch(error => {
-      if (!this.disposed) this.pushLocalCommandMessage(`Skill installation failed: ${errorText(error)}\nRetry with /skill install <owner/repo>.`, "error");
-    });
-    return this.skillInstallation;
   }
 
   /** Structured research entry for hosts; shares the normal UI/event/command runtime. */
@@ -363,7 +348,7 @@ export class AppRuntime {
 
   async shutdown(): Promise<void> {
     this.dispose();
-    await Promise.allSettled([this.skillInstallation, this.bootstrapTask, this.extensionShutdown, ...this.localOperations]);
+    await Promise.allSettled([this.bootstrapTask, this.extensionShutdown, ...this.localOperations]);
     await Promise.allSettled([this.agent?.waitForIdle()]);
   }
 
@@ -515,7 +500,7 @@ export class AppRuntime {
       });
       if (cancelled()) return;
       applyRuntimeCommandResult(result, this.commandResultContext());
-      if (result.success && parsed.command === "skill" && (parsed.positional[0] === "install" || (parsed.positional[0] === "info" && (parsed.flags.check || parsed.flags["check-imports"] || parsed.flags["check-network"])))) this.callbacks.onSkillsChanged?.();
+      if (parsed.command === "skill" && ["install", "remove", "reload"].includes(parsed.positional[0] ?? "")) this.callbacks.onSkillsChanged?.();
       this.refreshHudFromAgentState();
       if (invocation.isSkillInvoke) this.finalizeSkillMessage(!result.success);
       if (result.success) updateLastSymbol(this.agent, parsed.flags);

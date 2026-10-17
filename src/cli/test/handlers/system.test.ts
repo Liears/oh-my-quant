@@ -366,7 +366,8 @@ describe("skillHandler", () => {
     const skill = mock(async () => {});
     const signal = new AbortController().signal;
     const result = await skillHandler({}, ["run", "whyj-quant", "review", "the", "holdings"], {
-      agentSession: mockAgent({ skill }),
+      agentSession: mockAgent({ skill, getSkills: async () => [{ name: "whyj-quant", description: "Fixture skill",
+        content: "Use the supplied holdings.", filePath: "C:/fixture/SKILL.md", sourcePath: "C:/fixture", scope: "project", source: "agents" }] }),
       commandSignal: signal,
     });
     expect(result.success).toBe(true);

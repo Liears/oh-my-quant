@@ -75,7 +75,7 @@
 |---|---|
 | `data/` | 行情入口、数据配置与端点能力诊断 |
 | `models/` | 模型编辑、OAuth、Pi 导入与显式图片读取 |
-| `skills/` | 技能安装根、发现刷新、探测执行器和资格接线 |
+| `skills/` | 预制安装根、目录选择与发现刷新 |
 | `research/` | 有 IO 的研究服务、观察组、新闻与报告编排；区别于顶层 `research` 的证据重算 |
 | `evidence/` | 根据提供的研究状态和文本核对回答；不依赖其他 runtime 分组 |
 | `evaluation/` | 可选评测运行器及合成场景；其他生产模块不得反向引用 |
@@ -85,11 +85,12 @@ runtime 不导入 CLI 或 TUI，包括类型。共享 `AppState`、`UIMessage`�
 
 ### `src/skill/`
 
-- `index.ts` 暴露精选目录、安装事务、文件/报告核验及资格判断；只依赖模块内部、共享技能类型和 Node 标准库，不依赖 Agent、runtime、CLI、行情或应用存储。
-- Python 探测必须显式接收 `SkillPythonRunner`，只向端口交付固定脚本、参数、超时和取消信号；`runtime/skills/skill-probes.ts` 绑定默认解释器执行器。探测观察按工作目录保留，取消及旧请求不能覆盖新结果。
-- `runtime/skills/skill-store.ts` 绑定安装根、精选路径与安装后的发现缓存失效；`runtime/skills/skill-discovery.ts` 绑定 settings、Agent loader 与 readiness。安装事务仍在 skill 模块内，接收明确目录和 Git 端口。
-- `cli/handlers/skill.ts` 与 `skill-*-audit.ts` 负责 slash 参数、文件选择及文字/JSON 回执；skill 模块不返回 CLI 的 `CommandResult`。
-- 模块测试位于 `src/skill/test/`；宿主安装/刷新测试位于 runtime，命令测试位于 CLI。隔离回归在仅包含 skill 与共享技能类型的临时目录运行公开服务，验证无其他产品模块也可使用。
+- 只维护预制仓库、下载提交、技能名称和 Git 安装事务；通过 `index.ts` 暴露。
+- `runtime/skills/skill-store.ts` 绑定安装根和缓存失效，`skill-discovery.ts` 供 CLI 与界面共用。
+- `agent/src/skills.ts` 调用 Pi Coding Agent 的公开加载 API；目录扫描、元数据与忽略规则不再本地复制。
+- `/skill install` 先展示选择，按名称下载并启用，`/skill remove` 持久化移除加载选择，`/skill reload` 刷新已安装内容；启动不自动下载。已移除逐技能文件哈希、Python/网络探针、运行资格与报告审计。
+- 安装仍保护本地变更并处理取消；会话保留进行中资源快照。上游依赖与使用方法回到 `SKILL.md`。
+- `runtime/skills/mcp-presets.ts` 维护 MCP 模板，`mcp-config.ts` 经 `agent/src/pi-mcp.ts` 复用 Pi 配置增删。`/mcp` 按需管理用户或项目配置并导出模板；连接、认证、加载与包缓存归 Pi。
 
 ### `src/source/`
 

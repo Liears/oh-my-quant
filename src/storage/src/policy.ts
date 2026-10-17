@@ -15,6 +15,8 @@ export interface StoragePolicyEntry {
 }
 
 export const STORAGE_POLICY: StoragePolicyEntry[] = [
+  { path: ".ohquant/skills/.selection.json", class: "durable", cacheable: false,
+    description: "User-selected skill names per shared repository. Removal changes loading choices, not cached source files or local edits." },
   { path: ".ohquant/research/decisions/", class: "artifact", cacheable: false,
     description: "Explicit research choices and rationale bound to comparison archives. Not verified user approval, account activity or public market cache; free text may contain private research notes." },
   {

@@ -220,19 +220,12 @@ function buildQuantAnalysisGuidance(input: string, ctx: SessionCtx): string | nu
 }
 
 function buildQuantSkillGuidance(skillName: string): string | null {
-  if (skillName === "macro-regime-detector") return [
-    "<!-- macro source evidence -->",
-    "Use the JSON report metadata.data_source and metadata.data_mode to identify the actual price source; compare them with the Markdown source line.",
-    "The pinned Markdown generator can say FMP API on a yfinance-only run. If labels disagree, call out the mismatch and do not cite the Markdown line as FMP evidence.",
-    "A local /skill audit macro-regime-detector command can check the selected report or pinned bundle without a model or provider call. Its report-only mode does not prove original ETF prices or installed revision.",
-    "SHY/TLT is a yield-curve proxy, not observed Treasury rates; keep that distinction in the analysis.",
-  ].join("\n");
   if (!/(quant|trader|trading|risk|factor|technical|market)/i.test(skillName)) return null;
   return [
     "<!-- quant skill analysis contract -->",
     "Follow the selected skill workflow and the user's requested output. For requested tool-backed quant calculations, preserve an auditable analysis chain: researched object/code → price or NAV data → technical factors → risk metrics → concise conclusion.",
     "For interpretation of supplied material, keep facts, report/observation dates, missing inputs and your interpretation distinct. Do not add price/factor/risk calculations or declare a quant task just to fit this generic chain. A read-only workflow file supplies instructions, not independently verified financial evidence.",
-    "Follow the declared task and skill's permitted modes; use only enabled tools. Include risk metrics when required by that task and a valid return series exists, otherwise explain the missing evidence. Keep actual technical and risk values as labeled rows for Artifact Dashboard ingestion.",
+    "Follow the declared task and selected skill; use only enabled tools. Include risk metrics when required by that task and a valid return series exists, otherwise explain the missing evidence. Keep actual technical and risk values as labeled rows for Artifact Dashboard ingestion.",
   ].join("\n");
 }
 

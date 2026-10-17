@@ -291,40 +291,28 @@ it("uses an injected tool's current schema description without copying the built
   }
 });
 
-it("narrows skill modes with task tools while retaining the idle registry and dependency observations", async () => {
+it("keeps Pi skill instructions while task tools remain scoped across a host refresh", async () => {
   await agent.waitForIdle();
   const dependencies = createDefaultSessionDependencies({ cwd: root, sessionsRoot: join(root, "sessions") });
-  let revision = "initial", shellObserved = true, preparations = 0;
-  const skill = { name: "fixture-research", description: "Scoped fixture", content: "Use only permitted modes.",
+  let revision = "initial";
+  const skill = { name: "fixture-research", description: "Scoped fixture", content: "Follow the task scope.",
     filePath: join(root, "SKILL.md"), sourcePath: root, scope: "project" as const, source: "agents" as const };
   agent = createQuantResearchAgent({ dependencies: { ...dependencies,
     loadSkills: async () => [skill],
     readTools: () => ({ revision, tools: dependencies.tools.filter(tool => revision === "initial" || tool.name !== "run_backtest") }),
-    prepareSkills: items => { preparations++; return items.map(item => ({ ...item, readiness: {
-      status: shellObserved ? "requirements-met" as const : "blocked" as const, checkedAt: "fixed-observation",
-      modes: [{ name: "script", status: shellObserved ? "requirements-met" as const : "blocked" as const,
-        requirements: [{ requirement: "shell-execution", status: shellObserved ? "available" as const : "missing" as const, reason: "fixture observation" }] }],
-    } })); },
   } });
-  let atStart = 0;
   steps = [payload => {
-    expect(toolNames(payload)).toEqual(FULL_TOOL_NAMES); expect(JSON.stringify(payload.messages)).toContain("Scoped fixture");
-    atStart = preparations; shellObserved = false; revision = "removed";
+    expect(toolNames(payload)).toEqual(FULL_TOOL_NAMES);
+    revision = "removed";
     return read(payload);
   }, declare];
   await agent.prompt(request);
-  expect(preparations).toBe(atStart);
   expect(toolNames(requests.at(-1)!)).toEqual(["research_task", "run_backtest"]);
-  expect(JSON.stringify(requests.at(-1)!.messages)).not.toContain("Scoped fixture");
+  expect(JSON.stringify(requests.at(-1)!.messages)).toContain("Scoped fixture");
   expect(agent.state.tools.some(tool => tool.name === "run_backtest")).toBe(true);
-  const branch = await agent.getSessionEntries(), count = requests.length;
-  await expect(agent.skill(skill.name)).rejects.toThrow("blocked");
-  expect(requests).toHaveLength(count);
-  // Idle refresh can persist the new host tool selection, but explicit blocked invocation adds no messages.
-  expect((await agent.getSessionEntries()).filter(item => item.type === "message")).toEqual(branch.filter(item => item.type === "message"));
-  expect((await agent.getSkills())[0]!.description).toContain("permitted modes: none");
-  await agent.prompt("继续原任务并检查缺项");
+  await agent.skill(skill.name);
   expect(toolNames(requests.at(-1)!)).toEqual(["research_task"]);
+  expect(JSON.stringify(requests.at(-1)!.messages)).toContain("Follow the task scope.");
   expect((await agent.getResearchState()).task?.status).toBe("blocked");
 });
 
