@@ -188,7 +188,8 @@ it("keeps cancelled tasks readable and resumes only with a new declaration at th
   await agent.prompt("恢复这个任务，保留原范围和验收条件");
   expect((await agent.getResearchState()).task?.status).toBe("complete");
   expect(toolNames(requests.at(-1)!)).toEqual(["research_task", "run_backtest"]);
-});
+  // Three persisted Pi turns exercise lifecycle semantics, not a 5 s latency budget.
+}, 15_000);
 
 it("links a real failed call to its matching verified retry without deleting the failure", async () => {
   const fixture = await backtestFixture();
