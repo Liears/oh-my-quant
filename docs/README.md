@@ -12,8 +12,7 @@
 | 当前范围、缺口与实施顺序 | [GOALS](./quant-harness/GOALS.md) → [PRD](./quant-harness/PRD.md) → [Roadmap](./quant-harness/roadmap.md) |
 | 配置、数据源与工具为何不同步 | [配置](./quant-harness/configuration.md) → [数据源](./quant-harness/source-data-providers.md) → [UI/UX](./quant-harness/quant-uiux.md) |
 | 怎样验证，哪些结论尚未得到证明 | [评测指南](./quant-harness/evaluation.md) · [测试与反例](./blog/05-evaluation-beyond-green.md) |
-| 仓库质量管理与 npm 发布 | [维护规范](./quant-harness/ci-release.md) · [Agent Repo 基础建设](./blog/agent-repo-infrastructure.md) |
-| PR 冲突、代码审查与团队协作 | [Review 实践与取舍](./blog/review-for-shared-understanding.md) |
+| 仓库质量管理、PR 评审与 npm 发布 | [维护规范](./quant-harness/ci-release.md) · [Agent Repo 基础建设与 Review 实践](./blog/agent-repo-infrastructure.md) |
 | 产品、架构与 UI/UX 的选择理由 | [技术博客](./blog/README.md) · [离线版](./blog/index.html) |
 
 当前工作区不等于发布版。产品完成度由 PRD 维护；代码和测试链接定位可重复检查，不把旧验证记成本轮成绩。这里的“归档整理”是把现行文档归入责任目录，不恢复 archive、旧稿汇编或重定向页面。
