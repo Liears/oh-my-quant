@@ -22,7 +22,7 @@ description: Prepare and review single-issue PRs for oh-my-quant targeting stabl
 5. Inspect the staged diff and run `git diff --check`. Commit only issue-related files. Report baseline failures without weakening assertions or claiming success. Push an incomplete WIP/draft only when explicitly requested.
 6. Before handoff, inspect tracked and untracked changes for omitted issue work. Commit intended deliverables and explicitly report any preserved unrelated changes; a clean Git status does not prove ignored local data is disposable.
 
-Local checks precede the final commit and push. CI follows the push and must pass before merge readiness.
+Local checks precede the final commit and push. Before opening a non-Draft PR or marking a Draft ready for review, confirm the complete release gate and applicable local checks passed for the submitted content; after further edits, rerun affected checks and keep the complete gate valid. If checks fail or cannot run, report the exact blocker and missing evidence; use an explicitly requested Draft for early collaboration. Do not weaken assertions to obtain a pass. CI follows the push and must pass before merge readiness; pending CI is not a successful result.
 
 ## Documentation
 
@@ -47,6 +47,13 @@ For internal changes, briefly explain why visual evidence is inapplicable.
 For substantial features or non-obvious design decisions, consider a focused article in `docs/blog/`. Explain the problem, prior limitations, alternatives, chosen mechanism, evidence, costs, and remaining limits. Link claims to implementation or verification; distinguish facts from proposals.
 
 Follow the [blog guide](../../../docs/blog/README.md), update navigation/generated pages as needed, and link the article from the PR. Keep it within the same issue. Blogs supplement current module documentation and a self-contained PR description; ordinary fixes do not require one.
+
+## Description
+
+- Follow [shared writing conventions](../../../AGENTS.md#writing-style) for language, length, and formatting. Keep the template's exact English second-level headings and canonical closing line: PR policy parses them even when the explanatory prose uses another language.
+- Lead with the concrete problem and resulting behavior; explain the mechanism and why it is sufficient. A before/after example is useful when it clarifies the change. A file list or commit diary does not replace the explanation.
+- Map acceptance criteria to commands or procedures, results, and the tested revision. Distinguish passed, failed, pending, and unrun checks; link logs rather than copying them into the description.
+- Rewrite the title and affected sections when scope, implementation, or evidence changes. Preserve relevant historical evidence with its revision instead of appending competing "final" summaries.
 
 ## PR Template
 
@@ -85,7 +92,7 @@ Article link and the design question it explains; omit when unused.
 Use [review-skill](../review-skill/SKILL.md) for findings, integration checks, and feedback convergence; this skill remains the source for delivery and cleanup requirements.
 
 - Close only the primary issue; link dependencies without closing them. Add the PR link to the issue.
-- Use `gh` to verify applicable workflows against the final head SHA. Trigger available non-publishing checks within existing authorization when needed.
+- Use `gh` to verify applicable workflows against the final head SHA and final PR description. Body edits can trigger new policy runs without changing the code SHA; check the latest applicable runs, not an older success. Trigger available non-publishing checks within existing authorization when needed.
 - Inspect failed job logs and fix confirmed causes; repeated reruns are not a substitute. Require all applicable checks and mandatory manual acceptance before declaring merge readiness.
 - Refresh descriptions and evidence after changes. Return the PR link, final SHA, results, and outstanding work.
 - Treat PR creation, merging, and publishing as separate actions governed by existing authorization.
