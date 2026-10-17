@@ -285,7 +285,48 @@ GitHub 对有 merge conflict 的 PR 不运行普通 `pull_request` 工作流；`
 
 正确步骤是先看 mergeability、base/head 和依赖 PR，解决冲突、同步基线，再验证新的合并候选。反复重跑旧任务或者推空提交，只会增加历史噪声。这个操作已写入 PR Skill，和“最后一次正文编辑后重新核对 policy”放在同一处，避免规则分散。
 
-这些 job 只有被平台规则要求，才会实际阻止合并。审计发现 main 尚无 branch protection/ruleset；本次代码不声称已替维护者完成平台配置。建议后续将 `CI required`、`PR policy` 和 `Desktop required` 纳入 main 的必需检查，并以故意失败的测试 PR 验证阻塞效果。不要只截图设置页面就宣布门禁有效。
+### 从检查通过，到 GitHub 真正要求检查通过
+
+这些 job 只有被平台规则要求，才会实际阻止合并。第一次审计发现 main 没有 branch protection，也没有 ruleset。于是 `CI required` 虽然名字里有 required，仍只是一个报告结果的 job；AGENTS.md 要求先验证再合并，也没有自动变成服务器端约束。
+
+2026-10-18，维护者在 GitHub 保存分支保护后，我们再次读取配置。这个过程又暴露了一个容易忽略的中间状态：**main 已受保护，但尚未指定任何必需检查。** 下表记录北京时间 00:45 的 API 快照，后续设置应重新查询，不能把文章中的快照当成永久状态。
+
+| 配置 | 当时实测值 | 对交付的含义 |
+| --- | --- | --- |
+| main `protected` | `true` | 已启用 classic branch protection；rulesets 仍为空，两者不矛盾 |
+| `required_status_checks.contexts` / `checks` | 都是 `[]` | 没有指定必须通过的 CI 检查 |
+| `required_status_checks.strict` | `false` | 没有要求分支与最新 main 一起验收 |
+| PR approving reviews | `1` | 需要合资格审查者批准；#41 返回 `REVIEW_REQUIRED`，reviews 为空 |
+| `required_signatures.enabled` | `true` | 提交签名是另一项约束；#41 当时的 head `ae684b1` 返回 `verified=false, reason=unsigned` |
+| `enforce_admins.enabled` | `true` | 管理员也受规则约束，包括使用管理员身份执行的 agent |
+| conversation resolution | `true` | 合并前要求解决审查对话 |
+| force pushes / deletions | 都是 `false` | 禁止强推和删除受保护分支 |
+
+因此，界面显示“受保护”不等于 CI 门禁已接通；PR 显示 blocked 也不等于 CI 正在阻止它。#41 当时已有通过的检查，却仍需要 review，而且存在未签名提交。核验时必须分别读取状态检查、审查、签名和管理员适用范围，不能凭一个总状态推断唯一原因。本文没有通过实际合并或强推来试探这些限制。
+
+### 搜索框里填的是检查名称，而不是工作流名称
+
+在 **Settings → Branches → main 的保护规则 → Require status checks to pass before merging** 下，逐个搜索、选中检查，最后保存。应使用 Actions 实际报告的 job 名称：
+
+| 必需检查名称 | 它负责什么 | 启用时机 |
+| --- | --- | --- |
+| `CI required` | 汇总 Linux、Windows 的完整 release gate，任一平台未成功就拒绝 | 当前 CI 已产生此检查，可以先加入 |
+| `PR policy` | 机械校验 Issue、文档改动和 PR 描述 | 当前策略已产生此检查，可以先加入 |
+| `Desktop required` | 打包、安装、升级和桌面交互验收 | #41 引入所有 PR 的覆盖；待该工作流合入 main 后加入，旧 PR 同步基线再验证 |
+
+不要填写 workflow 标题 `CI`、`Windows desktop`，也不要选仅在手动发布运行的 `publish` 或 `checks`。若界面允许选择检查来源，选择 GitHub Actions。只是输入搜索词并没有完成选择；保存后重新读取 API，确认 `contexts` / `checks` 中出现准确名称。
+
+同时勾选 **Require branches to be up to date before merging**，并确认 API 的 `strict=true`。它把证据对象从“这个分支曾经通过”推进到“这个分支已与最新 main 一起验证”，代价是 main 更新后可能需要同步分支和重新构建。至少指定一个检查后，这项设置才有实际意义。[GitHub 分支保护说明](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)
+
+### 约束要匹配维护方式，也要有启用顺序
+
+个人维护阶段可以要求所有修改通过 PR，但不强制另一位 reviewer 批准：PR 作者不能批准自己的 PR。如果确实有第二位维护者承担审查，则保留至少一人批准有明确价值。agent 用同一账号代替作者操作，并不会成为独立审查者。
+
+签名提交要求同样有独立目的。需要先确认贡献者和 agent 的签名方式，以及待合并提交的 GitHub Verified 状态；SSH 推送认证成功并不表示 Git commit 已签名。本次如实报告未签名状态，没有为绕过规则而改写历史、关闭签名要求或尝试管理员合并。[GitHub 提交签名验证](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification)
+
+这几个层次各自回答一个问题：PR 让修改可审查，review 指定谁批准，签名验证提交来源，CI 验证规定行为，strict 约束验收基线。AGENTS 和 Skills 组织执行过程，分支保护在 GitHub 接收合并时执行限制。一个层次开启，不能替代另一个层次。
+
+合理的上线顺序是先接上已有的 CI/policy 检查，再交付能对所有 PR 稳定报告的 Desktop 检查，最后将 Desktop 纳入必需条件。否则要求一个旧 workflow 从不报告的检查，只会让 PR 一直等待。保存设置以后，核对 API 与实际 PR 的阻塞原因；需要专门验证拒绝行为时使用受控测试 PR，不能用破坏性推送测试 main。这里记录了配置审计，尚未声称完成“故意失败且被 CI 规则拒绝合并”的端到端验收。
 
 ## 10. 三个公开仓库提供了什么可以迁移的机制
 

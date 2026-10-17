@@ -33,7 +33,25 @@ The release gate covers types, architecture, quality-policy regressions, test or
 
 CI/Desktop concurrency cancels outdated PR runs only; main/manual runs are not automatically interrupted. CI groups include the caller workflow name so reusable invocations do not cancel another workflow. Release gate output is retained as a per-platform artifact for 14 days, including failure when the log exists; Desktop preserves its existing screenshots and installer artifacts. No artifact does not mean success.
 
-After these workflows reach the default branch, configure `CI required`, `PR policy`, and `Desktop required` as required checks in GitHub branch protection or a ruleset. The CI aggregate fails unless every platform succeeds. Workflow files alone do not enable branch protection: the 2026-10-17 audit found main unprotected and no repository rulesets. Platform configuration and an actual rejected-merge check remain separate work. All-PR Desktop coverage intentionally costs more than path-filtered execution; any future optimization must preserve a consistently reported gate and account for shared dependencies.
+All-PR Desktop coverage intentionally costs more than path-filtered execution; any future optimization must preserve a consistently reported gate and account for shared dependencies.
+
+## Main Branch Protection
+
+Workflow files and a job name ending in `required` do not configure GitHub enforcement. In **Settings → Branches → main protection rule**, require pull requests and select the actual check names `CI required` and `PR policy`. After the all-PR Desktop workflow reaches the default branch, also require `Desktop required`; update older PR branches so they produce that check. Do not use workflow titles (`CI`, `Windows desktop`) or manual-only publishing jobs as required check names. Select GitHub Actions as the expected source where available.
+
+Enable **Require branches to be up to date before merging**, conversation resolution, and enforcement for administrators; keep force pushes and branch deletion disabled. Save the rule and read back its check names and `strict` value. Requiring an absent check can leave PRs waiting indefinitely. Review-count and signing requirements are separate decisions: a solo maintainer can require PRs without requiring another approving reviewer; signed commits require a working signing setup and verified commits, not merely SSH push authentication.
+
+The 2026-10-17 audit found main unprotected. At 2026-10-18 00:45 Asia/Shanghai, a follow-up API audit confirmed classic protection was enabled, administrators were included, conversations had to be resolved, and force pushes/deletion were disabled. However, `required_status_checks.contexts` and `checks` were empty, and `strict` was false. One approving review and signed commits were required. PR #41 reported `REVIEW_REQUIRED` with no reviews; its then-head `ae684b1` was unsigned. This is a dated snapshot, not a claim that the incomplete settings remain current. The [blog](../blog/agentic/vibe-repo-ops.md) explains the distinction between configured protection and enforced CI.
+
+Read-only verification commands (requires repository access):
+
+```sh
+gh api repos/yangjingo/oh-my-quant/branches/main/protection
+gh api 'repos/yangjingo/oh-my-quant/rulesets?includes_parents=true'
+gh pr view 41 --repo yangjingo/oh-my-quant --json reviewDecision,mergeStateStatus,statusCheckRollup
+```
+
+An empty ruleset list does not negate classic branch protection. Verify ruleset details too if rulesets are later introduced. Check configuration and actual PR blocking reasons separately; a blocked PR does not establish that CI is the blocker. A controlled failing-check acceptance test remains unperformed; do not test main protection with a destructive push.
 
 ## npm Setup
 
