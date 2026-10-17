@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
-import { mkdtempSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { parse } from "yaml";
@@ -41,12 +41,14 @@ test("rejects comment-only template sections and absent current docs", () => {
   assert.throws(() => validateDescription(body, ["README.md"]), /docs/);
 });
 
-function api({ issue = { state: "open" }, other = [], listed = [{ filename: files[0], status: "modified" }], count = 1 } = {}) {
+function api({ issue = { state: "open" }, other = [], listed = [{ filename: files[0], status: "modified" }], count = 1, snapshots = [{}], issueError } = {}) {
   const listFiles = Symbol("files");
   const list = Symbol("pulls");
+  let reads = 0;
   return {
-    rest: { pulls: { get: async () => ({ data: { body, changed_files: count } }), listFiles, list },
-      issues: { get: async () => ({ data: issue }) } },
+    rest: { pulls: { get: async () => ({ data: { body, changed_files: count, state: "open", head: { sha: "head" }, base: { sha: "base" },
+      ...snapshots[Math.min(reads++, snapshots.length - 1)] } }), listFiles, list },
+      issues: { get: async () => { if (issueError) throw issueError; return { data: issue }; } } },
     paginate: async method => method === listFiles ? listed : other,
   };
 }
@@ -65,6 +67,34 @@ test("rejects PR references, closed issues, and competing implementation PRs", a
 test("rejects incomplete file pagination and documentation deletions", async () => {
   await assert.rejects(check({ count: 2 }), /every changed file/);
   await assert.rejects(check({ listed: [{ filename: files[0], status: "removed" }] }), /docs/);
+});
+
+test("closed PRs do not validate issues, including a merge during issue validation", async () => {
+  assert.equal(await check({ snapshots: [{ state: "closed" }], issueError: new Error("must not fetch") }), null);
+  assert.equal(await check({ snapshots: [{}, { state: "closed", merged: true }], issue: { state: "closed" } }), null);
+  assert.equal(await check({ snapshots: [{}, { state: "closed" }], issueError: new Error("API unavailable") }), null);
+});
+
+test("revalidates edited metadata and rewritten heads instead of returning stale success", async () => {
+  const invalid = { body: body.replace("Closes #17", "Closes #0") };
+  await assert.rejects(check({ snapshots: [{}, invalid] }), /standalone/);
+  assert.equal(await check({ snapshots: [invalid, {}] }), 17);
+  await assert.rejects(check({ snapshots: [{}, { head: { sha: "new" }, changed_files: 2 }] }), /every changed file/);
+  const changes = Array.from({ length: 6 }, (_, i) => ({ head: { sha: String(i) } }));
+  await assert.rejects(check({ snapshots: changes }), /changed repeatedly/);
+});
+
+test("open PR API errors remain failures", async () => {
+  await assert.rejects(check({ issueError: new Error("API unavailable") }), /API unavailable/);
+});
+
+test("target workflow pins trusted event code instead of a stale PR base or untrusted head", () => {
+  const workflow = parse(readFileSync(new URL("../workflows/pr-policy.yml", import.meta.url), "utf8"));
+  assert.ok(workflow.on.pull_request_target);
+  const checkout = workflow.jobs.policy.steps.find(step => step.uses?.startsWith("actions/checkout@"));
+  assert.equal(checkout.with.ref, "${{ github.sha }}");
+  assert.equal(checkout.with["persist-credentials"], false);
+  assert.ok(Object.values(workflow.permissions).every(value => value === "read"));
 });
 
 test("only repository-local output receipts are optional", () => {
@@ -96,4 +126,41 @@ test("the actual release guard accepts only main and the exact stable package", 
     });
     assert.equal(result.status === 0, succeeds, `${ref} ${input} ${name}: ${result.stderr}`);
   }
+});
+
+test("desktop publishing rejects other branches, prereleases, and mismatched versions", t => {
+  const workflow = parse(readFileSync(new URL("../workflows/desktop.yml", import.meta.url), "utf8"));
+  const step = workflow.jobs.publish.steps.find(step => step.name === "Validate desktop release branch and version");
+  const code = step.run.split("\n").slice(1, -2).join("\n");
+  const directory = mkdtempSync(resolve(tmpdir(), "ohquant-desktop-guard-"));
+  const desktop = resolve(directory, "desktop"); mkdirSync(desktop);
+  t.after(() => {
+    unlinkSync(resolve(desktop, "package.json")); unlinkSync(resolve(directory, "package.json"));
+    rmdirSync(desktop); rmdirSync(directory);
+  });
+  for (const [ref, cli, app, succeeds] of [
+    ["refs/heads/main", "1.4.0", "1.4.0", true],
+    ["refs/heads/feature", "1.4.0", "1.4.0", false],
+    ["refs/tags/v1.4.0", "1.4.0", "1.4.0", false],
+    ["refs/heads/main", "1.4.0", "1.4.1", false],
+    ["refs/heads/main", "1.4.0-rc.1", "1.4.0-rc.1", false],
+  ]) {
+    writeFileSync(resolve(directory, "package.json"), JSON.stringify({ version: cli }));
+    writeFileSync(resolve(desktop, "package.json"), JSON.stringify({ version: app }));
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e", code], {
+      cwd: directory, encoding: "utf8", env: { ...process.env, GITHUB_REF: ref },
+    });
+    assert.equal(result.status === 0, succeeds, `${ref} ${cli}/${app}: ${result.stderr}`);
+  }
+});
+
+test("PRs always create desktop checks and only explicit dispatch may publish", () => {
+  const workflow = parse(readFileSync(new URL("../workflows/desktop.yml", import.meta.url), "utf8"));
+  assert.ok(Object.hasOwn(workflow.on, "pull_request"));
+  assert.equal(workflow.on.pull_request, null);
+  assert.equal(workflow.jobs.windows.name, "Desktop required");
+  assert.equal(workflow.jobs.windows.if, undefined);
+  assert.equal(workflow.jobs.publish.if, "github.event_name == 'workflow_dispatch' && inputs.publish_release");
+  assert.deepEqual(workflow.jobs.publish.needs, ["checks", "windows"]);
+  assert.equal(workflow.jobs.checks.uses, "./.github/workflows/ci.yml");
 });

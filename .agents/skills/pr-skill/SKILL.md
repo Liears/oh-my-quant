@@ -84,6 +84,8 @@ Article link and the design question it explains; omit when unused.
 
 - Close only the primary issue; link dependencies without closing them. Add the PR link to the issue.
 - Use `gh` to verify applicable workflows against the final head SHA. Trigger available non-publishing checks within existing authorization when needed.
+- Finalize the PR description before the final check audit. Body edits can start a new policy run without changing the head SHA; wait for that run too. Record the PR head, tested merge candidate when applicable, and relevant run IDs. A previous green run on the same head does not settle a newer pending check.
+- When checks are absent, inspect mergeability first. Resolve conflicts and synchronize the base before expecting `pull_request` checks; do not use empty commits or repeated reruns to replace conflict resolution.
 - Inspect failed job logs and fix confirmed causes; repeated reruns are not a substitute. Require all applicable checks and mandatory manual acceptance before declaring merge readiness.
 - Refresh descriptions and evidence after changes. Return the PR link, final SHA, results, and outstanding work.
 - Treat PR creation, merging, and publishing as separate actions governed by existing authorization.

@@ -41,7 +41,27 @@ export function validateDescription(body, files) {
 }
 
 export async function checkPullRequest({ github, owner, repo, number }) {
-  const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+  const read = async () => (await github.rest.pulls.get({ owner, repo, pull_number: number })).data;
+  const ended = pr => pr.state === "closed" || pr.merged === true;
+  const revision = pr => JSON.stringify([pr.head?.sha, pr.base?.sha, pr.body, pr.changed_files]);
+  // PR edits and merges can happen while paginating files or reading the issue.
+  // Retry changed snapshots, never reinterpret an invalid open PR as a skip.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const pr = await read();
+    if (ended(pr)) return null;
+    let issueNumber, failure;
+    try { issueNumber = await validateOpenPullRequest({ github, owner, repo, number, pr }); }
+    catch (error) { failure = error; }
+    const current = await read();
+    if (ended(current)) return null;
+    if (revision(pr) !== revision(current)) continue;
+    if (failure) throw failure;
+    return issueNumber;
+  }
+  throw new Error("PR changed repeatedly during validation; rerun PR policy for the current revision");
+}
+
+async function validateOpenPullRequest({ github, owner, repo, number, pr }) {
   const files = await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: number, per_page: 100 });
   if (files.length !== pr.changed_files) throw new Error("Could not inspect every changed file");
   const issueNumber = validateDescription(pr.body ?? "", files.filter(file => file.status !== "removed").map(file => file.filename));
