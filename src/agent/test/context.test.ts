@@ -290,10 +290,10 @@ describe("injectSkillContext", () => {
     expect(result).toContain("technical factors → risk metrics");
   });
 
-  it("keeps macro report source provenance and the SHY/TLT proxy explicit", () => {
-    const result = injectSkillContext("macro-regime-detector");
-    expect(result).toContain("metadata.data_source");
-    expect(result).toContain("FMP API on a yfinance-only run");
-    expect(result).toContain("SHY/TLT is a yield-curve proxy");
+  it("leaves third-party macro rules to the loaded skill", () => {
+    const result = injectSkillContext("macro-regime-detector", "Use the supplied macro snapshot.");
+    expect(result).toContain("Use the supplied macro snapshot.");
+    expect(result).not.toContain("/skill audit");
+    expect(result).not.toContain("FMP API on a yfinance-only run");
   });
 });

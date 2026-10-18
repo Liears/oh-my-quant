@@ -17,7 +17,7 @@
 | Financial Datasets | https://docs.financialdatasets.ai/introduction | `src/source/src/financial-datasets.ts` | 美股 | `WHYJ_QUANT_FINANCIAL_DATASETS_KEY` |
 | LLMQuant Data | `LLMQUANT_BASE_URL` / `https://api.llmquantdata.com` | `src/source/src/llmquant.ts` | 美股；港股路由支持待核验 | `WHYJ_QUANT_LLMQUANT_API_KEY` |
 
-注意：LLMQuant Data 在本仓库中以直接 HTTP adapter 方式接入。撰写时，仓库依赖配置的 API base URL，而非入库的公开文档链接。
+注意：LLMQuant Data 在本仓库中以直接 HTTP adapter 方式接入。供应商的 MCP 服务是独立接入方式，官方介绍和配置参数统一见 [Skills 与 MCP 指南](./trader-skills.md#mcp)，不改变本页的行情路由与核验范围。
 
 <a id="ohlc-复权口径2026-10-11"></a>
 

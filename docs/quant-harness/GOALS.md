@@ -32,7 +32,7 @@
 - F18–F19：参考 coding harness，在 runtime 形成量化专用 Harness，明确 loop、goal、tool、skill、data 的职责；每次模块化说明解决的量化场景问题。
 - F20：设计研究上下文、压缩和恢复，保持对象、参数、证据与目标连续。
 - F21–F22：存储与 Harness 共同定义持久化、数据及时性及 portfolio 私有状态边界。
-- F23：默认集成精选 quant skills，用户能看见安装与依赖状态。
+- F23：提供精选 quant skills 的一键下载与 Pi 加载入口，依赖和工作流遵循上游。
 - F24：统一常用工具注册与能力说明，在 prompt 中正确装配 tools/skills，验证调用效果。
 
 ## 文档与项目表达

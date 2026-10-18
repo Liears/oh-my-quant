@@ -3,7 +3,6 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { ExtensionHost } from "../../extensions/index.ts";
-import type { ExtensionDefinition } from "../../extensions/index.ts";
 import { statisticsExtension } from "../../extensions/test/fixtures/statistics-extension.ts";
 import { extensionSessionDependencies } from "../extension-session.ts";
 import { createQuantResearchAgent, QuantResearchHarness } from "../quant-harness.ts";
@@ -12,29 +11,11 @@ import { NodeExecutionEnv } from "../../agent/src/session-runtime/node.ts";
 import { formatSkillsForSystemPrompt } from "../../agent/src/session-runtime/index.ts";
 import { memorySessionRepo } from "../../agent/test/fixtures/memory-session-repo.ts";
 import { buildResearchReport } from "../../research/input.ts";
-import { prepareRuntimeSkills } from "../skills/skill-readiness.ts";
-import { resolveSkillsDir } from "../../storage/index.ts";
-import { Type } from "typebox";
 
 let root: string, host: ExtensionHost, agent: QuantAgentSession | undefined, base: QuantAgentDependencies;
 let server: ReturnType<typeof Bun.serve>, noProxy: string | undefined, requestTool: boolean;
 let requests: Array<{ tools?: Array<{ function: { name: string } }>; messages: Array<{ role: string; content: unknown }> }>;
 
-function webSearchExtension(status: "available" | "missing" = "available"): ExtensionDefinition {
-  const capabilities = [
-    { requirement: "web-search", status, reason: status === "available" ? "Fixture search returns timestamped source records." : "Fixture search provider is offline.",
-      requiresTools: ["fixture_web_search"] },
-    { requirement: "shell-execution", status: "available" as const, reason: "A capability claim cannot replace the active bash tool." },
-  ];
-  return {
-    manifest: { id: "fixture.search", version: status === "available" ? "1.0.0" : "1.1.0", apiVersion: 1,
-      tools: ["fixture_web_search"], skills: [], commands: [], capabilities: capabilities.map(capability => capability.requirement) },
-    activate: () => ({ tools: [{ name: "fixture_web_search", label: "Fixture web search", description: "Return a fixed source record for capability tests",
-      parameters: Type.Object({ query: Type.String() }), async execute(_id, args) {
-        return { content: [{ type: "text", text: `Fixture source for ${(args as { query: string }).query}` }], details: { observedAt: "2026-09-24T00:00:00.000Z" } };
-      } }], skills: [], commands: [], capabilities }),
-  };
-}
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "whyj-extension-session-"));
   noProxy = process.env.NO_PROXY; process.env.NO_PROXY = "127.0.0.1,localhost";
@@ -134,36 +115,4 @@ it("excludes out-of-task extensions installed after agent construction from Pi r
   expect(calls).toBe(0);
   expect(requests.at(-1)!.tools?.map(tool => tool.function.name)).toEqual(["research_task"]);
   expect((await agent.getResearchState()).task?.spec.id).toBe("restricted-research");
-});
-
-it("recomputes curated skill readiness from extension capabilities across load, disable, enable and reload", async () => {
-  const baseCapability = { requirement: "economic-calendar", status: "available" as const, reason: "Base host calendar fixture." };
-  const curated = { name: "market-environment-analysis", description: "Curated environment fixture", content: "Fixture",
-    filePath: join(resolveSkillsDir(), "tradermonty-claude-trading-skills", "skills", "market-environment-analysis", "SKILL.md"),
-    sourcePath: root, source: "pi" as const, scope: "project" as const };
-  const dependencies = await extensionSessionDependencies({ ...base, tools: [], loadSkills: async () => [curated],
-    readSkillRevision: () => "base-1", readSkillCapabilities: () => ({ "economic-calendar": baseCapability }),
-    prepareSkills: (skills, tools, capabilities = {}) => prepareRuntimeSkills(skills, tools, root, { readCapabilities: () => capabilities }) }, host);
-  expect(dependencies.readSkillCapabilities?.()).toEqual({ "economic-calendar": baseCapability });
-  await expect(host.load(statisticsExtension({ id: "fixture.base-conflict", capabilities: [baseCapability] }))).rejects.toThrow("capabilities conflict");
-
-  agent = createQuantResearchAgent({ dependencies });
-  const requirement = async (name: string) => (await agent!.getSkills())[0]!.readiness!.modes.flatMap(mode => mode.requirements).find(item => item.requirement === name)!;
-  expect(await requirement("web-search")).toMatchObject({ status: "missing" });
-
-  await host.load(webSearchExtension());
-  expect(dependencies.readSkillCapabilities?.()).toMatchObject({ "economic-calendar": baseCapability, "web-search": { status: "available" } });
-  expect(await requirement("web-search")).toMatchObject({ status: "available", reason: "Fixture search returns timestamped source records." });
-  expect(await requirement("shell-execution")).toMatchObject({ status: "missing" });
-  const withoutSearchTool = dependencies.prepareSkills!([curated], [], dependencies.readSkillCapabilities?.())[0]!;
-  expect(withoutSearchTool.readiness!.modes[0]!.requirements.find(item => item.requirement === "web-search")).toMatchObject({
-    status: "missing", requiresTools: ["fixture_web_search"],
-  });
-
-  await host.disable("fixture.search");
-  expect(await requirement("web-search")).toMatchObject({ status: "missing" });
-  await host.enable("fixture.search");
-  expect(await requirement("web-search")).toMatchObject({ status: "available" });
-  await host.reload(webSearchExtension("missing"));
-  expect(await requirement("web-search")).toMatchObject({ status: "missing", reason: "Fixture search provider is offline." });
 });

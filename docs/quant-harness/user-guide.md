@@ -90,7 +90,7 @@ OAuth 和 Pi 配置导入见 [认证生命周期](./configuration.md#oauth)与 [
 | 设置冲突 | 重新加载并核对修改，不直接覆盖另一窗口的配置 | 冲突不表示新值已经生效 |
 | 报告恢复受阻 | 核对来源会话、固定报告版本和归档是否仍可用 | 旧 HTML 可打开不等于来源证据可恢复 |
 
-检查 Skill 的版本/文件、显式导入、网络或执行脚本不是同一种操作；先读 `/skill --help` 与 [就绪规则](./trader-skills.md#readiness)，不要把全部检查理解成零副作用的沙箱。长错误可在 Doctor 面板滚动阅读，截图前遮盖私有信息。
+用 `/skill install` 查看选择，`/skill install <name>` 按需下载，`/skill remove <name>` 移除加载选择，`/skill reload` 刷新本地修改；MCP 用 `/mcp install <name>` 和 `/mcp remove <name>` 管理 Pi 配置；依赖和配置按上游说明准备，具体见 [Skills 指南](./trader-skills.md)。长错误可在 Doctor 面板滚动阅读，截图前遮盖私有信息。
 
 ## 本地 Demo 的两条路线
 

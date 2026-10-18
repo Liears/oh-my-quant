@@ -26,7 +26,7 @@ export async function main(args = process.argv.slice(2)) {
 
 Uses the saved model connection and incurs model usage. Actual WhyJ tools execute
 only synthetic observations in an isolated temporary workspace. The skill case
-stages reviewed Markdown and replaces shell execution with one read-only workflow
+stages selected Markdown and replaces shell execution with one read-only workflow
 reader; the weighted-score case also exposes its declared pure arithmetic tool.
 No market, account or network tool is offered. Original settings/sessions stay intact.
 Automated arithmetic, task or citation checks do not judge explanation quality.

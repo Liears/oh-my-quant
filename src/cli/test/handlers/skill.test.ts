@@ -1,20 +1,44 @@
 import { describe, expect, it } from "bun:test";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { skillHandler } from "../../handlers/skill.ts";
 import { installSkills, skillPaths } from "../../../runtime/skills/skill-store.ts";
 import { resolveSkillsDir } from "../../../storage/index.ts";
+import { commandPreflight } from "../../../runtime/workspace/command-preflight.ts";
+import { parseCommand } from "../../registry.ts";
 
 describe("skillHandler", () => {
-  it("rejects valued import flags and unrelated skill sources before running Python", async () => {
-    const fixture = { name: "technical-analyst", filePath: join(resolveSkillsDir(), "tradermonty-claude-trading-skills", "skills", "technical-analyst", "SKILL.md"),
-      description: "Fixture", scope: "user", source: "pi" };
-    const ctx = { agentSession: { getSkills: async () => [fixture] } as never };
-    const invalid = await skillHandler({ "check-imports": "false" }, ["info", fixture.name], ctx);
-    expect(invalid.success).toBe(false); expect(invalid.message).toContain("takes no value");
-    fixture.filePath = join(resolveSkillsDir(), "shadow", "SKILL.md");
-    const shadow = await skillHandler({ "check-imports": true }, ["info", fixture.name], ctx);
-    expect(shadow.success).toBe(false); expect(shadow.message).toContain("curated skills");
+  it("accepts preset install and reload but rejects retired probes before execution", () => {
+    for (const command of ["/skill install", "/skill reload"]) expect(commandPreflight(parseCommand(command)!)).toBeUndefined();
+    for (const command of ["/skill info x --check", "/skill info x --check-imports", "/skill info x --check-network", "/skill audit x"]) {
+      expect(commandPreflight(parseCommand(command)!)?.success).toBe(false);
+    }
+  });
+
+  it("loads existing presets without network or credentials and reloads edited content", async () => {
+    const root = mkdtempSync(join(tmpdir(), "whyj-skill-command-")), previous = process.env.OHQUANT_SKILLS_DIR;
+    process.env.OHQUANT_SKILLS_DIR = root;
+    try {
+      const skillDir = join(root, "LLMQuant-skills", "skills", "llmquant-data");
+      mkdirSync(skillDir, { recursive: true });
+      mkdirSync(join(root, "tradermonty-claude-trading-skills"));
+      const file = join(skillDir, "SKILL.md");
+      writeFileSync(file, "---\nname: llmquant-data\ndescription: Preset fixture\n---\nFIRST");
+      const result = await skillHandler({}, ["install", "llmquant-data"], {});
+      expect(result.success).toBe(true);
+      expect(result.message).toContain("Selected llmquant-data");
+      const before = await skillHandler({}, ["info", "llmquant-data"], {});
+      expect(before.data).toMatchObject({ content: "FIRST" });
+      expect(before.data).not.toHaveProperty("readiness");
+      writeFileSync(file, "---\nname: llmquant-data\ndescription: Updated preset fixture\n---\nSECOND");
+      await skillHandler({}, ["reload"], {});
+      expect((await skillHandler({}, ["info", "llmquant-data"], {})).data).toMatchObject({ content: "SECOND" });
+    } finally {
+      if (previous === undefined) delete process.env.OHQUANT_SKILLS_DIR; else process.env.OHQUANT_SKILLS_DIR = previous;
+      if (!root.startsWith(join(tmpdir(), "whyj-skill-command-"))) throw new Error("Unsafe cleanup");
+      rmSync(root, { recursive: true, force: true });
+    }
   });
   it("lists skills (or reports none found)", async () => {
     const result = await skillHandler({}, [], {});
@@ -28,7 +52,7 @@ describe("skillHandler", () => {
   it("shows error for missing name on info", async () => {
     const result = await skillHandler({}, ["info"], {});
     expect(result.success).toBe(false);
-    expect(result.message).toContain("/skill info <name>");
+    expect(result.message).toContain("/skill info NAME");
   });
 
   it("shows error for info on unknown skill", async () => {
@@ -40,7 +64,7 @@ describe("skillHandler", () => {
   it("shows error for run without agent session", async () => {
     const result = await skillHandler({}, ["run", "some-skill"], {});
     expect(result.success).toBe(false);
-    expect(result.message).toContain("active agent session");
+    expect(result.message).toContain("Unknown skill");
   });
 
   it("rejects run with missing skill name", async () => {
@@ -53,12 +77,6 @@ describe("skillHandler", () => {
     const result = await skillHandler({}, ["nonexistent-skill-xyz"], {});
     expect(result.success).toBe(false);
     expect(result.message).toContain("Unknown skill");
-  });
-
-  it("shows usage for install without repo", async () => {
-    const result = await skillHandler({}, ["install"], {});
-    expect(result.success).toBe(false);
-    expect(result.message).toContain("/skill install");
   });
 
   it("rejects invalid install repo format before invoking git", async () => {

@@ -39,10 +39,26 @@ export function commandPreflight(parsed: ParsedCommand): CommandResult | undefin
   if (command === "doctor") allowed = ["phase"];
   if (command === "resume") allowed = ["task"];
   const action = positional[0] || "list";
+  if (command === "mcp") {
+    if (!["list", "info", "install", "remove", "export"].includes(action)) return fail("Unknown MCP action.");
+    if (keys.some(key => key !== "local") || flags.local !== undefined && (flags.local !== true || ["info", "export"].includes(action))) return fail("Use --local only with list/install/remove.");
+    if (action === "list" ? positional.length > 1 : action === "info" ? positional.length !== 2 : positional.length < 2) return fail("Choose MCP names. Use /mcp to see the presets.");
+    if (positional.slice(1).some(name => !/^[A-Za-z0-9_-]+$/.test(name))) return fail("Invalid MCP name.");
+    return;
+  }
+  if (command === "skill" && ["install", "remove", "catalog"].includes(action)) {
+    if (action === "catalog") return keys.length || positional.length > 1 ? fail("Catalog takes no arguments.") : undefined;
+    if (action === "remove") return keys.length || positional.length < 2 || positional.slice(1).some(name => !name.trim()) ? fail("Use /skill remove NAME [NAME ...].") : undefined;
+    if (keys.some(key => !["repo", "all"].includes(key))) return fail("Unknown install option.");
+    if (flags.all !== undefined && (flags.all !== true || keys.length > 1 || positional.length > 1)) return fail("Use /skill install --all by itself.");
+    if (flags.repo !== undefined && (typeof flags.repo !== "string" || !flags.repo.trim() || positional.length > 1)) return fail("Use one --repo OWNER/REPO.");
+    if (positional.slice(1).some(name => !name.trim()) || positional.slice(1).some(name => name.includes("/")) && positional.length !== 2) return fail("Choose skill names, or one OWNER/REPO.");
+    return;
+  }
   if (command === "skill") {
     allowed = action === "list" ? ["scope", "source"] : action === "install" ? ["repo"]
-      : action === "info" ? ["name", "skill", "check", "check-imports", "check-network"] : action === "run" || action === "trigger" ? ["name", "skill", "image"]
-      : action === "audit" ? ["record", "json", "markdown"] : ["image"];
+      : action === "info" ? ["name", "skill"] : action === "run" || action === "trigger" ? ["name", "skill", "image"]
+      : action === "reload" ? [] : ["image"];
   }
   const unknown = keys.find(key => !allowed.includes(key));
   if (unknown) return fail(`Unknown option --${unknown}.`);
@@ -58,24 +74,16 @@ export function commandPreflight(parsed: ParsedCommand): CommandResult | undefin
     if (!valid) return fail("Invalid portfolio action or argument count.");
   }
   if (command === "skill") {
-    const checkFlags = ["check", "check-imports", "check-network"];
-    if (keys.some(key => checkFlags.includes(key) ? flags[key] !== true : typeof flags[key] !== "string" || !(flags[key] as string).trim())) return fail("Use non-empty option values; --check, --check-imports and --check-network take no value.");
+    if (action === "audit") return fail("Skill report audits have been removed. Follow the upstream SKILL.md.");
+    if (action === "reload" && positional.length > 1) return fail("Reload takes no arguments.");
+    if (keys.some(key => typeof flags[key] !== "string" || !(flags[key] as string).trim())) return fail("Use non-empty option values.");
     if (action === "list" && (positional.length > 1 || keys.length > 1)) return fail("List accepts at most one scope/source filter and no extra arguments.");
     if (["info", "install", "run", "trigger"].includes(action)) {
-      const selectors = [positional[1], ...keys.filter(key => key !== "image" && !checkFlags.includes(key)).map(key => flags[key])].filter(value => value !== undefined);
-      if (selectors.length !== 1 || !String(selectors[0]).trim()) return fail("Specify exactly one skill name or repository, by position or option.");
+      const selectors = [positional[1], ...keys.filter(key => key !== "image").map(key => flags[key])].filter(value => value !== undefined);
+      if (!(action === "install" && selectors.length === 0) && (selectors.length !== 1 || !String(selectors[0]).trim())) return fail("Specify exactly one skill name or repository, by position or option.");
       if ((action === "info" || action === "install") && positional.length > 2) return fail("Unexpected extra arguments.");
     }
-    if (action === "audit") {
-      const target = positional[1];
-      if (positional.length !== 2 || !["macro-regime-detector", "position-sizer"].includes(String(target)))
-        return fail("Audit supports macro-regime-detector or position-sizer reports.");
-      const recordOnly = target === "macro-regime-detector" && keys.length === 1 && typeof flags.record === "string";
-      const reportPair = keys.length === 2 && typeof flags.json === "string" && typeof flags.markdown === "string";
-      if (!recordOnly && !reportPair)
-        return fail(target === "position-sizer" ? "Use both --json REPORT.json and --markdown REPORT.md."
-          : "Use --record PATH, or both --json REPORT.json and --markdown REPORT.md.");
-    }
+
   }
   return;
 }

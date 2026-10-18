@@ -5,8 +5,6 @@ import { isDeepStrictEqual } from "node:util";
 import type { AgentTool } from "../../agent/src/session-runtime/index.ts";
 import type { QuantAgentDependencies, QuantAgentSession } from "../../agent/src/session-contracts.ts";
 import { bashTool } from "../../tools/bash-tool.ts";
-import { checkSkillFiles } from "../../skill/index.ts";
-import { LLMQUANT_REVIEWED_FILES } from "../../skill/index.ts";
 import { createQuantResearchAgent } from "../quant-harness.ts";
 import { EvaluationAnswers, isCompleteEvaluationAnswer } from "./evaluation-answers.ts";
 import type { ResearchEvaluationOptions } from "./research-evaluation.ts";
@@ -34,14 +32,13 @@ function hashText(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-/** Copy only the reviewed closure into the isolated evaluation root and record the normal file-readiness observation. */
+/** Snapshot the entry and selected workflow for an isolated evaluation, without a production certification gate. */
 export function stageSkillEvaluation(id: SkillEvaluationCase, installedSkillsRoot: string, evaluationRoot: string) {
   const fixture = skillEvaluationCase(id);
-  const manifest = LLMQUANT_REVIEWED_FILES[fixture.skill];
-  if (!manifest) throw new Error(`Missing reviewed files for ${fixture.skill}`);
+  const files = ["SKILL.md", fixture.workflow];
   const sourceRoot = resolve(installedSkillsRoot, REPOSITORY_DIR, "skills", fixture.skill);
   const targetRoot = resolve(evaluationRoot, "skills", REPOSITORY_DIR, "skills", fixture.skill);
-  for (const file of Object.keys(manifest)) {
+  for (const file of files) {
     const source = resolve(sourceRoot, file), target = resolve(targetRoot, file);
     const withinSource = relative(sourceRoot, source), withinTarget = relative(targetRoot, target);
     if (withinSource === ".." || withinSource.startsWith(`..${sep}`) || withinTarget === ".." || withinTarget.startsWith(`..${sep}`)) {
@@ -51,9 +48,7 @@ export function stageSkillEvaluation(id: SkillEvaluationCase, installedSkillsRoo
     copyFileSync(source, target);
   }
   const skillFile = join(targetRoot, "SKILL.md");
-  const readiness = checkSkillFiles(evaluationRoot, skillFile, manifest);
-  if (readiness.status !== "available") throw new Error(`Installed ${fixture.skill} does not match the reviewed evaluation closure: ${readiness.reason}`);
-  return { fixture, skillFile, workflowFile: join(targetRoot, fixture.workflow), stagedFiles: Object.keys(manifest) };
+  return { fixture, skillFile, workflowFile: join(targetRoot, fixture.workflow), stagedFiles: files };
 }
 
 function commandText(args: unknown): string {
@@ -130,10 +125,10 @@ export async function runSkillEvaluation(id: SkillEvaluationCase, dependencies: 
       toolFailures.push({ tool: event.message.toolName, message: event.message.content.filter(part => part.type === "text").map(part => part.text).join("\n") });
     }
   });
-  let readiness: Awaited<ReturnType<QuantAgentSession["getSkills"]>>[number]["readiness"];
+  let discovered = false;
   try {
     const skill = (await agent.getSkills()).find(candidate => candidate.name === fixture.skill);
-    readiness = skill?.readiness;
+    discovered = !!skill;
     await agent.skill(fixture.skill, fixture.prompt, { signal }); signal.throwIfAborted();
     if (agent.state.errorMessage) outcome = "request-failed";
   } catch (error) {
@@ -147,10 +142,9 @@ export async function runSkillEvaluation(id: SkillEvaluationCase, dependencies: 
   const accepted = trace.reads.filter(read => read.status === "accepted"), rejected = trace.reads.filter(read => read.status === "rejected");
   const injection = providerPayloads[0] ?? "", workflowPayload = providerPayloads.slice(1).some(payload => payload.includes(fixture.workflowMarker));
   const checks = [
-    { name: "reviewed skill exposes only the limited supplied-evidence mode", passed: readiness?.status === "needs-input"
-      && isDeepStrictEqual(readiness.modes.map(mode => mode.status), ["blocked", "needs-input"]) },
-    { name: "explicit production skill invocation and preflight reach the provider", passed: injection.includes(`<skill name=\\\"${fixture.skill}\\\"`)
-      && injection.includes("limited supplied evidence (needs-input)") && fixture.injectionNeedles.every(needle => injection.includes(needle)) },
+    { name: "selected skill is loaded", passed: discovered },
+    { name: "explicit skill invocation reaches the provider", passed: injection.includes(fixture.skill)
+      && fixture.injectionNeedles.every(needle => injection.includes(needle)) },
     { name: "model selects and reads exactly the expected reviewed workflow", passed: accepted.length === 1 && accepted[0]?.workflow === fixture.workflow
       && rejected.length === 0 && toolCalls.filter(call => call.name === "bash").length === 1
       && toolCalls.length === requiredTools.length && toolCalls.every(call => requiredTools.includes(call.name)) },
@@ -173,7 +167,7 @@ export async function runSkillEvaluation(id: SkillEvaluationCase, dependencies: 
       endpointHash: createHash("sha256").update(connection.model.baseUrl).digest("hex"), toolNames: agent.state.tools.map(tool => tool.name), timeoutMs, maxRequests },
     fixture: { kind: "reviewed-skill-and-supplied-workspace-snapshot", skill: fixture.skill, workflow: fixture.workflow, liveMarketAccess: false, prompt: fixture.prompt },
     outcome, requests, usage: { inputTokens, outputTokens }, checks, passed: outcome === "finished" && checks.every(check => check.passed),
-    readiness, trace, toolCalls, toolFailures, knownClaimViolations, answers: completion.answers, ...(failure ? { failure } : {}),
+    discovered, trace, toolCalls, toolFailures, knownClaimViolations, answers: completion.answers, ...(failure ? { failure } : {}),
     reviewRequired: "Review the retained answer for prioritization and wording. Automated checks prove explicit skill injection, one reviewed workflow read, supplied fact/date retention, and stated evidence/read-only boundaries; they do not prove general workflow selection or financial advice quality." };
 }
 

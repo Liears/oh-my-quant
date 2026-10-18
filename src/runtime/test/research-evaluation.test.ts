@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from "bun:test";
+import { afterEach, beforeEach, expect, it, setDefaultTimeout } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
@@ -7,11 +7,35 @@ import { createBuiltinTools, findBuiltinTool } from "../../tools/registry.ts";
 import { DEFAULT_SETTINGS } from "../../types/config.ts";
 import { saveSettings } from "../../storage/index.ts";
 import { createHash } from "node:crypto";
-import { createEvaluationFundData, createEvaluationPriceData, researchEvaluationCase, runResearchEvaluation, type ResearchEvaluationCase } from "../evaluation/research-evaluation.ts";
+import { createEvaluationFundData, createEvaluationPriceData, researchEvaluationCase, runResearchEvaluation as evaluateResearch, type ResearchEvaluationCase } from "../evaluation/research-evaluation.ts";
 import type { ResearchTaskSpec } from "../../types/research-task.ts";
 import { createEvaluationPortfolioData } from "../evaluation/research-evaluation-portfolio.ts";
 
 type Call = { name: string; args: Record<string, unknown> };
+// These cases persist evidence and recover sessions across multiple HTTP turns.
+// Keep the 10s operation deadline inside the 30s test budget (some cases run twice).
+setDefaultTimeout(30_000);
+let fixtureController: AbortController;
+let pending: Set<ReturnType<typeof evaluateResearch>>;
+let cancellationTimer: ReturnType<typeof setTimeout> | undefined;
+let onRequest: () => void;
+
+function runResearchEvaluation(...[id, deps, options = {}]: Parameters<typeof evaluateResearch>) {
+  // A timed-out test continuation must not start more work during teardown.
+  fixtureController.signal.throwIfAborted();
+  const signal = options.signal ? AbortSignal.any([options.signal, fixtureController.signal]) : fixtureController.signal;
+  const operation = evaluateResearch(id, deps, { timeoutMs: 10_000, ...options, signal });
+  const owned = pending;
+  owned.add(operation);
+  void operation.then(() => owned.delete(operation), () => owned.delete(operation));
+  return operation;
+}
+
+async function stopEvaluations() {
+  fixtureController.abort();
+  await Promise.allSettled([...pending]);
+}
+
 let root: string, previous: string | undefined, noProxy: string | undefined;
 let server: ReturnType<typeof Bun.serve>, requests: number, loop: boolean, hold: boolean;
 let steps: Array<(payload: Record<string, unknown>) => Call | undefined>;
@@ -19,6 +43,7 @@ let receivedHashes: string[];
 let answerText: string, answerEnding: "stop" | "length";
 let stalledAnswer: "partial" | "empty" | null, cancelAnswer: () => void;
 beforeEach(() => {
+  fixtureController = new AbortController(); pending = new Set(); cancellationTimer = undefined; onRequest = () => {};
   previous = process.env.OHQUANT_DIR; noProxy = process.env.NO_PROXY;
   root = mkdtempSync(join(tmpdir(), "whyj-evaluation-test-")); process.env.OHQUANT_DIR = root; process.env.NO_PROXY = "127.0.0.1,localhost";
   requests = 0; steps = []; loop = false; hold = false; receivedHashes = [];
@@ -26,6 +51,7 @@ beforeEach(() => {
   stalledAnswer = null; cancelAnswer = () => {};
   server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(incoming) {
     const payload = await incoming.json() as Record<string, unknown>; requests++;
+    onRequest();
     receivedHashes.push(createHash("sha256").update(JSON.stringify(payload)).digest("hex"));
     if (hold) return new Response(new ReadableStream(), { headers: { "content-type": "text/event-stream" } });
     const call = loop ? { name: "research_task", args: { action: "read" } } : steps.shift()?.(payload);
@@ -34,7 +60,7 @@ beforeEach(() => {
     const chunk = { id: "evaluation", object: "chat.completion.chunk", created: 0, model: "evaluation-test" };
     if (!call && stalledAnswer) return new Response(new ReadableStream({ start(controller) {
       if (stalledAnswer === "partial") controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ ...chunk, choices: [{ index: 0, delta, finish_reason: null }] })}\n\n`));
-      setTimeout(cancelAnswer, 100);
+      cancellationTimer = setTimeout(cancelAnswer, 100);
     } }), { headers: { "content-type": "text/event-stream" } });
     return new Response([{ ...chunk, choices: [{ index: 0, delta, finish_reason: null }] },
       { ...chunk, choices: [{ index: 0, delta: {}, finish_reason: call ? "tool_calls" : answerEnding }] }]
@@ -43,12 +69,27 @@ beforeEach(() => {
   const settings = structuredClone(DEFAULT_SETTINGS); settings.provider = "custom"; settings.model = "evaluation-test"; settings.thinkingLevel = "off";
   settings.providers = { custom: { baseUrl: `${server.url}v1`, api: "openai-completions", apiKey: "TEST_SECRET_MUST_NOT_APPEAR" } }; saveSettings(settings);
 });
-afterEach(() => {
-  server.stop(true);
+afterEach(async () => {
+  // Finish owned async work before removing the root or restoring process.env.
+  await stopEvaluations();
+  clearTimeout(cancellationTimer);
+  await server.stop(true);
   if (previous === undefined) delete process.env.OHQUANT_DIR; else process.env.OHQUANT_DIR = previous;
   if (noProxy === undefined) delete process.env.NO_PROXY; else process.env.NO_PROXY = noProxy;
   if (!resolve(root).startsWith(resolve(tmpdir()) + sep)) throw new Error("Unexpected evaluation fixture directory");
   rmSync(root, { recursive: true, force: true });
+}, 15_000);
+
+it("fixture teardown cancels an active provider stream before releasing its workspace", async () => {
+  hold = true;
+  const started = Promise.withResolvers<void>(); onRequest = started.resolve;
+  const operation = runResearchEvaluation("stock", dependencies());
+  await started.promise;
+  await stopEvaluations();
+  expect((await operation).outcome).toBe("cancelled");
+  expect(pending.size).toBe(0);
+  expect(process.env.OHQUANT_DIR).toBe(root);
+  expect(() => runResearchEvaluation("stock", dependencies())).toThrow();
 });
 
 function dependencies(id: ResearchEvaluationCase = "stock") {

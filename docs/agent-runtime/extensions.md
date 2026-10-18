@@ -2,7 +2,7 @@
 
 更新：2026-10-13。协议为 WhyJ Extension API 1，使用 Pi AgentTool/Skill 数据类型；不实现 Pi Coding Agent ExtensionAPI，也不承诺安装 npm Pi 包即可运行。
 
-扩展由显式静态 import 后交给宿主加载，不扫描或动态执行任意目录。manifest 声明 ID、发行版本、精确 API 版本，以及工具、skills、命令和 capability 名称；实现与声明必须完全一致。`capabilities` 是 API 1 的可选增量字段，旧定义省略时按空集合处理。命令通过扩展宿主 API 调用，现有十个公开 slash 命令保持单一 catalog。
+扩展由显式静态 import 后交给宿主加载，不扫描或动态执行任意目录。manifest 声明 ID、发行版本、精确 API 版本，以及工具、skills、命令和 capability 名称；实现与声明必须完全一致。`capabilities` 是 API 1 的可选增量字段，旧定义省略时按空集合处理。命令通过扩展宿主 API 调用，公开 slash 命令保持单一 catalog。
 
 宿主提供工作目录、扩展生命周期 AbortSignal 与诊断出口。业务不获得 TUI 或私有 storage 实例；Node 扩展属于受信任同进程代码，此接口不是恶意代码沙箱。未来 npm 分发、UI 管理或其他协议的适配不能由本接口推定已完成。
 
@@ -73,7 +73,7 @@ try {
 
 适配器把宿主视为完整工具集合；希望保留内置能力就显式加载 `whyj.core`。`createQuantResearchAgent` 为后续新装工具继续绑定研究任务范围与取消守卫，自定义工具成功不自动成为已核验的研究证据。
 
-插件只有在确实提供并核验某项宿主能力时才发布 capability。下面的资源声明表示同一插件同时提供搜索工具和 `web-search` readiness 事实；`status` 也可为 `missing`、`unverified` 或 `input-required`，重载后会在空闲边界重新计算精选 skill。完整工具 schema 与取消实现可参照 statistics fixture。
+插件只有在确实提供并核验某项宿主能力时才发布 capability。下面的资源声明表示同一插件同时提供搜索工具和 `web-search` readiness 事实；`status` 也可为 `missing`、`unverified` 或 `input-required`，重载后会在空闲边界更新宿主能力快照。完整工具 schema 与取消实现可参照 statistics fixture。
 
 ```ts
 import type { ExtensionDefinition } from "./src/extensions/index.ts";
@@ -102,13 +102,13 @@ export const searchExtension: ExtensionDefinition = {
 };
 ```
 
-能力名在扩展之间及基础宿主能力源之间必须唯一；冲突在初始化前拒绝。宿主复制 capability 回执，调用方后续修改对象不会改变活动快照。能力依赖插件工具时必须用 `requiresTools` 绑定 manifest 中由本插件声明的工具；恢复会话的活动工具选择或研究任务范围移除其中任一工具后，状态会收缩为 missing。绑定未知工具、重复绑定或非数组值在候选发布前拒绝。`shell-execution` 与 `local-resource-read` 即使被插件声明为 available，也不会覆盖会话策略：两者只由当前活动 `bash` 工具决定。Capability 只参与调用资格，不把一次工具成功升级为研究证据。
+能力名在扩展之间及基础宿主能力源之间必须唯一；冲突在初始化前拒绝。宿主复制 capability 回执，调用方后续修改对象不会改变活动快照。`requiresTools` 可声明能力与插件工具的关系，绑定未知工具、重复绑定或非数组值在候选发布前拒绝。2026-10-16 起，默认宿主不再用这些声明计算逐技能资格；可选 `prepareSkills` 策略由自定义宿主负责。能力声明不会自动注册工具，也不是研究证据。
 
 `load(definition)` 添加新 ID；`reload(definition)` 替换已有 ID；`disable(id)` 撤销资源；`enable(id)` 重新执行已保存的初始化工厂。`snapshot()` 返回启用资源，`list()` 包含已禁用条目，`getDiagnostics(id)` 可查询初始化失败和清理错误。初始化失败的 ID 不加入 list。`reserve({ tools, skills, commands, capabilities })` 原子预留宿主名称，已占用时失败；会话适配器自动预留 `research_task` 和基础宿主当前发布的能力名，因此需要 `await`。`dispose()` 取消整个宿主并清理资源。
 
 会话在空闲 `getSkills()` 或下一次独立 prompt/skill 时读取版本，先准备工具、合并技能与 prompt，再提交。基础技能与扩展技能重名时保留旧会话资源，修复后可重试。只刷新技能不写研究日志；工具集合变化通过已有 active-tools entry 保存选择。自动选择模式接纳新增工具，恢复的显式选择仅与当前工具取交集；显式空集合保持为空。
 
-默认 AppRuntime 在启动及启用/重载前预留已发现的本地技能名和基础宿主能力名，名称在此宿主生命周期中保持预留；冲突在扩展初始化前拒绝。后续外部技能编辑若产生冲突，刷新失败会明确提示，用户可禁用扩展或修正技能后重试。当前活动工具清单随 system prompt 更新，旧工作流说明仅在对应工具启用时适用；禁用能力不能通过 shell 自动绕过。只接管 Agent 工具、扩展技能和 readiness 能力事实，Overview、Doctor 与本地配置服务具有各自生命周期。
+默认 AppRuntime 在启动及启用/重载前预留已发现的本地技能名和基础宿主能力名，名称在此宿主生命周期中保持预留；冲突在扩展初始化前拒绝。后续外部技能编辑若产生冲突，刷新失败会明确提示，用户可禁用扩展或修正技能后重试。当前活动工具清单随 system prompt 更新，旧工作流说明仅在对应工具启用时适用；禁用能力不能通过 shell 自动绕过。只接管 Agent 工具、扩展技能和 宿主能力元数据，Overview、Doctor 与本地配置服务具有各自生命周期。
 
 ## 测试方式
 
@@ -121,8 +121,8 @@ bun run test
 bun run build
 ```
 
-回归分三层：[扩展宿主](../../src/extensions/test/host.test.ts)检查 manifest/API、名称预留、初始化/重载失败、取消与资源清理；[会话接线](../../src/runtime/test/extension-session.test.ts)检查真实 Pi 循环里的工具增删、技能资格、任务子集、原会话保留；[应用管理](../../tests/app/app-extensions.test.ts)检查实际 CLI/Composer 入口、设置冲突回滚、启动取消与 shutdown 等待。
+回归分三层：[扩展宿主](../../src/extensions/test/host.test.ts)检查 manifest/API、名称预留、初始化/重载失败、取消与资源清理；[会话接线](../../src/runtime/test/extension-session.test.ts)检查真实 Pi 循环里的工具增删、技能刷新、任务子集、原会话保留；[应用管理](../../tests/app/app-extensions.test.ts)检查实际 CLI/Composer 入口、设置冲突回滚、启动取消与 shutdown 等待。
 
-能力声明不能伪造 shell；基础名称冲突在激活前拒绝，绑定工具退出活动集合后资格撤销。禁用选择跨重启保留，未知 ID 不被偷偷删除；忙碌时只读查看。异步启动中的提交须等待启动完成，不能吞掉用户紧接的输入；补全检查应读取真实建议列表，不只统计刷新回调。
+能力声明不能注册 shell；基础名称冲突在激活前拒绝。默认宿主只更新资源，不维护逐技能运行资格。禁用选择跨重启保留，未知 ID 不被偷偷删除；忙碌时只读查看。异步启动中的提交须等待启动完成，不能吞掉用户紧接的输入；补全检查应读取真实建议列表，不只统计刷新回调。
 
 这些测试使用隔离 fixture、本地 HTTP/SSE 和源码 CLI，不访问真实模型、行情或资产。独立 bundle 是否可运行需要另外验证；并行超时后的隔离通过不能改写原失败。接口是否可达及异步入口的反思见[模块边界](../blog/09-boundaries-for-change.md)，完整产品状态由 [PRD](../quant-harness/PRD.md)维护，不在本页保存历次通过数。

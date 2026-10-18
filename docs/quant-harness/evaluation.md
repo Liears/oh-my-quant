@@ -40,6 +40,18 @@ bun run eval:research -- --case all --timeout-ms 180000 --max-requests 12 --outp
 
 <a id="tasks"></a>
 
+## CI 测试生命周期
+
+集成测试的业务期限应先于测试框架的外层期限到达；外层超时不等于异步工作已经停止。[research-evaluation.test.ts](../../src/runtime/test/research-evaluation.test.ts) 使用 10 秒 fixture 操作预算和 30 秒测试预算，显式超时反例保留自己的期限，生产默认值不变。清理开始后拒绝新评测，先取消并等待所有在途评测，再停止服务器、恢复环境和移除临时目录；清理 hook 有独立 15 秒预算。
+
+[research-decisions.test.ts](../../src/runtime/test/research-decisions.test.ts) 多次写入真实锁定归档并生成报告，使用 30 秒测试预算。夹具持有完整测试 Promise；超时后的清理也先等待写入和其后续步骤结算，再恢复环境、删除工作目录，避免迟到写入报 ENOENT。预算不是性能目标；仍保留全部报告范围与证据断言。
+
+[skill-command-cancellation.test.ts](../../src/runtime/test/skill-command-cancellation.test.ts) 等待 provider 实际收到请求后取消，并用受控响应 barrier 验证取消先于正常回答完成。启动时间不计入取消性能断言；测试仍要求原始取消原因、无成功结果、无正常 assistant stop、streaming=false 和未取消路径成功。外层期限只负责发现挂死，不把放宽机器速度要求当作放宽取消契约。
+
+[Doctor handler 测试](../../src/cli/test/handlers/system.test.ts) 通过现有 collector/dependency 注入口固定 Python 状态，保留真实格式化与面板状态推送；仅设置 skip-network 并不能阻止本机 Python 探针。真实依赖检查由 Doctor 依赖矩阵和 CLI 进程测试承担。
+
+完整历史、首次失败 attempt 与相应取舍见 [Agentic / Vibe Repo Ops](../blog/agentic/vibe-repo-ops.md)。这些合成测试不调用真实市场或模型。
+
 ## 任务与恢复
 
 固定矩阵入口为 [research-task-matrix.test.ts](../../src/runtime/test/research-task-matrix.test.ts)。这组测试检查研究任务的执行、证据与恢复契约；模型动作由固定 SSE 响应给定，不测自然语言理解准确率。下节提供真实模型运行入口；自动门槛与人工审阅须分别记录。
@@ -274,7 +286,7 @@ bun run eval:research -- --case skill-all --timeout-ms 180000 --max-requests 6 -
 
 ### 隔离与执行链
 
-CLI 在创建第一个 Session 前，一次性把本次要运行的全部 reviewed closure 复制到 TEMP；否则 Pi skill discovery 的正常缓存会只看到第一个已 staged 的目录。每个闭包复用生产 [文件探测器](../../src/skill/file-probe.ts)核对 SHA-256。默认 Session 继续执行真实 `prepareRuntimeSkills`、`QuantAgentSession.skill()`、skill XML 注入、Pi provider 请求和工具循环；source-backed research 因缺 LLMQuant research/workspace 服务保持 blocked，limited supplied evidence 保持 needs-input 并接收本次合成输入。
+CLI 在创建第一个 Session 前把选定技能的 `SKILL.md` 与目标 workflow 复制到隔离目录，再通过 Pi 加载。当前评测保留显式技能注入、工具读取与回答核对；2026-10-16 已移除生产文件哈希探测和模式资格，不再评测 blocked/needs-input。下文带日期的旧成绩属于此前实现，不能作为简化后新版本的验收。
 
 每例提供一个名为 `bash` 的兼容工具。它不启动 shell，只允许一次简单只读命令读取该例预期的 staged workflow；其它 workflow、第二次读取、命令分隔符、重定向和写入命令均拒绝。恐慌评分案例另外提供生产纯计算工具 `calculate_weighted_score`，核对用户给定分数与权重。报告只保存命令/参数 SHA-256、workflow 名称和状态，不保存本机临时路径。Quant Harness 自身仍附加 `research_task`，skill 案例不允许用它替代 workflow 读取。
 
@@ -333,8 +345,8 @@ bun run src/runtime/dev/check-data-providers.ts --public-only --output output/da
 | 淘汰的入口 | 现行复验方式与代价 |
 |---|---|
 | `check-public-a-fallback.ts`、`check-public-global-fallback.ts`、`check-public-fund-fallback.ts` | 冷取数与缓存重放使用 [source facade 测量](../../src/runtime/dev/measure-public-source-facade.ts)，独立 NAV 使用 [基金运行时测量](../../src/runtime/dev/measure-public-fund-runtime.ts)，连接使用上方 provider 矩阵与 `/doctor --tool fetch_bars`。精确 fallback、复权和基金工具契约分别由 [A 股](../../src/source/tests/sina-a-history.test.ts)、[US/HK](../../src/source/tests/sina-global-history.test.ts)、[基金端点](../../src/source/tests/eastmoney-fund-nav.test.ts)和[基金工具](../../src/runtime/test/fund-literal-data.test.ts)固定回归。删除的是一次性「固定日期 + 固定端点 + 编译 CLI」组合探针；这些替代入口不是那三次历史观察的同范围重跑，也不会强制真实上游再次触发旧 fallback。 |
-| `check-skill-network.ts` | 公开 breadth 端点与 Python 导入已经纳入 [breadth 独立检查](../../src/cli/dev/check-breadth-skill.ts)；保留 [网络探针回归](../../src/skill/test/network-probe.test.ts)。不再额外创建一个故意不满足 reviewed files 的相同网络检查入口；完整 breadth 检查还需要固定源文件与报告链路可用，不能把二者的失败范围混同。 |
-| `chart-image-validation-fixture.py` | 原脚本固定了 `output/` 日期、个人 `.ohquant/skills` checkout、Git revision 和 Windows Arial 路径。显式图像验证仍由 [validate-chart-image.ts](../../src/runtime/dev/chart/validate-chart-image.ts)接收 `--image`、`--skills-root` 和新的 `--output`；它会调用模型，不自动生成旧教学图。图像输入与只读参考边界保留 [输入回归](../../src/runtime/test/chart-image-input.test.ts)及[参考读取回归](../../src/runtime/test/chart-reference-reader.test.ts)，不把传输测试当作视觉准确性验证。 |
+| `check-skill-network.ts` 与各技能专用检查脚本 | 2026-10-16 随自建技能资格层移除；依赖和网络使用方法交给上游，JQ 保留 Pi 加载与通用会话回归。 |
+| `chart-image-validation-fixture.py` 与 `validate-chart-image.ts` | 专用固定技能核验已移除。图片仍有[输入回归](../../src/runtime/test/chart-image-input.test.ts)、[实际 Pi 图片会话回归](../../src/agent/test/chart-image-session.test.ts)和[参考读取回归](../../src/runtime/test/chart-reference-reader.test.ts)；这些不代表视觉分析质量。 |
 | `check-pi-dual-cli.ts` | 使用[配置文档](./configuration.md#pi-verification)中的当前连接诊断与 Pi 导入回归。旧脚本绑定单一模型和旧包布局，删除后不再提供原双 CLI 并发场景的一键入口；单侧 Doctor 不能证明双侧并发与 OAuth 刷新。 |
 
 已有报告记录的脚本路径和哈希仍属于当时的代码快照，不能因入口淘汰而回写为新路径；需要原样复现时，恢复对应 Git 版本并另存新回执。本轮清理与确定性检查不构成新的真实市场、模型或实体终端验收。

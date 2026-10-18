@@ -207,6 +207,8 @@ Azure、Bedrock、Vertex、Mistral 的原生协议也可导入并在各自 provi
 
 ## Market Data 与凭证
 
+内置行情源使用本节的统一配置入口。可选 MCP 服务的介绍、官方链接和连接参数见 [Skills 与 MCP 指南](./trader-skills.md#mcp)；`/mcp install <name>`、`/mcp remove <name>` 按需维护 Pi 配置，`/mcp export <name>` 导出模板。本页行情设置不会自动转成 MCP 凭证。
+
 | Market Data | 主要市场 | Data Token |
 |---|---|---|
 | `akshare` | A 股、指数、基金 | 不需要 |

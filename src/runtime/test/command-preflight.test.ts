@@ -51,13 +51,13 @@ it("rejects invalid command arguments before settings, panels, mutation and diag
 
 it("preserves documented research commands, skill selectors, quoted labels and endpoint parameters", () => {
   for (const input of ["/clear", "/exit", "/compact retain original parameters", "/resume old-session", "/resume --task", "/portfolio",
-    "/skill info macro-regime-detector --check-imports", "/skill info --name technical-analyst --check --check-imports --check-network",
+    "/skill info technical-analyst", "/skill info technical-analyst",
     '/portfolio create "Growth --US"', '/portfolio add "Growth US" AAPL "Apple Inc"', "/portfolio remove Core AAPL", "/portfolio import old group",
     "/doctor --phase DATA,tools", "/doctor --tool fetch_bars --market US --symbol AAPL --start 2025-01-06 --end 2025-01-17",
-    "/skill list --scope user", "/skill info Alpha --check", "/skill info --name Alpha --check", "/skill install --repo owner/repo",
-    "/skill info market-breadth-analyzer --check-network", "/skill info --name market-breadth-analyzer --check --check-network",
-    "/skill info macro-regime-detector --check --check-network",
-    '/skill audit position-sizer --json "C:\\Private Report\\position.json" --markdown "C:\\Private Report\\position.md"',
+    "/skill list --scope user", "/skill info technical-analyst", "/skill info technical-analyst", "/skill install --repo owner/repo",
+    "/skill info technical-analyst", "/skill info technical-analyst",
+    "/skill info technical-analyst",
+    "/skill install",
     "/skill run Alpha retain dates", "/skill trigger --skill Alpha", "/skill:Alpha retain dates", "/config --pi list", "/config --extensions list",
     '/config --pi preview --provider custom --model "model with spaces"', '/config --pi apply --from "C:\\Pi Lab" --review observed-token',
     "/config --extensions", "/config --extensions disable whyj.core", "/config --extensions reload whyj.core"]) {
