@@ -97,6 +97,12 @@ describe("CLI doctor command", () => {
         hints: expect.arrayContaining([expect.stringContaining("Python")]),
       }),
     }));
+    // The fixture deliberately excludes Python. Every failed phase must retain
+    // its actionable diagnosis independently of host machine configuration.
+    const failedPhases = body.data.phases.filter((phase: { status: string }) => phase.status === "fail");
+    expect(body.data.overall).toBe(failedPhases.length ? "partial_fail" : "all_pass");
+    expect(body.data.hints).toEqual([...new Set(failedPhases
+      .map((phase: { action?: string }) => phase.action).filter(Boolean))]);
     expect(body.data.phases).toContainEqual(expect.objectContaining({ phase: "tools", status: "fail", dependency: { status: "missing-python" } }));
     expect(body.data.auth.WHYJ_QUANT_API_KEY).toEqual(expect.objectContaining({
       available: true,

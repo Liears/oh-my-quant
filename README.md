@@ -60,7 +60,8 @@ Source checkouts also include an experimental local Web research workspace: `bun
 | `/config` | Connect models and data; adjust the workspace |
 | `/doctor` | Check the research environment |
 | `/portfolio` | Manage observation groups |
-| `/skill` | Discover and inspect skills |
+| `/skill` | Choose, install, remove, and run skills |
+| `/mcp` | Choose and manage MCP presets for Pi |
 | `/artifact` | Browse reports and restore their source research |
 | `/resume` | Continue a saved session |
 

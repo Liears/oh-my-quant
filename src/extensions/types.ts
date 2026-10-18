@@ -10,7 +10,7 @@ export interface ExtensionManifest {
   tools: string[];
   skills: string[];
   commands: string[];
-  /** Additive API 1 field: trusted capability facts published to curated skill readiness. */
+  /** Additive API 1 field: trusted capability facts available to custom host policies. */
   capabilities?: string[];
 }
 

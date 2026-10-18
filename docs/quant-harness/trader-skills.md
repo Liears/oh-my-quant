@@ -1,116 +1,174 @@
-# Skills：安装、发现与调用资格
+# Skills 与 MCP：预制入口与 Pi 加载
 
-更新：2026-10-13。本页统一维护技能的完整生命周期，不再把“文件装到了磁盘”“模型看见名称”和“本轮可以执行”混成一个 ready。命令参数见 [Slash 参考](./slash-commands.md)，会话和图片边界见 [Harness](./README.md)，误判与修正见[能力与技能](../blog/04-capability-and-skills.md#readiness)。
+更新：2026-10-16。JQ 只维护推荐目录、一键下载与加载入口。Skills 的目录扫描、元数据解析、忽略规则和模型索引直接复用锁定的 `@earendil-works/pi-coding-agent`；工作流、依赖和使用方法由上游 `SKILL.md` 维护。
+
+<a id="toolkit"></a>
+
+## 从研究任务找到工具
+
+| 入口 | JQ 提供什么 | 如何开始 |
+|---|---|---|
+| 内置行情与量化工具 | 数据适配器、因子、回测、风险与报告 | `/config → Market Data`，按需填写凭证，检查并保存 |
+| 预制 Skills | 两个仓库的下载版本和十个可选入口 | `/skill install` 查看选项，再按名称安装；`/skill remove` 移除 |
+| MCP 扩展 | 预制目录、Pi 配置增删和模板导出 | `/mcp` 选择服务；连接与认证由 Pi 等 MCP 宿主负责 |
+
+行情接入范围见[数据源](./source-data-providers.md)，配置见 [Market Data](./configuration.md#market-data-与凭证)。MCP 参数不放入 `.ohquant/settings.json`。安装 Pi SDK 以复用 Skills API，不意味着 JQ 自动启动了 Pi 的 MCP 会话。
+
+### 预制研究技能
+
+| 上游 | 默认入口 | 主要用途 |
+|---|---|---|
+| [LLMQuant/skills](https://github.com/LLMQuant/skills) | `llmquant-data`、`llmquant-macro`、`llmquant-equities` | 数据、宏观与公司研究 |
+| 同上 | `llmquant-portfolio`、`llmquant-risk` | 组合与风险研究 |
+| [Claude Trading Skills](https://github.com/tradermonty/claude-trading-skills) | `technical-analyst`、`market-breadth-analyzer` | 图表与市场广度 |
+| 同上 | `position-sizer`、`macro-regime-detector`、`market-environment-analysis` | 仓位、跨资产宏观与市场环境 |
+
+JQ 负责帮助用户找到并加载这些指令。Python 包、数据服务、账户权限和输入材料按各技能上游说明准备；安装成功只表示源码已下载，不是运行结果认证。
 
 <a id="installation"></a>
 
-## 1. 安装与更新
+## 一键下载与加载
 
-交互启动可在后台补齐缺失的默认精选仓库；headless 不自动下载。目录已存在会跳过安装，不代表完整、兼容或可调用。一个仓库失败不阻止检查下一个，取消则停止后续工作；进程内同一目标路径的并发安装拒绝。
+```text
+/skill install
+/skill install technical-analyst llmquant-risk
+/skill
+/skill info technical-analyst
+/skill run technical-analyst --image "C:\Charts\weekly.png" 分析这张周线图
+/skill remove technical-analyst
+/skill install technical-analyst
+/skill reload
+```
 
-新安装在不可被发现的临时目录中完成 clone、HEAD 和核心文件检查，再原子重命名到目标。失败只清理本次临时目录。已有目录更新先检查仓库根、origin，以及 tracked/untracked/ignored 文件；有用户变化则拒绝，不执行 reset、stash 或删除重装。更新采用明确的快进策略；精选目录使用审阅提交，普通外部仓库没有同等固定版本保证。fetch 可能修改 Git 元数据，不能把失败描述成字节完全没变。
+`/skill install` 不带名称时展示可选清单，等同 `/skill catalog`，不下载。`/skill install <name> [name ...]` 只启用选中的技能，需要首次下载时才使用 Git 和 GitHub 网络。`/skill install --all` 显式选择全部预制项。共享仓库会完整下载并缓存，但模型只看到所选技能；清单区分 available、cached 和 selected。启动不自动下载。选择变化后刷新发现缓存和建议列表，空闲会话在下一次独立请求加载新内容。
 
-退出会取消 Git 进程树（Windows）或进程组（Unix）并尝试清理。进程内保护不等于跨进程锁，也不保证崩溃后没有临时文件。安装成功才发布技能 revision，空闲会话在下一次列表/独立请求准备时重读；进行中的请求与已排队 follow-up 保留旧快照。准备失败保留旧资源，任意编辑文件不会自动热加载。
+`/skill remove <name> [name ...]` 移除 JQ 管理的加载选择，不删除共享仓库源码或用户修改。选择保存在安装根的 `.selection.json`；空数组表示该仓库不加载任何技能，缺失记录兼容旧安装。再次 `/skill install <name>` 可离线启用已缓存技能。项目自带与用户外部技能仍在各自来源管理，不能由此命令删除。
 
-第三方技能的功能、工作流与使用教程直接参考上游，不在本页逐项复述：
+要安装其他仓库或显式更新已有仓库，使用 `/skill install <owner/repo>`。修改本地 `SKILL.md` 后执行 `/skill reload`。进行中的请求和已排队续问保持原快照，避免一次研究中途替换指令。
 
-| 上游文档 | 本项目固定版本 |
+| 预制仓库 | 下载版本 |
 |---|---|
-| [LLMQuant/skills](https://github.com/LLMQuant/skills) | [已审阅提交 1918237](https://github.com/LLMQuant/skills/tree/1918237467c2dff4cc97a18ebc0892dfd46e8129) |
-| [Claude Trading Skills](https://github.com/tradermonty/claude-trading-skills) | [已审阅提交 a2506fd](https://github.com/tradermonty/claude-trading-skills/tree/a2506fd1bab662723fb7142734320fef23fc48fa) |
+| LLMQuant/skills | [1918237](https://github.com/LLMQuant/skills/tree/1918237467c2dff4cc97a18ebc0892dfd46e8129) |
+| tradermonty/claude-trading-skills | [a2506fd](https://github.com/tradermonty/claude-trading-skills/tree/a2506fd1bab662723fb7142734320fef23fc48fa) |
 
-上游能力介绍不是本项目的就绪承诺；本地精选范围与模式要求以 [catalog](../../src/skill/catalog.ts) 和实际检查结果为准。
-
-默认只展示精选白名单，不因上游新增文件自动扩张。自定义目录由 `OHQUANT_SKILLS_DIR` 等明确配置确定；普通仓库按其 skills 子目录或根目录发现。精选资格同时绑定实际路径和文件内容，不能因为项目中存在同名技能就附上精选认证。
+提交号仅用于可重复下载。JQ 不再维护逐文件哈希、逐技能 Python/网络探测、模式资格或报告审计。更新事务仍保护本地改动：已有仓库存在 tracked/untracked/ignored 变化时拒绝更新；新安装在临时目录准备成功后发布，失败或取消只清理本次临时内容。
 
 <a id="discovery"></a>
 
-## 2. 发现、模型索引与显式调用
+## Pi 负责加载，JQ 负责路径和会话接线
 
-项目祖先的 `.agents/skills`、`.pi/skills` 及额外配置路径参与发现。外部用户级 Codex/Claude/Agents/Pi 路径默认关闭，只有打开 externalSkills 才参与；旧设置按兼容迁移规则合并，设置字段以[配置参考](./configuration.md)为准。
+项目祖先的 `.agents/skills`、`.pi/skills` 和 JQ 安装目录参与发现；`OHQUANT_SKILLS_DIR` 可指定安装根。External Skills 打开后才加入用户级 Codex、Claude、Agents 和 Pi 目录。删除本仓库的 `.claude` 配置不会删除用户自己的外部技能。
 
-`SKILL.md` 需要 name 和 description frontmatter；名称为不超过 64 字符的小写字母/数字/连字符，描述不超过 1,024 字符。同名按发现顺序先到者生效，覆盖不是合并文件。
+JQ 将选择的目录或精确文件路径交给 Pi 的 `loadSkills`（`includeDefaults: false`），用 `parseFrontmatter` 读取正文快照，用 `formatSkillsForPrompt` 生成模型索引。普通仓库用 `loadSkillsFromDir` 枚举 `skills/` 或根目录，之后按名称保存选择、按文件加载，避免同目录中已移除的 Markdown 技能重新出现。管理命令遇到多个仓库的同名技能会拒绝修改，需先在源仓库解决重名；项目与外部路径的发现优先级仍保留第一项。
 
-模型默认只收到 `available_skills` 的名称、描述、位置，不把所有正文塞进 system prompt。`disableModelInvocation` 从模型索引排除；普通技能仍可显式调用，但精选技能的 blocked/unverified 不能靠显式命令绕过。显式调用由 `formatSkillInvocation` 包装正文进入模型轮次，用户只看到 `SKILL.<name>` 的 displayText；TUI 折叠重复同名 banner，不回显隐藏指令全文。
+这些函数通过一个 [Pi 适配文件](../../src/agent/src/pi-skills.ts)导入锁定版本的包内模块，避免 SDK 总入口带入完整应用与额外的模型注册。包内路径不是稳定的独立导出，升级 Pi 时须同步验证；Bun / Node 独立打包测试覆盖无运行时 SDK 安装的技能发现和提示词生成。
 
-可见技能最终依据当前请求工具子集，而非全局注册工具。任务剔除 bash 后，依赖本地资源或执行的技能也需失效。发现缓存可由 `WHYJ_SKILL_CACHE=off` 关闭；该开关不等于刷新已运行会话的资源。
+模型索引包含名称、描述和文件位置；`disable-model-invocation` 交给 Pi 的格式化规则处理。显式 `/skill:<name>` 和 `/skill run <name>` 共用一个入口，将技能正文交给现有会话。Pi 的命令展开器不是独立公开 API，因此 JQ 保留一个很小的正文包装适配，兼容现有会话快照和 `SKILL.<name>` 显示。
 
 <a id="readiness"></a>
-
-## 3. 资格是有范围的观察
-
-```text
-/skill
-/skill info technical-analyst --check
-/skill info market-breadth-analyzer --check-imports --check-network
-/skill info macro-regime-detector --check-imports --check-network
-/skill info market-environment-analysis --check-imports
-/skill audit position-sizer --json REPORT.json --markdown REPORT.md
-```
-
-普通列表和详情不新发 Python、包导入或网络检查。此前成功的文件回执会在读取资格/revision 时有界重读内容：缺失、修改或超限撤销成功并通知空闲会话。恢复原文件不自动恢复资格，需重新显式检查。
-
-| 检查 | 能证明什么 | 不会做什么 |
-|---|---|---|
-| `--check` | 精选路径的固定文件闭包、声明的 Python/包版本 | 不安装包、导入第三方 workflow、运行脚本、调用模型或联网 |
-| `--check-imports` | 包含 Python/包版本与文件检查；同一选定解释器成功导入声明的包 | 不接受任意模块名，不执行 workflow，不代表脚本正确 |
-| `--check-network` | 对指定公开 CSV / ETF 样本取得限时网络观察 | 不验证全部外部服务，不保存长期访问权限 |
-| `audit` | 固定格式报告与显式输入之间的有限算术/方法核对 | 不授予账户读取或公开私有结果的权限 |
-
-文件内容匹配不等于已核对当前 Git HEAD；安装事务的版本检查与调用资格的文件检查是不同观察。Python 选择与行情请求共用规则。需要包的模式仅版本满足时仍为 unverified，导入失败为 blocked；导入成功后仍须满足文件、网络、输入及能力要求。无 Python 的 LLMQuant 路由也需要固定文件检查。网络回执约 5 分钟有效，绑定解释器、导入/包观察和限定资源；重试失败、取消或状态改变不能接受晚到的成功。修复环境、重启或升级技能后应重新检查，不沿用未经验证的推断。
-
-| 状态 | 含义与行为 |
-|---|---|
-| requirements-met | 至少一个模式的已声明运行要求有证据；只开放该模式，不认证脚本或回答质量 |
-| needs-input | 某模式运行条件满足，但缺本次任务资料；可询问输入，不能先分析或执行 |
-| blocked | 所有模式都有已知缺项；从可用索引移出，显式调用返回修复入口 |
-| unverified | 没有可用模式且必要条件缺观察；从可用索引移出，要求先核验 |
-
-模式独立判断；“日历助手可用”不等于“市场环境研究可用”。needs-input 不把普通对话自动认证为图表、账户或市场证据；先询问输入的指令不是任意 shell 参数的安全拦截器。
-
 <a id="capabilities"></a>
 
-## 4. 宿主能力与权限边界
+## 依赖与调用边界
 
-默认宿主以真实 bash 工具提供 shell/local-resource-read，但没有通用 web-search、完整 LLMQuant workflow 服务或 private-output 能力。配置日线 API key 不会产生这些能力。model-image 另需实际模型支持和本轮输入通道；见[显式图片](./README.md#images)。
+2026-10-16 起撤销 JQ 自建的 `requirements-met`、`needs-input`、`blocked`、`unverified` 技能状态，以及 `--check`、`--check-imports`、`--check-network` 和 `/skill audit` 命令。旧参数会被命令预检拒绝。详情只展示来源、路径、描述和模型可见性。
 
-可信宿主或静态扩展可以补能力，须声明真实要求；`requiresTools` 在任务过滤后再核对。单纯声明 capability 不能伪造 bash。自定义 `prepareSkills` 的宿主需要承担自己的策略，不自动继承默认精选限制。
-
-精选资格绑定实际路径和固定文件内容，不认证任意同名外部技能。涉及私有账户输入或输出的模式仍需单独的 private-output 授权；上游能生成报告不等于宿主已经授权读取或公开这些数据。当前机制不是第三方代码沙箱。
+技能依赖由上游指令和实际工具调用处理。通用会话仍检查显式图片、保留取消与资源刷新语义；量化任务仍约束工具、对象和日期。项目可提供通用宿主扩展策略，但默认加载流程不再按具体技能名称维护资格。
 
 <a id="supplied-evidence"></a>
 
-## 5. 已给材料与量化任务不是同一种证据
+解释用户提供的材料时，保留出处、日期、缺项和推断边界。读取技能只取得工作流指令，不会生成独立的行情或账户证据；实际量化结论仍由[研究任务](./README.md#tasks)与[工具计算](./quant-tools-design.md)的证据链负责。
 
-先识别用户在请求什么，再选择 workflow 和工具。出现 ticker、日期或“风险”一词，不足以强制建立 Quant 归档研究任务。用户给出一份研究快照、要求解释其中权重和风险时，可以在声明的 limited-evidence 模式内回答；只有需要执行受支持计算并以固定输入验收时才建立对应任务。已有任务仍须尊重原 scope，不能借技能调用清空它。
+<a id="mcp"></a>
 
-`research_task.read.acceptanceTools` 来自共享受支持核验器，`metricLabels` 是其中部分工具的具体指标目录。不能创造 `supplied_snapshot_audit` 之类并不存在的工具来满足统一模板；也不能把固定 Markdown workflow 的阅读升级为价格/财务已核验。
+### MCP 服务目录与连接参数
 
-输入出处和缺项应随回答保留。workspace 的 drift 未提供时应记未知，不因材料中没有该字段就填 0；gross margin 是毛利率，thesis 在研究场景中是投资论点。明确单位的未年化 volatility 可以是合法期间离散度，不能被通用“必须年化”判据一刀切否决。
+JQ 提供以下管理命令，使用 Pi 1.2.0 自带的 `loadMcpConfig`、`addMcpServerConfig` 和 `removeMcpServerConfig`，不实现传输或认证层：
 
-用户给定分数与权重可交给[显式评分](./quant-tools-design.md#weighted-score)；假设持仓可用[情景计算](./quant-tools-design.md#position-scenarios)。二者只验证所给参数的算术，不证明分数映射、账户真实性或市场结论。有限回答检查仍可能漏掉自由叙述中的错误，必须把流程通过和人工解释审阅分开。
+```text
+/mcp
+/mcp info llmquant-data
+/mcp install llmquant-data web-reader
+/mcp remove web-reader
+/mcp export llmquant-data
+/mcp install web-search-prime --local
+/mcp list --local
+```
+
+默认目标为 Pi 用户目录的 `mcp.json`（通常 `~/.pi/agent/mcp.json`，遵循 `PI_CODING_AGENT_DIR`）；`--local` 只编辑当前项目 `.pi/mcp.json`。不自动安装全套，不覆盖同名已有配置；增删保留其他服务和字段。导出只返回所选预制模板，不读取本地凭证，不写文件。环境变量占位符由 Pi 解析，其他客户端可能需要调整语法。
+
+在 Pi 中执行 `/reload` 或重启后加载。HTTP 服务不需要下载；stdio 的 `npx` 包由 Pi 启动时获取。移除只删除选定作用域的配置项，不清理包缓存和 OAuth 凭证；移除项目覆盖项可能重新显露用户级同名服务。Tushare 的令牌位于 URL 中，Pi 不插值 URL，因此模板先禁用，填写账号提供的完整 URL 后在 Pi 中启用。
+
+以下五项服务承接原 `.claude/mcp.json` 的选型信息。官方配置文档于 2026-10-16 核对；这里提供连接指南，未使用真实账号执行 MCP 调用。供应商的数据范围、权限与额度以其当前文档和账号为准。
+
+| 服务 / 官方介绍 | 适合补充什么 | 连接方式与凭证 |
+|---|---|---|
+| [Financial Datasets](https://docs.financialdatasets.ai/mcp-server) | 美股财务报表、SEC 文件、价格与新闻 | 远程 HTTP；交互式客户端可用 OAuth，程序化访问可用 API key，参数见下表 |
+| [Tushare MCP](https://tushare.pro/document/1?doc_id=463) | 国内金融数据查询 | 从 Tushare 个人中心的 MCP Server 获取连接配置；按账号权限使用 |
+| [LLMQuant Data MCP](https://github.com/LLMQuant/data-mcp) | 金融知识、研究论文、SEC 文件、宏观与行情数据 | 本地 stdio：`npx -y @llmquant/data-mcp`，进程环境传入 `LLMQUANT_API_KEY`；需要 Node.js/npx |
+| [智谱 Web Search Prime](https://docs.bigmodel.cn/cn/coding-plan/mcp/search-mcp-server) | 搜索新闻与公开资料，获取标题、链接和摘要 | 远程 HTTP；`Authorization: Bearer YOUR_ZHIPU_API_KEY`，需账号具备对应服务权限 |
+| [智谱 Web Reader](https://docs.bigmodel.cn/cn/coding-plan/mcp/reader-mcp-server) | 读取已找到网页的正文与元数据 | 远程 HTTP；使用同样的 Bearer 鉴权，服务权限单独确认 |
+
+远程客户端中选择 HTTP / Streamable HTTP，按需复制对应 URL 和请求头：
+
+| 服务 | URL | 请求头 / 登录 |
+|---|---|---|
+| Financial Datasets · OAuth | `https://mcp.financialdatasets.ai/` | 完成客户端的 OAuth 登录 |
+| Financial Datasets · API key | `https://mcp.financialdatasets.ai/api` | `X-API-KEY: YOUR_FINANCIAL_DATASETS_KEY` |
+| Tushare | `https://api.tushare.pro/mcp/token=YOUR_TUSHARE_TOKEN` | 使用个人中心提供的完整 MCP 配置 |
+| Web Search Prime | `https://open.bigmodel.cn/api/mcp/web_search_prime/mcp` | `Authorization: Bearer YOUR_ZHIPU_API_KEY` |
+| Web Reader | `https://open.bigmodel.cn/api/mcp/web_reader/mcp` | `Authorization: Bearer YOUR_ZHIPU_API_KEY` |
+
+LLMQuant 本地 stdio 示例，适用于接受 `mcpServers` 结构的客户端：
+
+```json
+{
+  "mcpServers": {
+    "llmquant-data": {
+      "command": "npx",
+      "args": ["-y", "@llmquant/data-mcp"],
+      "env": {
+        "LLMQUANT_API_KEY": "YOUR_LLMQUANT_API_KEY"
+      }
+    }
+  }
+}
+```
+
+将 `YOUR_...` 替换为自己的凭证，保存在客户端的本地配置中；配置文件位置、HTTP 类型字段和环境变量插值语法由客户端决定。WhyJ 内的 `WHYJ_QUANT_*` 行情配置不会自动注入外部 MCP 进程。上例沿用上游 npx 安装入口，不代表 WhyJ 已审阅或锁定该 MCP 包版本；预制 Skills 的提交版本仅用于可重复下载。
+
+配置后，先在目标客户端确认工具列表能加载，再用一个公开标的或网页执行样本查询。WhyJ 的 `/doctor --phase data` 检查内置行情适配器，不能代替 MCP 客户端的连接验证。接上 LLMQuant Data MCP 也不会自动提供所有组合工作区服务；具体工作流依赖按上游说明准备。
 
 <a id="implementation"></a>
 
-## 6. 实现与回归
+## 实现与验证
 
-| 模块 | 所有权 |
+社区插件仍由当前 [WhyJ 扩展宿主](../agent-runtime/extensions.md)显式注册，不能把任意 Pi npm 插件直接装入 JQ。复用 Pi PackageManager、资源过滤和插件协议的后续工作见 [#33](https://github.com/yangjingo/oh-my-quant/issues/33)；目前保留的 Git 下载与选择文件属于兼容既有安装目录的接线。
+
+| 位置 | 职责 |
 |---|---|
-| [installer](../../src/skill/installer.ts)、[catalog](../../src/skill/catalog.ts) | 安装、固定版本与目录约束 |
-| [readiness](../../src/skill/readiness.ts) | 无 I/O 的模式资格规则 |
-| [runtime skill-store](../../src/runtime/skills/skill-store.ts) | 存储和运行时绑定，不属于 skill 纯模块 |
-| [runtime skill-readiness](../../src/runtime/skills/skill-readiness.ts)、[probes](../../src/runtime/skills/skill-probes.ts) | 依赖观察、revision 和请求上下文 |
-| [CLI handler](../../src/cli/handlers/skill.ts) | 用户命令、输入与呈现 |
-| [会话技能](../../src/agent/src/skills.ts) | 发现、索引与调用内容装配 |
-
-列表、system prompt 和显式调用复用同一资格投影；预检失败发生在模型调用和用户任务 journal 写入前。请求级 `scopeRuntimeSkills` 只按任务缩小已有资格，不偷偷重新联网或探测环境。检查观察在内存中有生命周期，取消不会发布，最后有效代次才可覆盖。
+| [预制目录](../../src/skill/catalog.ts) | 仓库、下载提交与技能名称 |
+| [安装器](../../src/skill/installer.ts) | Git 下载、更新保护与取消 |
+| [运行时安装入口](../../src/runtime/skills/skill-store.ts) | 安装根、选定路径与缓存失效 |
+| [Pi 加载适配](../../src/agent/src/skills.ts) | 调用 Pi 加载器，附加来源与正文快照 |
+| [命令](../../src/cli/handlers/skill.ts) | catalog、install、remove、reload、list、info 和 run |
+| [MCP 预制目录](../../src/runtime/skills/mcp-presets.ts) / [配置入口](../../src/runtime/skills/mcp-config.ts) | 所选模板、Pi 配置增删、无凭证导出 |
+| [MCP 薄适配](../../src/agent/src/pi-mcp.ts) | 锁定版本的 Pi 配置 API，无传输实现 |
 
 ```powershell
-bun test src/skill/test src/agent/test/skills.test.ts src/agent/test/chart-image-session.test.ts
+bun test src/skill/test src/agent/test/skills.test.ts src/runtime/test/skill-store.test.ts
 bun run typecheck
 bun run check:architecture
 ```
 
-固定工作流/合成输入、实际 Pi + 本地 SSE、真实模型与外部脚本执行是不同验证层。真实模型检查方法见[评测指南](./evaluation.md)，不会从旧的阶段通过数推出当前端到端能力。新增技能必须同时说明模式、输入、所需能力、副作用、失效规则与对应拒绝反例。
+[图表会话回归](../../src/agent/test/chart-image-session.test.ts)保留图片传输和取消检查；[会话依赖回归](../../src/agent/test/session-dependencies.test.ts)保留刷新、快照和恢复检查。第三方工作流质量与真实服务访问需分别验证，不由加载成功推断。
 
-关键反例回归：[已给材料会话](../../src/runtime/test/supplied-skill-session.test.ts)、[术语](../../src/runtime/test/skill-terminology.test.ts)、[reference reader](../../src/runtime/test/chart-reference-reader.test.ts)、[运行资格](../../src/runtime/test/skill-readiness.test.ts)。它们分别检验不同边界，不合并成“技能质量通过”。
+### 命令界面复现
+
+2026-10-17，issue #32 分支 `refactor/32-pi-community-tools`：Windows、Bun 1.3.14、Chromium 截图；使用当前 QuantTui 的实际字符缓冲区、命令处理器与 PageUp 按键解码，文件和配置全部为隔离 fixture。以下命令输出 SVG、ANSI 和浏览器索引，再用浏览器按宽度分组截图：
+
+```powershell
+bun run src/tui/dev/render-terminal-audit.ts --community --output output/community-review
+python -m http.server 8132 --bind 127.0.0.1 --directory output/community-review
+```
+
+[60×20 窄终端连续帧](../assets/community-tools-60x20.png)与 [120×32 宽终端连续帧](../assets/community-tools-120x32.png)覆盖缓存 Skill 的选择、PageUp、移除，以及 MCP 空配置、添加、移除和未知名称错误。窄屏长清单需要滚动，名称和来源按文本换行；Composer 的短错误沿用单行省略显示。未新增加载面板，网络下载取消由安装器回归测试覆盖。这些是实际渲染器的 SVG 投影截图，不是原生终端字体、IME 或真实服务连接验收。

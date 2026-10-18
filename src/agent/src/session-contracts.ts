@@ -150,8 +150,6 @@ export interface QuantAgentOptions {
   sessionsRoot?: string;
   settings?: Partial<Pick<OhQuantSettings, "env" | "model" | "thinkingLevel" | "skillIntegrations" | "provider" | "providers">>;
   skillPaths?: string[] | (() => string[]);
-  /** Optional trusted host capability source for curated skill readiness. Defaults remain fail-closed. */
-  skillCapabilities?: { read(): Readonly<Record<string, SkillRequirementCheck>>; revision?(): string };
   /** Full host composition. When supplied, local settings, discovery and repo defaults are not used. */
   dependencies?: QuantAgentDependencies;
 }

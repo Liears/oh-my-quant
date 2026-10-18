@@ -18,6 +18,7 @@ import {
   resumeHandler,
 } from "./handlers/system.ts";
 import { skillHandler } from "./handlers/skill.ts";
+import { mcpHandler } from "./handlers/mcp.ts";
 import { artifactHandler } from "./handlers/artifact.ts";
 import type { CommandContext, CommandHandler, CommandResult, ParsedCommand } from "./types.ts";
 
@@ -68,6 +69,7 @@ const HANDLERS: Record<string, CommandHandler> = {
   doctor: doctorHandler,
   resume: resumeHandler,
   skill: skillHandler,
+  mcp: mcpHandler,
   artifact: artifactHandler,
   help: helpHandler,
   clear: clearHandler,

@@ -10,11 +10,12 @@
 |---|---|
 | 目标、状态与演进 | [GOALS](./GOALS.md) · [PRD](./PRD.md) · [Roadmap](./roadmap.md) |
 | 应用骨架与持久化 | [模块架构](./module-architecture.md) · [存储策略](./ohquant-storage-policy.md) |
-| 数据、工具与技能 | [数据源](./source-data-providers.md) · [工具与计算](./quant-tools-design.md) · [Skills](./trader-skills.md) |
+| 数据、工具与技能 | [数据源](./source-data-providers.md) · [工具与计算](./quant-tools-design.md) · [精选 Skills 与 MCP 配置](./trader-skills.md#toolkit) |
 | 领域研究 | [组合比较](./portfolio-comparison.md) · [新闻](./news-research.md) · [Alpha 回测](./alpha-backtest.md) |
 | 账户与执行 | [账户业绩](./performance.md) · [执行](./execution.md) |
 | 报告与交互 | [制品](./artifacts-design.md) · [年报](./annual-reports.md) · [UI/UX](./quant-uiux.md) · [Windows 桌面宿主](./desktop.md) · [Web 研究工作台](./research-workspace.md) |
 | 使用与验证 | [配置](./configuration.md) · [手册](./user-guide.md) · [命令](./slash-commands.md) · [评测](./evaluation.md) |
+| 仓库质量与发布 | [CI and npm Releases](./ci-release.md) |
 
 文档在此归为一个应用体系，代码仍按 Source、Quant、Storage、Execution、Artifact、Runtime 与 TUI 的职责分开。UI/UX 不是研究结束后的包装，它承担输入、过程可见性、错误恢复和结果呈现；数据与计算也不是 Harness 外部的附录，而是研究得以成立的组成部分。返回[全部文档](../README.md)。
 
@@ -36,7 +37,7 @@
 |---|---|
 | 本任务允许哪些工具、标的、日期与基准 | Agent 负责执行、快照、取消与持久化屏障 |
 | 哪个调用和固定版本能满足接受条件 | Source/Storage 提供来源与归档，Quant 执行纯计算 |
-| 已给材料、模型能力、依赖是否支持本次技能模式 | [Skills](./trader-skills.md)维护安装/发现/资格机制 |
+| 技能指令怎样进入当前会话 | [Skills](./trader-skills.md)维护预制下载、Pi 加载与刷新机制 |
 | 恢复后哪些研究结论仍然有证据 | Artifact 保存报告版本，研究核验重新判断有效性 |
 
 宿主预检先于 Quant 任务预检；成功声明先提交会话事件，再影响下一轮请求。不为请求子集写永久活动工具事件，也不因任务缺能力自动启用扩展。会话空闲不等于研究 complete，模型回答完毕不等于接受条件通过，研究 complete 更不授权交易。

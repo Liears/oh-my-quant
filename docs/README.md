@@ -12,6 +12,7 @@
 | 当前范围、缺口与实施顺序 | [GOALS](./quant-harness/GOALS.md) → [PRD](./quant-harness/PRD.md) → [Roadmap](./quant-harness/roadmap.md) |
 | 配置、数据源与工具为何不同步 | [配置](./quant-harness/configuration.md) → [数据源](./quant-harness/source-data-providers.md) → [UI/UX](./quant-harness/quant-uiux.md) |
 | 怎样验证，哪些结论尚未得到证明 | [评测指南](./quant-harness/evaluation.md) · [测试与反例](./blog/05-evaluation-beyond-green.md) |
+| 仓库质量管理、PR 评审与 npm 发布 | [维护规范](./quant-harness/ci-release.md) · [Agentic / Vibe Repo Ops](./blog/agentic/vibe-repo-ops.md) |
 | 产品、架构与 UI/UX 的选择理由 | [技术博客](./blog/README.md) · [离线版](./blog/index.html) |
 
 当前工作区不等于发布版。产品完成度由 PRD 维护；代码和测试链接定位可重复检查，不把旧验证记成本轮成绩。这里的“归档整理”是把现行文档归入责任目录，不恢复 archive、旧稿汇编或重定向页面。
@@ -36,15 +37,15 @@ docs/
 
 Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/runtime/quant-harness.ts` 实现其中的任务装配与守卫；Source、Quant、Storage、Execution、Artifact 和 UI/UX 是这一应用体系内职责不同的组成部分。归入同一目录不抹平模块边界，不表示执行能力已经接入默认研究 Agent，也不放宽账户授权。
 
-当前共 **63 个文件**：40 份 Markdown、2 份 HTML、3 个 TypeScript、5 张 PNG、13 张 SVG。23 份原顶层文档已迁入两个目录；桌面宿主设计也归入 Quant Harness。顶层 Markdown 只保留本页。
+文档按职责维护入口，不手工同步文件总数；实际覆盖由文档检查验证。桌面宿主设计归入 Quant Harness，顶层 Markdown 只保留本页。
 
-| 位置 | 文件数 | 内容 |
-|---|---:|---|
-| `agent-runtime/` | 2 | 通用运行时与扩展契约 |
-| `quant-harness/` | 23 | 完整量化应用的设计、产品与使用文档 |
-| `blog/` | 30 | 12 篇正文、目录与编辑说明、12 张 SVG、构建/检查脚本、私有证据路径规则和离线 HTML |
-| `assets/` | 6 | 共用产品与设计素材 |
-| 顶层 | 2 | 本页和讲解演示 |
+| 位置 | 内容 |
+|---|---|
+| `agent-runtime/` | 通用运行时与扩展契约 |
+| `quant-harness/` | 完整量化应用的设计、产品、使用与仓库维护文档 |
+| `blog/` | 系列正文、工程补篇、目录与编辑说明、配图、构建/检查脚本、私有证据路径规则和离线 HTML |
+| `assets/` | 共用产品与设计素材、实际博客阅读视图、社区工具命令渲染证据及历史 CI 失败截图 |
+| 顶层 | 本页和讲解演示 |
 
 <a id="agent-design"></a>
 
@@ -82,7 +83,7 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 |---|---|
 | [数据源](./quant-harness/source-data-providers.md) | provider、凭证、回退、归档与研究数据的来源/时间边界 |
 | [工具与计算](./quant-harness/quant-tools-design.md) | 注册/能力、参数、账本、因子与价量计算 |
-| [研究技能](./quant-harness/trader-skills.md) | 安装、发现、资格、依赖观察与已给材料模式；第三方功能只引用上游 |
+| [精选 Skills 与 MCP](./quant-harness/trader-skills.md) | 技能选型、MCP 官方入口与配置；一键下载、Pi 加载与会话刷新 |
 | [组合比较](./quant-harness/portfolio-comparison.md) | 权重、币种、同日对齐与历史重算 |
 | [新闻研究](./quant-harness/news-research.md) | 来源/时间、正文与标题初筛、价格窗口及解释边界 |
 | [账户业绩](./quant-harness/performance.md) | 规范化账户历史、现金流与区间绩效；不代表真实券商接通 |
@@ -127,11 +128,11 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 | [01 · 保留自己的 Harness，不再维护模型协议](./blog/01-own-the-harness.md) | 协议复用以后，谁拥有研究状态？ | 技术架构 |
 | [02 · 一次故障，三种成功定义](./blog/02-data-contracts.md) | 保存、能力与实际请求为什么不能混为一谈？ | 数据架构 / 产品信任 |
 | [03 · 压缩对话后，研究事实从哪里回来](./blog/03-context-as-projection.md) | 有损摘要如何与可核验事实共存？ | 上下文 / 状态恢复 |
-| [04 · 工具和 Skill 越多就越强吗](./blog/04-capability-and-skills.md) | 当前能做什么、允许做什么？ | 能力架构 |
+| [04 · 让 Skills 回到 Pi，JQ 只做预制与加载](./blog/04-capability-and-skills.md) | 当前能做什么、允许做什么？ | 能力架构 |
 | [05 · 测试全绿，为什么仍不能交付结论](./blog/05-evaluation-beyond-green.md) | 哪种验证支持哪种声明？ | 工程验证 |
 | [06 · 终端也是一个一致性系统](./blog/06-terminal-consistency.md) | 迟到数据和旧画面由谁负责？ | 技术架构 / UI 状态 |
 | [07 · 报告要固定，设计要演进](./blog/07-artifacts-and-boundaries.md) | 哪些事实要保留，哪些设计可以淘汰？ | 产物 / 演进治理 |
-| [08 · 研究终端不能只是聊天框](./blog/08-research-workbench.md) | 如何支持一次提问之外的完整研究？ | 产品设计 |
+| [08 · 从研究终端到桌面工作台](./blog/08-research-workbench.md) | 两种入口怎样延续同一份研究？ | 产品形态 / apps 改造提案，尚未实施 |
 | [09 · 模块拆开后，为什么还要 Runtime](./blog/09-boundaries-for-change.md) | 变化应当停在哪一个边界？ | 技术架构 |
 | [10 · 80×24 的屏幕里，什么值得留下](./blog/10-layout-and-visual-language.md) | 空间不足时怎样分配注意力？ | UI 布局 / 视觉语义 |
 | [11 · 不知道下一条命令时](./blog/11-discoverable-interactions.md) | 能力如何被发现，又不误执行？ | UX / 功能发现 |
@@ -159,7 +160,7 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 <a id="assets"></a>
 ## 配图素材
 
-### 公共视觉素材（6）
+### 公共视觉素材（8）
 
 这些素材不是独立的设计规范或运行证明。无正文引用只能作为使用情况线索，不能单独作为删除依据。
 
@@ -171,6 +172,13 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 | [assets/image.png](./assets/image.png) | 另一版终端画面参考，含 Portfolio / Watchlist / Market | 保留素材；本轮分类前未在 docs、项目 README、DESIGN 的文本引用中找到入口 |
 | [assets/logo.png](./assets/logo.png) | 羽毛、柱形图与 WhyJ Quant 字标 | 品牌素材，同上范围未发现原入口 |
 | [assets/poste.svg](./assets/poste.svg) | 1200×1700 SVG 版面素材 | 展示素材，同上范围未发现原入口；不从文件名推断其发布或验收状态 |
+| [assets/blog-product-plan-wide-20261015.png](./assets/blog-product-plan-wide-20261015.png) | 第 08 篇离线博客的实际浏览器阅读视图，1440×1000 | 本地 Chromium、2026-10-15；仅文档渲染证据，不是新桌面 UI 截图或网站部署证明 |
+| [assets/blog-product-plan-narrow-20261015.png](./assets/blog-product-plan-narrow-20261015.png) | 同一博客的 390×844 阅读视图 | 同上；正文不溢出，机制图沿用带提示、可键盘横滚的容器 |
+| [assets/community-tools-60x20.png](./assets/community-tools-60x20.png) | Skills/MCP 选择与移除的窄终端连续帧 | 当前命令与 QuantTui 字符缓冲区的浏览器截图；隔离合成输入，不证明原生终端或外部服务可用 |
+| [assets/community-tools-120x32.png](./assets/community-tools-120x32.png) | 同一命令流程的宽终端连续帧 | 同上；复现步骤见 Skills 与 MCP 指南 |
+
+| [assets/ci-panel-transition-failure.png](./assets/ci-panel-transition-failure.png) | Desktop 面板切换的历史失败截图 | Actions 38156420320 原始 artifact；不是当前产品验收 |
+| [assets/ci-multiline-paste-failure.png](./assets/ci-multiline-paste-failure.png) | Desktop 多行粘贴的历史失败截图 | Actions 38234986954 原始 artifact；不是当前产品验收 |
 
 ### 博客机制图（12）
 

@@ -32,6 +32,7 @@ export { STORAGE_POLICY, assertPortfolioCacheDisabled, isPortfolioCachePath } fr
 export type { StorageClass, StoragePolicyEntry } from "./src/policy.ts";
 export { loadSettings, readSettings, readSettingsAsync, migrateOldConfig, normalizeModelSelection, saveSettings } from "./src/settings.ts";
 export { readPiConfigSnapshot } from "./src/pi-config.ts";
+export { readSkillSelection, updateSkillSelection } from "./src/skill-selection.ts";
 export { ModelOAuthFile } from "./src/model-auth.ts";
 export { PiOAuthStore } from "./src/pi-oauth.ts";
 export { loadWatchlist, saveWatchlist } from "./src/watchlist.ts";

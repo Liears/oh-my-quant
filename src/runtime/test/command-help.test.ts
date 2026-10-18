@@ -57,7 +57,7 @@ it("keeps every public command discoverable with no installed skills and preserv
     expect(all).toContainEqual({ label: `${entry.name}  ${entry.desc}`, fill: entry.name });
     expect(buildSuggestions(entry.name, [], [])).toEqual([]);
   }
-  expect(buildSuggestions("/ski", [], [])).toEqual([{ label: "/skill  Discover, audit, and run skills", fill: "/skill" }]);
+  expect(buildSuggestions("/ski", [], [])).toEqual([{ label: "/skill  Download, load, and run skills", fill: "/skill" }]);
   expect(buildSuggestions("/artifact ", [], [])).toEqual([]);
   for (const [width, height] of [[60, 20], [80, 24], [120, 32]] as const) {
     const buffer = new TerminalBuffer(width, height);

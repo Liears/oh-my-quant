@@ -53,9 +53,9 @@ for (const runtime of [process.execPath, "node"]) {
       expect(existsSync(result.state)).toBe(false);
     }
   }, 30000);
-  for (const mode of ["catalog", "transports", "abort", "oauth"]) {
+  for (const mode of ["catalog", "skills", "mcp", "transports", "abort", "oauth"]) {
     test(`${label}: isolated split bundle supports ${mode}`, async () => {
-      const result = await run(runtime, "lazy-startup.js", [mode], mode === "catalog" ? { WHYJ_TEST_NO_SDK: "1" } : {});
+      const result = await run(runtime, "lazy-startup.js", [mode], ["catalog", "skills", "mcp"].includes(mode) ? { WHYJ_TEST_NO_SDK: "1" } : {});
       expect(result.stderr.toString()).toBe("");
       expect(result.exitCode).toBe(0);
       expect(JSON.parse(result.stdout.toString())).toEqual({ ok: true, mode });

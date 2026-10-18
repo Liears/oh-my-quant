@@ -10,6 +10,11 @@ import { DEFAULT_SETTINGS, type OhQuantSettings } from "../../types/config.ts";
 import { buildSettingsCase, runCase } from "../../cli/dev/provider-smoke.ts";
 import { AppRuntime } from "../../app-runtime.ts";
 
+// A local request still includes cold SDK/session setup on hosted Windows.
+// Keep that budget separate from Bun's watchdog; timeout fixtures never reply.
+const PROBE_TIMEOUT_MS = 2_000;
+const PROBE_TEST_TIMEOUT_MS = 10_000;
+
 type RequestBody = { model: string; messages: unknown[] };
 let root: string;
 let previousDir: string | undefined;
@@ -148,7 +153,7 @@ it.each(["empty", "unauthorized", "timeout"] as const)("Doctor rejects %s respon
   mode = responseMode;
   let dataCalls = 0;
   const started = Date.now();
-  const report = await collectDoctor(cfg, {}, { phases: ["model"], writeLog: false, probeTimeoutMs: 200,
+  const report = await collectDoctor(cfg, {}, { phases: ["model"], writeLog: false, probeTimeoutMs: PROBE_TIMEOUT_MS,
     dataProbe: async () => { dataCalls++; return { ok: true, detail: "unexpected" }; },
   });
   expect(report.overall).toBe("partial_fail");
@@ -159,8 +164,8 @@ it.each(["empty", "unauthorized", "timeout"] as const)("Doctor rejects %s respon
   expect(report.phases.slice(1).map(phase => phase.status)).toEqual(["pending", "pending"]);
   expect(dataCalls).toBe(0);
   expect(JSON.stringify(report)).not.toContain("fixture-secret");
-  expect(Date.now() - started).toBeLessThan(2000);
-});
+  expect(Date.now() - started).toBeLessThan(PROBE_TEST_TIMEOUT_MS);
+}, PROBE_TEST_TIMEOUT_MS);
 
 it.each(["slash", "shell"] as const)("reports model failure in %s CLI JSON without exposing credentials", async entry => {
   mode = "unauthorized";
@@ -245,12 +250,15 @@ it.each(["ok", "empty", "unauthorized", "timeout"] as const)("provider smoke rep
   mode = responseMode;
   const smoke = buildSettingsCase(cfg);
   expect(smoke).not.toBeNull();
-  const result = await runCase(smoke!, 300);
+  const result = await runCase(smoke!, PROBE_TIMEOUT_MS);
   expect(result.ok).toBe(responseMode === "ok");
   expect(requests).toHaveLength(1);
+  if (responseMode === "empty") expect(result.error).toContain("no assistant text");
+  if (responseMode === "unauthorized") expect(result.error).toContain("Unauthorized");
+  if (responseMode === "timeout") expect(result.error).toContain("timed out");
   expect(JSON.stringify(result)).not.toContain("fixture-secret");
   expect(process.env.OHQUANT_DIR).toBe(root);
-});
+}, PROBE_TEST_TIMEOUT_MS);
 
 it("recovers an invalid startup configuration after saving from Settings", async () => {
   const models: string[] = [];

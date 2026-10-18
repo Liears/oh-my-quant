@@ -1,11 +1,35 @@
 import { strictEqual, ok } from "node:assert";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { getModels, streamSimple } from "../../../src/agent/src/kernel/llm.ts";
 import { resolveConfiguredModel } from "../../../src/agent/src/model-config.ts";
 import { resolveModelOAuth } from "../../../src/agent/src/model-oauth.ts";
 import { ModelOAuthFile } from "../../../src/storage/index.ts";
 
 const mode = process.argv[2];
-if (mode === "catalog") {
+if (mode === "mcp") {
+  const { manageMcpPresets } = await import("../../../src/runtime/skills/mcp-config.ts");
+  const options = { agentDir: join(process.env.OHQUANT_DIR!, "pi"), cwd: process.cwd() };
+  const exported = manageMcpPresets("export", ["web-reader"], options);
+  strictEqual(Object.keys(JSON.parse(exported.message).mcpServers).join(), "web-reader");
+  strictEqual(manageMcpPresets("install", ["web-reader"], options).success, true);
+  ok(manageMcpPresets("list", [], options).message.includes("Configured: web-reader"));
+  strictEqual(manageMcpPresets("remove", ["web-reader"], options).success, true);
+  ok(!manageMcpPresets("list", [], options).message.includes("Configured: web-reader"));
+} else if (mode === "skills") {
+  const { discoverSkills } = await import("../../../src/agent/src/skills.ts");
+  const { NodeExecutionEnv } = await import("../../../src/agent/src/session-runtime/node.ts");
+  const { formatSkillsForSystemPrompt } = await import("../../../src/agent/src/session-runtime/harness/system-prompt.ts");
+  const cwd = join(process.env.OHQUANT_DIR!, "skill-workspace");
+  const dir = join(cwd, ".agents", "skills", "bundle-fixture");
+  mkdirSync(dir, { recursive: true });
+  mkdirSync(join(cwd, ".git"));
+  writeFileSync(join(dir, "SKILL.md"), "---\nname: bundle-fixture\ndescription: Bundled skill discovery\n---\nBUNDLE_SKILL_BODY");
+  const result = await discoverSkills({ cwd, env: new NodeExecutionEnv({ cwd }) });
+  strictEqual(result.skills.length, 1);
+  strictEqual(result.skills[0]!.content, "BUNDLE_SKILL_BODY");
+  ok(formatSkillsForSystemPrompt(result.skills).includes("<name>bundle-fixture</name>"));
+} else if (mode === "catalog") {
   ok(getModels("anthropic").length > 0);
   strictEqual(resolveConfiguredModel({ provider: "openai", model: "gpt-4o", env: {}, thinkingLevel: "off" }).id, "gpt-4o");
 } else if (mode === "oauth") {

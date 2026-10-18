@@ -65,7 +65,6 @@ export async function startApp(): Promise<void> {
     }
   });
 
-  void runtime.startSkillInstallation();
 
   tui.onArtifactRestore((reportId) => {
     void runtime.restoreArtifact(reportId);

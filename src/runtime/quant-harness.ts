@@ -9,7 +9,6 @@ import { bindResearchTools } from "../tools/registry.ts";
 import { projectResearchState } from "../research/state.ts";
 import type { ResearchState } from "../research/state.ts";
 import type { AgentTool } from "../agent/src/session-runtime/index.ts";
-import { scopeRuntimeSkills } from "./skills/skill-readiness.ts";
 
 function taskToolDenial(task: ResearchState["task"], toolName: string, input: unknown): string | null {
   if (!task || toolName === "research_task") return null;
@@ -49,7 +48,7 @@ export function createQuantResearchAgent(options: QuantAgentOptions = {}): Quant
       if (!task) return prepared;
       const allowed = new Set(task.status === "cancelled" ? [] : task.spec.constraints.allowedTools);
       const activeToolNames = prepared.activeToolNames.filter(name => name === "research_task" || allowed.has(name));
-      return { activeToolNames, skills: scopeRuntimeSkills(input.rawSkills, prepared.skills, activeToolNames) };
+      return { activeToolNames, skills: prepared.skills };
     },
     ...(dependencies.readTools ? { readTools: () => { const snapshot = dependencies.readTools!(); return { ...snapshot, tools: bind(snapshot.tools) }; } } : {}),
     prompts: { ...dependencies.prompts, system: input => dependencies.prompts.system(input)

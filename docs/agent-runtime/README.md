@@ -1,6 +1,6 @@
 # Agent Runtime：通用会话运行时
 
-更新：2026-10-14。`docs/agent-runtime/` 维护可复用的 Agent 运行机制：模型协议适配、宿主端口、队列、取消、会话树、提交、压缩与扩展。完整量化应用归入 [Quant Harness](../quant-harness/README.md)，包括数据、计算、执行、报告和 UI/UX；两个文档目录不表示代码已经拆成独立发布包。
+更新：2026-10-16。`docs/agent-runtime/` 维护可复用的 Agent 运行机制：模型协议适配、宿主端口、队列、取消、会话树、提交、压缩与扩展。完整量化应用归入 [Quant Harness](../quant-harness/README.md)，包括数据、计算、执行、报告和 UI/UX；两个文档目录不表示代码已经拆成独立发布包。
 
 上层调用链为：宿主组装 → 通用 Agent 会话 → Pi 模型/工具循环。Quant 在宿主处注入研究任务、工具范围和证据核验；它复用会话账本，不维护第二套循环或研究状态文件。跨模块依赖以[模块架构](../quant-harness/module-architecture.md)为准。
 
@@ -45,7 +45,7 @@ Pi 提供模型协议和 agent loop；WhyJ 持有产品会话、JSONL 分支、�
 | `readTools` | 可选动态完整工具集合、revision 和扩展技能/能力；不是追加全局工具 |
 | `readConnection` | model、thinking、压缩阈值、延迟鉴权和恢复连接；鉴权闭包必须属于同一连接快照 |
 | `loadSkills` / `readSkillRevision` | 已解析技能内容及修订观察；非任意文件自动监控 |
-| `readSkillCapabilities` / `prepareSkills` | 按宿主实际工具、可信能力和观察结果准备调用资格 |
+| `readSkillCapabilities` / `prepareSkills` | 可选的自定义宿主策略；默认 Skills 直接使用 Pi 加载结果，不附加逐技能资格 |
 | `prepareRequestResources` | 由 research、skills、rawSkills 生成本次请求子集，不改写会话活动资源历史 |
 | `beforeToolCall` | Pi 参数校验后执行宿主检查，再执行 Quant 任务约束；可阻止并给出原因或终止要求 |
 | `prompts.system/turn/skill` | 构造提示；必须与当前真实工具集合一致 |

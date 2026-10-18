@@ -8,12 +8,20 @@ import { charWidth } from "../src/buffer.ts";
 import type { PanelDataService, StoredSessionSummary } from "../../runtime/workspace/panel-data.ts";
 import { DEFAULT_SETTINGS } from "../../types/config.ts";
 import type { DoctorResult } from "../../types/doctor.ts";
+import type { CommandContext } from "../../types/commands.ts";
+import { skillHandler } from "../../cli/handlers/skill.ts";
+import { manageMcpPresets } from "../../runtime/skills/mcp-config.ts";
+import { shouldRenderCommandResultAsMessage } from "../../runtime/workspace/messages.ts";
 
-const { values } = parseArgs({ args: process.argv.slice(2), options: { output: { type: "string" } }, allowPositionals: false });
+const { values } = parseArgs({ args: process.argv.slice(2), options: { output: { type: "string" }, community: { type: "boolean" } }, allowPositionals: false });
 if (!values.output) throw new Error("Pass --output NEW_DIRECTORY.");
 const root = resolve(values.output);
 if (existsSync(root)) throw new Error("Output must be a new directory.");
 mkdirSync(root, { recursive: true });
+if (values.community) {
+  process.env.OHQUANT_DIR = join(root, "fixture", "state");
+  process.env.OHQUANT_SKILLS_DIR = join(root, "fixture", "skills");
+}
 const unexpected = (): never => { throw new Error("Read-only rendering must not save or execute research."); };
 const settings = { ...structuredClone(DEFAULT_SETTINGS), provider: "custom", model: "visual-fixture", thinkingLevel: "off",
   providers: { custom: { api: "openai-completions" as const, apiKey: "synthetic-fixture", baseUrl: "http://127.0.0.1/fixture" } } };
@@ -39,6 +47,7 @@ const report: DoctorResult = { ready: true, mode: "diagnostic", overall: "partia
 const escape = (value: string) => value.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
 const frames: Array<{ name: string; columns: number; rows: number }> = [];
 for (const [columns, rows] of [[60, 20], [80, 24], [120, 32]] as const) {
+  if (values.community && columns === 80) continue;
   populated = false;
   const panel = new PanelController(data);
   const tui = new QuantTui({ model: "visual-fixture", modelLabel: "visual-fixture", version: "audit", user: "fixture", activity: "ready",
@@ -66,6 +75,34 @@ for (const [columns, rows] of [[60, 20], [80, 24], [120, 32]] as const) {
     frames.push({ name, columns, rows });
   };
   try {
+    if (values.community) {
+      tui.state.showPortfolioPanel = false;
+      const source = join(process.env.OHQUANT_SKILLS_DIR!, "LLMQuant-skills", "skills", "llmquant-risk");
+      mkdirSync(source, { recursive: true });
+      writeFileSync(join(source, "SKILL.md"), "---\nname: llmquant-risk\ndescription: Synthetic risk workflow for renderer review\n---\nFixture only.");
+      const ctx = {} as CommandContext;
+      const mcpOptions = { agentDir: join(root, "fixture", "pi"), cwd: join(root, "fixture", "project") };
+      const commands: Array<[string, () => ReturnType<typeof skillHandler>]> = [
+        ["skill-available", () => skillHandler({}, ["catalog"], ctx)],
+        ["skill-selected", async () => { await skillHandler({}, ["install", "llmquant-risk"], ctx); return skillHandler({}, ["catalog"], ctx); }],
+        ["skill-removed", async () => { await skillHandler({}, ["remove", "llmquant-risk"], ctx); return skillHandler({}, ["catalog"], ctx); }],
+        ["mcp-empty", async () => manageMcpPresets("list", [], mcpOptions)],
+        ["mcp-installed", async () => { manageMcpPresets("install", ["web-reader"], mcpOptions); return manageMcpPresets("list", [], mcpOptions); }],
+        ["mcp-removed", async () => { manageMcpPresets("remove", ["web-reader"], mcpOptions); return manageMcpPresets("list", [], mcpOptions); }],
+        ["mcp-error", async () => manageMcpPresets("install", ["unknown"], mcpOptions)],
+      ];
+      // Keep the same initial selection at both terminal widths.
+      await skillHandler({}, ["remove", "llmquant-risk"], ctx);
+      for (const [label, run] of commands) {
+        const result = await run(), message = result.message.replaceAll(root, "fixture");
+        tui.state.messages = shouldRenderCommandResultAsMessage(message) ? [{ role: result.success ? "assistant" : "error", text: message }] : [];
+        tui.state.composerStatus = shouldRenderCommandResultAsMessage(message) ? null : { kind: result.success ? "info" : "error", text: message };
+        Reflect.set(tui, "convScrollUp", 0);
+        capture(label);
+        if (label === "skill-selected") { key("\x1b[5~"); capture(`${label}-page-up`); }
+      }
+      continue;
+    }
     capture("research-red-up"); tui.state.marketColorScheme = "green-up"; capture("research-green-up");
     for (const mode of ["config", "portfolio", "resume", "artifact", "help"] as const) { panel.open(mode); capture(mode); panel.close(); }
     panel.open("config");
