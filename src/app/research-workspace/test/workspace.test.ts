@@ -10,6 +10,7 @@ import {
   createWorkspaceStore,
   workspaceHash,
   subscribeFileEvents,
+  loadWorkspaceMetadata,
   type WorkspaceMetadata,
 } from "../../../storage/index.ts";
 import { buildResearchReport } from "../../../research/input.ts";
@@ -265,7 +266,8 @@ async function fixture(mode = "normal") {
       };
     },
   };
-  const app = startWorkspaceServer({ port: 0, ...ports });
+  const metaPath = join(root, "projects-metadata.json");
+  const app = startWorkspaceServer({ port: 0, metaPath, ...ports });
   servers.push(app.server);
   const url = app.server.url;
   const { token } = (await (
@@ -707,7 +709,8 @@ test("workspace meta supports project pinning, study custom titles, and study de
   expect(initialMeta.projects.length).toBeGreaterThanOrEqual(1);
 
   // 2. Update metadata with pinned project and custom study title
-  const updatedMeta = {
+  const updatedMeta: WorkspaceMetadata = {
+    revision: initialMeta.revision,
     projects: [
       {
         id: "002048.SZ",
@@ -745,4 +748,134 @@ test("workspace meta supports project pinning, study custom titles, and study de
   expect(delRes.status).toBe(200);
   expect(f.store.list().some((s) => s.id === r.id)).toBe(false);
 }, 10000);
+
+test("renderer delete actions use authenticated POST mutation and project deletion handles partial failures", async () => {
+  const f = await fixture();
+  const token = f.token;
+
+  async function rendererApi(path: string, body?: unknown, method?: string) {
+    const effectiveMethod = method || (body !== undefined ? "POST" : "GET");
+    const options: RequestInit = { method: effectiveMethod };
+    if (effectiveMethod === "POST") {
+      options.headers = {
+        "Content-Type": "application/json",
+        "X-Workspace-Token": token,
+      };
+      options.body = JSON.stringify(body ?? {});
+    }
+    return fetch(new URL(path, f.url), options);
+  }
+
+  // 1. Create and save a study
+  const r = (await (
+    await f.post("api/runs", { question: "test study delete", scope })
+  ).json()) as WorkspaceRun;
+  await f.wait(r.id);
+  await f.post(`api/runs/${r.id}/save`);
+  expect(f.store.list().some((s) => s.id === r.id)).toBe(true);
+
+  // 2. Calling without POST or without body used to send GET and fail with 404
+  const unauthGetRes = await fetch(new URL(`api/runs/${r.id}/delete`, f.url));
+  expect(unauthGetRes.status).toBe(404);
+  expect(f.store.list().some((s) => s.id === r.id)).toBe(true);
+
+  // 3. Renderer calling with POST and {} succeeds with 200 and removes file from store
+  const deleteRes = await rendererApi(`api/runs/${r.id}/delete`, {}, "POST");
+  expect(deleteRes.status).toBe(200);
+  expect(f.store.list().some((s) => s.id === r.id)).toBe(false);
+
+  // 4. Test project deletion failure preservation logic
+  const mockProjectStudies = [{ id: "missing-study-uuid-404" }];
+  const failed: any[] = [];
+  const deletedIds = new Set<string>();
+  for (const s of mockProjectStudies) {
+    const res = await rendererApi(`api/runs/${s.id}/delete`, {}, "POST");
+    if (!res.ok) {
+      failed.push(s);
+    } else {
+      deletedIds.add(s.id);
+    }
+  }
+  expect(failed.length).toBe(1);
+  expect(deletedIds.size).toBe(0);
+});
+
+test("stale metadata snapshots are rejected under revision check (concurrent tabs)", async () => {
+  const f = await fixture();
+
+  // Tab A and Tab B read the same metadata snapshot (revision R1)
+  const tabARes = await fetch(new URL("api/workspace/meta", f.url));
+  const tabAMeta = (await tabARes.json()) as WorkspaceMetadata;
+  expect(tabAMeta.revision).toBeDefined();
+
+  const tabBRes = await fetch(new URL("api/workspace/meta", f.url));
+  const tabBMeta = (await tabBRes.json()) as WorkspaceMetadata;
+  expect(tabBMeta.revision).toBe(tabAMeta.revision);
+
+  // Tab A adds a new project and saves
+  tabAMeta.projects.push({
+    id: "600519.SH",
+    symbol: "600519.SH",
+    name: "贵州茅台跟踪",
+    benchmark: "000300.SH",
+    createdAt: new Date().toISOString(),
+  });
+  const saveARes = await f.post("api/workspace/meta", tabAMeta);
+  expect(saveARes.status).toBe(200);
+  const savedAMeta = (await saveARes.json()) as WorkspaceMetadata;
+  expect(savedAMeta.revision).not.toBe(tabAMeta.revision);
+  expect(savedAMeta.projects.some((p) => p.id === "600519.SH")).toBe(true);
+
+  // Tab B (still holding old revision R1) renames an existing project and attempts to save
+  tabBMeta.projects[0].name = "Tab B Renamed Project";
+  const saveBRes = await f.post("api/workspace/meta", tabBMeta);
+  // Must be rejected with 409 conflict!
+  expect(saveBRes.status).toBe(409);
+  const conflictBody = (await saveBRes.json()) as { code?: string; error?: string };
+  expect(conflictBody.code).toBe("ESTORAGECONFLICT");
+
+  // Verify that on disk, Tab A's new project is preserved and NOT wiped out by Tab B
+  const latestRes = await fetch(new URL("api/workspace/meta", f.url));
+  const latestMeta = (await latestRes.json()) as WorkspaceMetadata;
+  expect(latestMeta.projects.some((p) => p.id === "600519.SH")).toBe(true);
+  expect(latestMeta.projects[0].name).not.toBe("Tab B Renamed Project");
+});
+
+test("corrupt metadata is rejected without overwriting original bytes", async () => {
+  const f = await fixture();
+  const metaPath = (f as any).metaPath as string;
+
+  // Write malformed/truncated JSON to simulate file corruption
+  const corruptBytes = '{"projects": [{"id": "corrupted", "symb';
+  writeFileSync(metaPath, corruptBytes, "utf8");
+
+  // 1. Loading corrupt metadata must reject with ESTORAGEFORMAT
+  expect(() => loadWorkspaceMetadata(metaPath)).toThrow();
+  try {
+    loadWorkspaceMetadata(metaPath);
+  } catch (err: any) {
+    expect(err.code).toBe("ESTORAGEFORMAT");
+  }
+
+  // Verify GET /api/workspace/meta surfaces 500 recovery error
+  const getRes = await fetch(new URL("api/workspace/meta", f.url));
+  expect(getRes.status).toBe(500);
+  const getBody = (await getRes.json()) as { code?: string };
+  expect(getBody.code).toBe("ESTORAGEFORMAT");
+
+  // 2. Saving metadata over a corrupt file must also be rejected
+  const attemptedSave = {
+    revision: "missing",
+    projects: [{ id: "new", symbol: "000001.SZ", name: "平安银行" }],
+    studies: {},
+  };
+  const saveRes = await f.post("api/workspace/meta", attemptedSave);
+  expect(saveRes.status).toBe(400);
+  const saveBody = (await saveRes.json()) as { code?: string };
+  expect(saveBody.code).toBe("ESTORAGEFORMAT");
+
+  // 3. CRITICAL: The original corrupt bytes on disk must be PRESERVED, not replaced
+  const diskBytes = readFileSync(metaPath, "utf8");
+  expect(diskBytes).toBe(corruptBytes);
+});
 

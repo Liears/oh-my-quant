@@ -6,16 +6,18 @@ import {
   loadWorkspaceMetadata,
   saveWorkspaceMetadata,
   resolveProjectDirPath,
+  resolveWorkspaceMetaPath,
   type WorkspaceMetadata,
 } from "../../storage/index.ts";
 import { revealInFileManager } from "./reveal.ts";
 
 /** Local-only composition. No model credentials, raw provider events, or arbitrary files cross this boundary. */
 export function startWorkspaceServer(
-  options: WorkspacePorts & { port?: number } = {},
+  options: WorkspacePorts & { port?: number; metaPath?: string } = {},
 ) {
   const manager = createWorkspaceManager(options),
-    token = randomBytes(32).toString("hex");
+    token = randomBytes(32).toString("hex"),
+    metaPath = options.metaPath;
   const assets: Record<string, string> = {
     "/": "index.html",
     "/app.js": "app.js",
@@ -66,8 +68,16 @@ export function startWorkspaceServer(
             local: true,
             current: manager.current(),
           });
-        if (request.method === "GET" && url.pathname === "/api/workspace/meta")
-          return json(loadWorkspaceMetadata());
+        if (request.method === "GET" && url.pathname === "/api/workspace/meta") {
+          try {
+            return json(loadWorkspaceMetadata(metaPath));
+          } catch (err: any) {
+            return json(
+              { error: err?.message || "工作区元数据读取失败", code: err?.code },
+              err?.code === "ESTORAGEFORMAT" ? 500 : 500,
+            );
+          }
+        }
         if (request.method === "GET" && url.pathname === "/api/studies")
           return json(
             manager.list().map((r) => ({
@@ -86,8 +96,21 @@ export function startWorkspaceServer(
           const text = await request.text();
           if (text.length > 16000) return json({ error: "请求过大。" }, 413);
           if (url.pathname === "/api/workspace/meta") {
-            const meta = JSON.parse(text) as WorkspaceMetadata;
-            return json(saveWorkspaceMetadata(meta));
+            try {
+              const meta = JSON.parse(text) as WorkspaceMetadata;
+              return json(saveWorkspaceMetadata(meta, metaPath));
+            } catch (err: any) {
+              const status =
+                err?.code === "ESTORAGECONFLICT"
+                  ? 409
+                  : err?.code === "ESTORAGEFORMAT"
+                    ? 400
+                    : 500;
+              return json(
+                { error: err?.message || "工作区元数据保存失败", code: err?.code },
+                status,
+              );
+            }
           }
           if (url.pathname === "/api/workspace/reveal") {
             const payload = JSON.parse(text) as {
@@ -125,10 +148,10 @@ export function startWorkspaceServer(
             if (match[2] === "delete") {
               const result = manager.delete(id);
               try {
-                const meta = loadWorkspaceMetadata();
+                const meta = loadWorkspaceMetadata(metaPath);
                 if (meta.studies[id]) {
                   delete meta.studies[id];
-                  saveWorkspaceMetadata(meta);
+                  saveWorkspaceMetadata(meta, metaPath);
                 }
               } catch {}
               return json(result);
@@ -207,7 +230,12 @@ export function startWorkspaceServer(
       }
     },
   });
-  return { server, manager };
+  return {
+    server,
+    manager,
+    token,
+    metaPath: metaPath ?? resolveWorkspaceMetaPath(),
+  };
 }
 if (import.meta.main) {
   const { server } = startWorkspaceServer();

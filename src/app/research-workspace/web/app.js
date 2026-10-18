@@ -36,8 +36,12 @@ async function fetchWorkspaceMeta() {
       saveCustomProjects(meta.projects);
       return workspaceMeta;
     }
-  } catch {}
+  } catch (e) {
+    error(e);
+    throw e;
+  }
   workspaceMeta = {
+    revision: "missing",
     projects: getCustomProjects(),
     studies: {},
   };
@@ -45,9 +49,11 @@ async function fetchWorkspaceMeta() {
 }
 async function persistWorkspaceMeta() {
   saveCustomProjects(workspaceMeta.projects);
-  try {
-    await api("/api/workspace/meta", workspaceMeta);
-  } catch {}
+  const updated = await api("/api/workspace/meta", workspaceMeta, "POST");
+  if (updated && updated.revision) {
+    workspaceMeta.revision = updated.revision;
+  }
+  return updated;
 }
 const date = new Intl.DateTimeFormat("sv-SE", {
   timeZone: "Asia/Shanghai",
@@ -63,20 +69,17 @@ const el = (tag, text, cls) => {
 };
 const num = (n) =>
   n === null || n === undefined ? "证据不足" : Number(n).toFixed(2);
-async function api(path, body) {
-  const response = await fetch(
-    path,
-    body === undefined
-      ? {}
-      : {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Workspace-Token": token,
-          },
-          body: JSON.stringify(body),
-        },
-  );
+async function api(path, body, method) {
+  const effectiveMethod = method || (body !== undefined ? "POST" : "GET");
+  const options = { method: effectiveMethod };
+  if (effectiveMethod === "POST") {
+    options.headers = {
+      "Content-Type": "application/json",
+      "X-Workspace-Token": token,
+    };
+    options.body = JSON.stringify(body ?? {});
+  }
+  const response = await fetch(path, options);
   const value = await response.json();
   if (!response.ok) throw new Error(value.error || "请求失败");
   return value;
@@ -172,11 +175,15 @@ function showModal({ title, body, buttons }) {
 function hideModal() {
   $("app-modal").hidden = true;
 }
-function togglePinProject(project) {
+async function togglePinProject(project) {
   project.pinned = !project.pinned;
   project.pinnedAt = project.pinned ? new Date().toISOString() : undefined;
-  persistWorkspaceMeta();
-  studies();
+  try {
+    await persistWorkspaceMeta();
+  } catch (e) {
+    error(e);
+  }
+  await studies();
 }
 function renameProjectModal(project) {
   const input = el("input");
@@ -197,7 +204,11 @@ function renameProjectModal(project) {
           const val = input.value.trim();
           if (!val) return true;
           project.name = val;
-          await persistWorkspaceMeta();
+          try {
+            await persistWorkspaceMeta();
+          } catch (e) {
+            error(e);
+          }
           updateBreadcrumb(project, run);
           await studies();
         },
@@ -234,12 +245,39 @@ function deleteProjectModal(project, projectStudies) {
         label: "删除",
         cls: "btn-danger",
         action: async () => {
+          const failedStudies = [];
+          const deletedStudyIds = new Set();
           for (const s of projectStudies) {
             try {
-              await api(`/api/runs/${s.id}/delete`);
-            } catch {}
+              await api(`/api/runs/${s.id}/delete`, {}, "POST");
+              deletedStudyIds.add(s.id);
+            } catch (err) {
+              failedStudies.push({ study: s, error: err });
+            }
           }
-          workspaceMeta.projects = workspaceMeta.projects.filter((p) => p.id !== project.id);
+          for (const id of deletedStudyIds) {
+            delete workspaceMeta.studies[id];
+          }
+          if (failedStudies.length > 0) {
+            const names = failedStudies
+              .map((f) => f.study.id.slice(0, 8))
+              .join(", ");
+            error(
+              new Error(
+                `部分研究删除失败 (${names})，已保留项目及未删除研究。`,
+              ),
+            );
+            try {
+              await persistWorkspaceMeta();
+            } catch (e) {
+              error(e);
+            }
+            await studies();
+            return;
+          }
+          workspaceMeta.projects = workspaceMeta.projects.filter(
+            (p) => p.id !== project.id,
+          );
           if (currentProjectId === project.id) {
             currentProjectId = null;
             run = null;
@@ -250,7 +288,11 @@ function deleteProjectModal(project, projectStudies) {
             updateBreadcrumb(null, null);
             renderInspect();
           }
-          await persistWorkspaceMeta();
+          try {
+            await persistWorkspaceMeta();
+          } catch (e) {
+            error(e);
+          }
           await studies();
         },
       },
@@ -278,7 +320,11 @@ function renameStudyModal(study) {
           if (!val) return true;
           if (!workspaceMeta.studies[study.id]) workspaceMeta.studies[study.id] = {};
           workspaceMeta.studies[study.id].customTitle = val;
-          await persistWorkspaceMeta();
+          try {
+            await persistWorkspaceMeta();
+          } catch (e) {
+            error(e);
+          }
           updateBreadcrumb(null, run);
           await studies();
         },
@@ -302,7 +348,11 @@ async function toggleArchiveStudy(study) {
   const isArchived = Boolean(workspaceMeta.studies[study.id].archived);
   workspaceMeta.studies[study.id].archived = !isArchived;
   workspaceMeta.studies[study.id].archivedAt = !isArchived ? new Date().toISOString() : undefined;
-  await persistWorkspaceMeta();
+  try {
+    await persistWorkspaceMeta();
+  } catch (e) {
+    error(e);
+  }
   await studies();
 }
 function moveStudyModal(study, currentProject) {
@@ -332,7 +382,11 @@ function moveStudyModal(study, currentProject) {
           const targetId = select.value;
           if (!workspaceMeta.studies[study.id]) workspaceMeta.studies[study.id] = {};
           workspaceMeta.studies[study.id].projectId = targetId;
-          await persistWorkspaceMeta();
+          try {
+            await persistWorkspaceMeta();
+          } catch (e) {
+            error(e);
+          }
           await studies();
         },
       },
@@ -354,7 +408,15 @@ function deleteStudyModal(study) {
         cls: "btn-danger",
         action: async () => {
           try {
-            await api(`/api/runs/${study.id}/delete`);
+            await api(`/api/runs/${study.id}/delete`, {}, "POST");
+            if (workspaceMeta.studies[study.id]) {
+              delete workspaceMeta.studies[study.id];
+              try {
+                await persistWorkspaceMeta();
+              } catch (e) {
+                error(e);
+              }
+            }
             if (run?.id === study.id || run?.conversationId === study.id) {
               run = null;
               activeStudyId = null;
@@ -542,12 +604,14 @@ async function studies() {
       latest.set(value.conversationId ?? value.id, value);
   const allStudies = Array.from(latest.values());
 
+  let metaChanged = false;
   for (const s of allStudies) {
     const studyMeta = workspaceMeta.studies[s.id] || {};
     const sym = s.scope.symbol;
     if (studyMeta.projectId) {
       if (!workspaceMeta.projects.some((p) => p.id === studyMeta.projectId)) {
         delete studyMeta.projectId;
+        metaChanged = true;
       }
     }
     if (
@@ -562,9 +626,16 @@ async function studies() {
         pinned: false,
         createdAt: new Date().toISOString(),
       });
+      metaChanged = true;
     }
   }
-  await persistWorkspaceMeta();
+  if (metaChanged) {
+    try {
+      await persistWorkspaceMeta();
+    } catch (e) {
+      error(e);
+    }
+  }
 
   if ($("projects-count"))
     $("projects-count").textContent = String(workspaceMeta.projects.length);
@@ -1448,9 +1519,16 @@ $("project-form").onsubmit = async (e) => {
     createdAt: new Date().toISOString(),
   };
   workspaceMeta.projects.push(newProj);
-  await persistWorkspaceMeta();
-  $("project-form").hidden = true;
-  startNewResearchInProject(newProj);
+  try {
+    await persistWorkspaceMeta();
+    $("project-form").hidden = true;
+    startNewResearchInProject(newProj);
+  } catch (err) {
+    workspaceMeta.projects = workspaceMeta.projects.filter(
+      (p) => p.id !== newProj.id,
+    );
+    error(err);
+  }
 };
 document.addEventListener("keydown", (e) => {
   if (e.ctrlKey && e.key.toLowerCase() === "g" && run?.status === "running") {
