@@ -98,6 +98,7 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 | [年度报告](./quant-harness/annual-reports.md) | 年度/YTD、组合版本、观点来源与私有导出 |
 | [UI/UX](./quant-harness/quant-uiux.md) | 工作台、布局、队列投影、异步状态与文本渲染；视觉真源为根 [DESIGN](../DESIGN.md) |
 | [Windows 桌面宿主](./quant-harness/desktop.md) | Electron/ConPTY、随包运行时、数据目录、构建与安装验收 |
+| [Web 研究工作台](./quant-harness/research-workspace.md) | 本地对话入口、真实取证与计算、引用、保存和独立复核的首个任务 |
 
 <a id="reference"></a>
 

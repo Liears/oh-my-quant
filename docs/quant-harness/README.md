@@ -13,7 +13,7 @@
 | 数据、工具与技能 | [数据源](./source-data-providers.md) · [工具与计算](./quant-tools-design.md) · [精选 Skills 与 MCP 配置](./trader-skills.md#toolkit) |
 | 领域研究 | [组合比较](./portfolio-comparison.md) · [新闻](./news-research.md) · [Alpha 回测](./alpha-backtest.md) |
 | 账户与执行 | [账户业绩](./performance.md) · [执行](./execution.md) |
-| 报告与交互 | [制品](./artifacts-design.md) · [年报](./annual-reports.md) · [UI/UX](./quant-uiux.md) · [Windows 桌面宿主](./desktop.md) |
+| 报告与交互 | [制品](./artifacts-design.md) · [年报](./annual-reports.md) · [UI/UX](./quant-uiux.md) · [Windows 桌面宿主](./desktop.md) · [Web 研究工作台](./research-workspace.md) |
 | 使用与验证 | [配置](./configuration.md) · [手册](./user-guide.md) · [命令](./slash-commands.md) · [评测](./evaluation.md) |
 | 仓库质量与发布 | [CI and npm Releases](./ci-release.md) |
 
