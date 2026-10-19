@@ -176,6 +176,9 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 | [assets/blog-product-plan-narrow-20261015.png](./assets/blog-product-plan-narrow-20261015.png) | 同一博客的 390×844 阅读视图 | 同上；正文不溢出，机制图沿用带提示、可键盘横滚的容器 |
 | [assets/community-tools-60x20.png](./assets/community-tools-60x20.png) | Skills/MCP 选择与移除的窄终端连续帧 | 当前命令与 QuantTui 字符缓冲区的浏览器截图；隔离合成输入，不证明原生终端或外部服务可用 |
 | [assets/community-tools-120x32.png](./assets/community-tools-120x32.png) | 同一命令流程的宽终端连续帧 | 同上；复现步骤见 Skills 与 MCP 指南 |
+| [assets/research-workspace-icons-2026-10-19.png](./assets/research-workspace-icons-2026-10-19.png) | Web 研究工作台 1600×1000 实际渲染：55:45 会话/画布分栏、Lucide 2px 图标、无装饰 emoji | 本机 Chromium 无头模式、2026-10-19；渲染本机已保存研究记录，仅界面证据，不证明模型回答质量，也不证明该界面已进入任何发布物 |
+| [assets/research-workspace-narrow-2026-10-19.png](./assets/research-workspace-narrow-2026-10-19.png) | 同一界面 1280×900，分栏比例在小窗口下仍为 55:45 | 同上；只验证该尺寸，不是响应式断点全覆盖 |
+| [assets/research-workspace-citation-pulse-2026-10-19.png](./assets/research-workspace-citation-pulse-2026-10-19.png) | 点击正文引用 `E1` 后画布对应证据卡的瞬时高亮脉冲 | 同上；动画瞬时状态，不代表该高亮长期驻留 |
 
 | [assets/ci-panel-transition-failure.png](./assets/ci-panel-transition-failure.png) | Desktop 面板切换的历史失败截图 | Actions 38156420320 原始 artifact；不是当前产品验收 |
 | [assets/ci-multiline-paste-failure.png](./assets/ci-multiline-paste-failure.png) | Desktop 多行粘贴的历史失败截图 | Actions 38234986954 原始 artifact；不是当前产品验收 |
