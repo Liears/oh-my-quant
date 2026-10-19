@@ -1,4 +1,5 @@
 import { renderMarkdown, parseInline } from "./markdown.js";
+import { iconSvg, iconEl, jqLogoSvg } from "./icons.js";
 
 const $ = (id) => document.getElementById(id);
 let token,
@@ -132,7 +133,12 @@ function showContextMenu(x, y, items) {
     }
     const btn = el("button", undefined, item.danger ? "danger" : undefined);
     if (item.icon) {
-      const icon = el("span", item.icon, "menu-icon");
+      const icon = el("span", undefined, "menu-icon");
+      if (typeof item.icon === "string" && (item.icon.includes("<svg") || /^[a-zA-Z]/.test(item.icon))) {
+        icon.innerHTML = item.icon.includes("<svg") ? item.icon : iconSvg(item.icon, 14);
+      } else {
+        icon.textContent = item.icon;
+      }
       btn.append(icon);
     }
     const label = el("span", item.label);
@@ -446,7 +452,7 @@ function updateBreadcrumb(project, currentRun) {
     }
   }
   if (project) {
-    if ($("bc-project")) $("bc-project").textContent = "📁 " + project.name;
+    if ($("bc-project")) $("bc-project").textContent = project.name;
     currentProjectId = project.id;
   } else {
     if ($("bc-project")) $("bc-project").textContent = "全部项目";
@@ -455,9 +461,9 @@ function updateBreadcrumb(project, currentRun) {
     const custom = workspaceMeta.studies[currentRun.id]?.customTitle;
     const q = (custom || currentRun.question).replace(/\s+/g, " ");
     if ($("bc-study"))
-      $("bc-study").textContent = "📄 " + (q.length > 20 ? q.slice(0, 20) + "…" : q);
+      $("bc-study").textContent = q.length > 24 ? q.slice(0, 24) + "…" : q;
   } else {
-    if ($("bc-study")) $("bc-study").textContent = "＋ 新建研究";
+    if ($("bc-study")) $("bc-study").textContent = "新研究";
   }
 }
 function updateActiveStudyUi() {
@@ -503,6 +509,8 @@ function startNewResearchInProject(project) {
   $("alert").textContent = "";
   for (const id of ["save", "review", "cancel", "continue"])
     $(id).hidden = true;
+  if ($("composer-stop")) $("composer-stop").hidden = true;
+  if ($("agent-status-badge")) $("agent-status-badge").textContent = "真实 Agent · 就绪";
   $("submit").disabled = false;
 
   updateBreadcrumb(project, null);
@@ -554,35 +562,36 @@ function renderStudyRow(container, study, project, isArchived) {
   };
 
   const actionBox = el("div", undefined, "study-item-actions");
-  const moreBtn = el("button", "···", "btn-more-study");
+  const moreBtn = el("button", undefined, "btn-more-study");
+  moreBtn.innerHTML = iconSvg("moreHorizontal", 14);
   moreBtn.title = "会话操作";
   moreBtn.onclick = (e) => {
     e.stopPropagation();
     const rect = moreBtn.getBoundingClientRect();
     showContextMenu(rect.right - 148, rect.bottom + 4, [
       {
-        icon: "✏️",
+        icon: "pencil",
         label: "重命名研究",
         action: () => renameStudyModal(study),
       },
       {
-        icon: "📁",
+        icon: "folder",
         label: "在资源管理器中定位",
         action: () => revealStudyFile(study),
       },
       {
-        icon: isArchived ? "📤" : "📦",
+        icon: isArchived ? "archiveRestore" : "archive",
         label: isArchived ? "取消归档" : "归档研究",
         action: () => toggleArchiveStudy(study),
       },
       {
-        icon: "↗️",
+        icon: "moveRight",
         label: "移动到其他项目...",
         action: () => moveStudyModal(study, project),
       },
       { divider: true },
       {
-        icon: "🗑️",
+        icon: "trash2",
         label: "删除研究",
         danger: true,
         action: () => deleteStudyModal(study),
@@ -674,17 +683,16 @@ async function studies() {
 
     const header = el("div", undefined, "project-header");
     const titleGroup = el("div", undefined, "project-title-group");
-    const chevron = el("span", "▾", "project-chevron");
-    const icon = el(
-      "span",
-      collapsedProjects.has(project.id) ? "📁" : "📂",
-      "project-icon",
-    );
+    const chevron = el("span", undefined, "project-chevron");
+    chevron.innerHTML = iconSvg(collapsedProjects.has(project.id) ? "chevronRight" : "chevronDown", 13);
+    const icon = el("span", undefined, "project-icon");
+    icon.innerHTML = iconSvg(collapsedProjects.has(project.id) ? "folder" : "folderOpen", 15);
     const name = el("span", project.name, "project-name");
     name.title = `${project.name} (${project.symbol})`;
     titleGroup.append(chevron, icon, name);
     if (project.pinned) {
-      const pin = el("span", "📌", "project-pin-badge");
+      const pin = el("span", undefined, "project-pin-badge");
+      pin.innerHTML = iconSvg("pin", 12);
       pin.title = "已置顶项目";
       titleGroup.append(pin);
     }
@@ -695,37 +703,39 @@ async function studies() {
       String(activeStudies.length + archivedStudies.length),
       "folder-count",
     );
-    const addBtn = el("button", "＋", "btn-add-study");
+    const addBtn = el("button", undefined, "btn-add-study");
+    addBtn.innerHTML = iconSvg("plus", 13);
     addBtn.title = `在「${project.name}」中发起新研究`;
     addBtn.onclick = (e) => {
       e.stopPropagation();
       startNewResearchInProject(project);
     };
 
-    const moreBtn = el("button", "···", "btn-more-project");
+    const moreBtn = el("button", undefined, "btn-more-project");
+    moreBtn.innerHTML = iconSvg("moreHorizontal", 14);
     moreBtn.title = "项目操作";
     moreBtn.onclick = (e) => {
       e.stopPropagation();
       const rect = moreBtn.getBoundingClientRect();
       showContextMenu(rect.right - 148, rect.bottom + 4, [
         {
-          icon: project.pinned ? "📍" : "📌",
+          icon: project.pinned ? "pinOff" : "pin",
           label: project.pinned ? "取消置顶" : "置顶项目",
           action: () => togglePinProject(project),
         },
         {
-          icon: "✏️",
+          icon: "pencil",
           label: "重命名项目",
           action: () => renameProjectModal(project),
         },
         {
-          icon: "📁",
+          icon: "folder",
           label: "打开本地文件夹",
           action: () => openProjectFolder(project),
         },
         { divider: true },
         {
-          icon: "🗑️",
+          icon: "trash2",
           label: "删除项目",
           danger: true,
           action: () => deleteProjectModal(project, projectStudies),
@@ -740,17 +750,19 @@ async function studies() {
       if (collapsedProjects.has(project.id)) {
         collapsedProjects.delete(project.id);
         folder.classList.remove("collapsed");
-        icon.textContent = "📂";
+        chevron.innerHTML = iconSvg("chevronDown", 13);
+        icon.innerHTML = iconSvg("folderOpen", 15);
       } else {
         collapsedProjects.add(project.id);
         folder.classList.add("collapsed");
-        icon.textContent = "📁";
+        chevron.innerHTML = iconSvg("chevronRight", 13);
+        icon.innerHTML = iconSvg("folder", 15);
       }
     };
 
     const studiesContainer = el("div", undefined, "project-studies");
     if (activeStudies.length === 0 && archivedStudies.length === 0) {
-      const empty = el("div", "暂无研究 · 点击 ＋ 启动", "empty-project-hint");
+      const empty = el("div", "暂无研究 · 点击新建启动", "empty-project-hint");
       empty.onclick = () => startNewResearchInProject(project);
       empty.style.cursor = "pointer";
       studiesContainer.append(empty);
@@ -765,11 +777,10 @@ async function studies() {
           "archived-section collapsed",
         );
         const archivedHeader = el("div", undefined, "archived-header");
-        const archivedTitle = el(
-          "span",
-          `📦 已归档 (${archivedStudies.length})`,
-        );
-        const archivedChev = el("span", "▾", "archived-chevron");
+        const archivedTitle = el("span", undefined, "archived-title-wrap");
+        archivedTitle.innerHTML = `${iconSvg("archive", 13)} <span>已归档 (${archivedStudies.length})</span>`;
+        const archivedChev = el("span", undefined, "archived-chevron");
+        archivedChev.innerHTML = iconSvg("chevronDown", 12);
         archivedHeader.append(archivedTitle, archivedChev);
         archivedHeader.onclick = (e) => {
           e.stopPropagation();
@@ -828,11 +839,14 @@ function renderProgress() {
 
   const traceHeader = el("div", undefined, "trace-header");
   const leftGroup = el("div", undefined, "trace-header-left");
-  const icon = el(
-    "span",
-    isRunning ? "🧠" : isComplete ? "✓" : isNeedsInput ? "❓" : "⏹",
-    "trace-status-icon",
-  );
+  const icon = el("span", undefined, "trace-status-icon");
+  icon.innerHTML = isRunning
+    ? iconSvg("loader2", 14, "spin")
+    : isComplete
+      ? iconSvg("check", 14)
+      : isNeedsInput
+        ? iconSvg("helpCircle", 14)
+        : iconSvg("square", 14);
   if (isRunning) icon.classList.add("pulse");
 
   let headlineText = "";
@@ -875,10 +889,8 @@ function renderProgress() {
     if (run.thinking) {
       const thinkingBox = el("div", undefined, "trace-thinking-box");
       const thinkingHeader = el("div", undefined, "trace-thinking-header");
-      const thinkingTitle = el(
-        "span",
-        "💭 模型推理思考过程 (Chain of Thought)",
-      );
+      const thinkingTitle = el("span", undefined, "trace-thinking-title");
+      thinkingTitle.innerHTML = `${iconSvg("sparkles", 14)} <span>模型推理思考过程 (Chain of Thought)</span>`;
       thinkingHeader.append(thinkingTitle);
 
       const thinkingContent = el("pre", run.thinking, "trace-thinking-content");
@@ -921,17 +933,14 @@ function renderProgress() {
         );
 
         const stepHeader = el("div", undefined, "trace-step-header");
-        const statusBadge = el(
-          "span",
-          ev.isError
-            ? "✕"
-            : ev.kind === "tool_success"
-              ? "✓"
-              : ev.kind === "tool_start"
-                ? "⏳"
-                : "•",
-          "step-badge",
-        );
+        const statusBadge = el("span", undefined, "step-badge");
+        statusBadge.innerHTML = ev.isError
+          ? iconSvg("x", 12)
+          : ev.kind === "tool_success"
+            ? iconSvg("check", 12)
+            : ev.kind === "tool_start"
+              ? iconSvg("loader2", 12, "spin")
+              : "•";
 
         const stepTitleGroup = el("div", undefined, "step-title-group");
         const toolLabel = ev.toolName
@@ -1064,6 +1073,15 @@ function render() {
     b.disabled = run.status === "running";
   });
   $("cancel").hidden = run.status !== "running";
+  if ($("composer-stop")) $("composer-stop").hidden = run.status !== "running";
+  if ($("agent-status-badge")) {
+    $("agent-status-badge").textContent =
+      run.status === "running"
+        ? "真实 Agent · 执行中"
+        : run.status === "needs_input"
+          ? "真实 Agent · 待澄清"
+          : "真实 Agent · 就绪";
+  }
   $("continue").hidden = !["cancelled", "failed"].includes(run.status);
   $("save").hidden = run.status !== "complete" || run.saved;
   $("review").hidden = !run.saved;
@@ -1076,7 +1094,9 @@ function render() {
       el("p", turn.question),
     );
     const assistant = el("article", undefined, "message assistant-message");
-    assistant.append(el("div", "▥ WhyJ", "message-role"));
+    const roleDiv = el("div", undefined, "message-role role-whyj");
+    roleDiv.innerHTML = `${jqLogoSvg(14)} <span>WhyJ</span>`;
+    assistant.append(roleDiv);
     if (turn.answer) {
       assistant.append(renderMarkdown(turn.answer.summary, "reply-summary"));
       const detail = el("details"),
@@ -1149,12 +1169,22 @@ function render() {
     });
   }
 }
-function showInspector() {
-  if (matchMedia("(max-width: 900px)").matches) {
-    document.querySelector(".workspace").classList.add("inspector-open");
-    $("toggle-inspector").textContent = "回到对话";
-    $("toggle-inspector").setAttribute("aria-expanded", "true");
+function updateInspectorToggleUi(open) {
+  const btn = $("toggle-inspector");
+  if (!btn) return;
+  btn.setAttribute("aria-expanded", String(open));
+  const label = btn.querySelector(".btn-canvas-label");
+  if (label) {
+    label.textContent = open ? "回到对话" : "研究面板";
   }
+  const icon = $("icon-canvas-toggle");
+  if (icon) {
+    icon.innerHTML = iconSvg(open ? "panelRightClose" : "panelRight", 16);
+  }
+}
+function showInspector() {
+  document.querySelector(".workspace").classList.add("inspector-open");
+  updateInspectorToggleUi(true);
 }
 function card(title, text) {
   const c = el("div", undefined, "card");
@@ -1287,6 +1317,7 @@ function renderInspect(focus) {
         `${evidence.source} · 获取于 ${new Date(evidence.fetchedAt).toLocaleString()}`,
       );
       c.id = evidence.id;
+      c.dataset.evidenceId = evidence.id;
       c.append(el("code", `SHA-256 ${evidence.contentHash}`));
       if (evidence.result)
         c.append(
@@ -1323,10 +1354,18 @@ function renderInspect(focus) {
         "small",
       ),
     );
-    if (focus)
-      requestAnimationFrame(() =>
-        $(focus)?.scrollIntoView({ behavior: "smooth", block: "center" }),
-      );
+    if (focus) {
+      requestAnimationFrame(() => {
+        const target = $(focus) || document.querySelector(`[data-evidence-id="${focus}"]`);
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+          target.classList.remove("target-highlight");
+          void target.offsetWidth;
+          target.classList.add("target-highlight");
+          setTimeout(() => target.classList.remove("target-highlight"), 2500);
+        }
+      });
+    }
   }
   if (selected === "review") {
     root.append(el("h2", "保存判断，复核变化"));
@@ -1426,9 +1465,19 @@ $("toggle-inspector").onclick = () => {
   const open = document
     .querySelector(".workspace")
     .classList.toggle("inspector-open");
-  $("toggle-inspector").textContent = open ? "回到对话" : "研究面板";
-  $("toggle-inspector").setAttribute("aria-expanded", String(open));
+  updateInspectorToggleUi(open);
 };
+$("answer").addEventListener("click", (e) => {
+  const citBtn = e.target.closest(".citation");
+  if (citBtn) {
+    const evidenceId = citBtn.textContent.trim();
+    if (evidenceId) {
+      selected = "evidence";
+      renderInspect(evidenceId);
+      showInspector();
+    }
+  }
+});
 for (const action of ["cancel", "continue", "save", "review"])
   $(action).onclick = async () => {
     try {
@@ -1475,6 +1524,8 @@ $("new").onclick = () => {
   $("alert").textContent = "";
   for (const id of ["save", "review", "cancel", "continue"])
     $(id).hidden = true;
+  if ($("composer-stop")) $("composer-stop").hidden = true;
+  if ($("agent-status-badge")) $("agent-status-badge").textContent = "真实 Agent · 就绪";
   $("submit").disabled = false;
   updateBreadcrumb(null, null);
   updateActiveStudyUi();
@@ -1599,6 +1650,22 @@ function initAsideResizer() {
     } catch {}
   });
 }
+function initStaticIcons() {
+  if ($("brand-logo")) $("brand-logo").innerHTML = jqLogoSvg(20);
+  if ($("icon-new-study")) $("icon-new-study").innerHTML = iconSvg("plus", 14);
+  if ($("new-project")) $("new-project").innerHTML = iconSvg("plus", 14);
+  if ($("icon-canvas-toggle")) $("icon-canvas-toggle").innerHTML = iconSvg("panelRight", 16);
+  if ($("icon-stop-btn")) $("icon-stop-btn").innerHTML = iconSvg("square", 12);
+  if ($("icon-send-btn")) $("icon-send-btn").innerHTML = iconSvg("send", 14);
+  if ($("modal-close")) $("modal-close").innerHTML = iconSvg("x", 16);
+  if ($("composer-stop")) {
+    $("composer-stop").onclick = () => {
+      $("cancel")?.click();
+    };
+  }
+}
+initStaticIcons();
+
 $("modal-close").onclick = hideModal;
 window.addEventListener("click", () => hideContextMenu());
 window.addEventListener("keydown", (e) => {
@@ -1607,6 +1674,7 @@ window.addEventListener("keydown", (e) => {
     hideModal();
   }
 });
+
 try {
   const status = await api("/api/status");
   token = status.token;

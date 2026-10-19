@@ -9,8 +9,11 @@
   </head>
   <body>
     <aside>
-      <a class="brand" href="/">▥ WhyJ <span>投资研究工作台</span></a>
-      <button id="new" class="primary btn-new-study" title="发起全局新研究">＋ 新建研究</button>
+      <a class="brand" href="/" title="WhyJ Quant 投资研究工作台">
+        <span id="brand-logo" class="brand-logo"></span>
+        <span class="brand-text">WhyJ <span>投资研究工作台</span></span>
+      </a>
+      <button id="new" class="primary btn-new-study" title="发起新研究"><span id="icon-new-study"></span><span>新建研究</span></button>
       <form id="project-form" class="project-inline-form" hidden>
         <div class="form-title">新建标的专题项目</div>
         <input id="new-project-symbol" placeholder="标的代码，如 600519.SH" required maxlength="12" />
@@ -24,7 +27,7 @@
         <span class="eyebrow">研究项目 · PROJECTS</span>
         <div class="meta-right">
           <span id="projects-count" class="badge-count">0</span>
-          <button id="new-project" class="btn-icon-add" title="新建标的专题项目">＋</button>
+          <button id="new-project" class="btn-icon-add" title="新建标的专题项目" aria-label="新建标的专题项目"></button>
         </div>
       </div>
       <div id="studies" class="projects-tree" role="tree"></div>
@@ -33,19 +36,21 @@
     </aside>
     <main>
       <header>
-        <div>
+        <div class="header-main">
           <nav id="breadcrumb" class="breadcrumb" aria-label="路径导航">
-            <span class="bc-part">WhyJ</span>
+            <span class="bc-part" id="bc-home">WhyJ</span>
             <span class="bc-sep">/</span>
             <span id="bc-project" class="bc-part">全部项目</span>
             <span class="bc-sep">/</span>
             <span id="bc-study" class="bc-part active">新研究</span>
           </nav>
-          <h1>把问题研究清楚。</h1>
         </div>
         <div class="header-tools">
-          <span class="badge">真实 Agent · 实验版</span>
-          <button id="toggle-inspector" aria-expanded="false">研究面板</button>
+          <span id="agent-status-badge" class="badge">真实 Agent · 就绪</span>
+          <button id="toggle-inspector" class="btn-toggle-canvas" title="展开/收起研究面板" aria-expanded="false" aria-label="研究面板">
+            <span id="icon-canvas-toggle"></span>
+            <span class="btn-canvas-label">研究面板</span>
+          </button>
         </div>
       </header>
       <div class="workspace">
@@ -98,10 +103,17 @@
               </div>
             </details>
             <div class="compose-actions">
-              <span id="composer-hint">Enter 发送 · Shift+Enter 换行</span
-              ><button type="submit" class="primary" id="submit">
-                发送 ↗
-              </button>
+              <span id="composer-hint">Enter 发送 · Shift+Enter 换行</span>
+              <div class="compose-btn-group">
+                <button type="button" id="composer-stop" class="btn-stop-research" hidden title="停止回复 (Ctrl+G)">
+                  <span id="icon-stop-btn"></span>
+                  <span>停止</span>
+                </button>
+                <button type="submit" class="primary btn-submit-research" id="submit" title="发送研究问题 (Enter)">
+                  <span class="btn-send-label">发送</span>
+                  <span id="icon-send-btn"></span>
+                </button>
+              </div>
             </div>
           </form>
           <div id="alert" role="alert"></div>
@@ -129,7 +141,7 @@
       <div class="modal-card">
         <div class="modal-header">
           <h3 id="modal-title">标题</h3>
-          <button id="modal-close" class="btn-icon" title="关闭">✕</button>
+          <button id="modal-close" class="btn-icon" title="关闭" aria-label="关闭"></button>
         </div>
         <div id="modal-body" class="modal-body"></div>
         <div id="modal-footer" class="modal-footer"></div>
