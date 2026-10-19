@@ -45,14 +45,52 @@ aside {
 .brand {
   color: #d4af37;
   text-decoration: none;
-  font-size: 23px;
+  font-size: 16px;
   font-weight: 650;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-.brand span {
-  display: block;
+.brand .brand-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.brand .brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.brand .brand-text span {
   color: #a6a6a6;
-  font-size: 12px;
-  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  margin-top: 3px;
+}
+
+/* Lucide and JQ SVG Icons */
+.lucide {
+  vertical-align: middle;
+  display: inline-block;
+  stroke-width: 2;
+  flex-shrink: 0;
+}
+.jq-logo-mark {
+  vertical-align: middle;
+  display: inline-block;
+  color: #d4af37;
+  flex-shrink: 0;
+}
+@keyframes lucide-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.lucide.spin {
+  animation: lucide-spin 1s linear infinite;
 }
 button,
 input,
@@ -179,11 +217,14 @@ button.small {
   background: #1a1a1d;
   border: 1px solid #333338;
   color: #aaa;
-  padding: 2px 7px;
-  font-size: 12px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border-radius: 4px;
-  line-height: 1.2;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.15s ease;
 }
 .btn-icon-add:hover {
@@ -237,17 +278,23 @@ button.small {
   flex: 1;
 }
 .project-chevron {
-  font-size: 10px;
   color: #777;
   transition: transform 0.15s ease;
-  display: inline-block;
-  width: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 .project-folder.collapsed .project-chevron {
   transform: rotate(-90deg);
 }
 .project-icon {
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #d4af37;
   flex-shrink: 0;
 }
 .project-name {
@@ -278,15 +325,18 @@ button.small {
   background: transparent;
   border: 1px solid #333338;
   color: #aaa;
-  padding: 2px 6px;
-  font-size: 11px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
   border-radius: 4px;
-  line-height: 1;
   cursor: pointer;
   display: none;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
 }
 .project-header:hover .btn-add-study {
-  display: inline-block;
+  display: inline-flex;
 }
 .btn-add-study:hover {
   border-color: #d4af37;
@@ -365,13 +415,15 @@ button.small {
   background: transparent;
   border: 1px solid transparent;
   color: #777;
-  padding: 1px 5px;
-  font-size: 11px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border-radius: 4px;
-  line-height: 1.2;
   cursor: pointer;
   transition: all 0.15s ease;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .btn-more-project:hover,
 .btn-more-study:hover {
@@ -403,9 +455,13 @@ button.small {
   display: flex;
 }
 .project-pin-badge {
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #d4af37;
   margin-left: 2px;
   opacity: 0.9;
+  flex-shrink: 0;
 }
 .archived-section {
   margin-top: 6px;
@@ -428,8 +484,16 @@ button.small {
   background: #17171b;
   color: #aaa;
 }
+.archived-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .archived-chevron {
-  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #777;
   transition: transform 0.15s;
 }
 .archived-section.collapsed .archived-chevron {
@@ -654,11 +718,20 @@ button.small {
   color: #ddd;
 }
 .trace-status-icon {
-  font-size: 13px;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 .trace-status-icon.pulse {
   animation: pulse-glow 1.5s infinite ease-in-out;
+}
+.trace-thinking-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 @keyframes pulse-glow {
   0%, 100% { opacity: 0.6; transform: scale(0.95); }
@@ -857,9 +930,8 @@ button.small {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: #777;
-  margin-bottom: 4px;
 }
 .bc-part {
   color: #999;
@@ -875,12 +947,37 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1a1a20;
+}
+.header-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 .header-tools {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.btn-toggle-canvas {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+  background: #141418;
+  border: 1px solid #2a2a32;
+  color: #bbb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-toggle-canvas:hover {
+  border-color: #d4af37;
+  color: #eee;
 }
 h1 {
   font-size: 24px;
@@ -905,8 +1002,8 @@ p {
 }
 .workspace {
   display: grid;
-  grid-template-columns: minmax(350px, 1.1fr) minmax(340px, 1fr);
-  gap: 30px;
+  grid-template-columns: minmax(360px, 55fr) minmax(300px, 45fr);
+  gap: 24px;
 }
 .intro {
   padding: 8px 0 18px;
@@ -991,6 +1088,38 @@ select {
   font-size: 11px;
   color: #a6a6a6;
 }
+.compose-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-stop-research {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #251212;
+  border: 1px solid #5a1f1f;
+  color: #ff9999;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-stop-research:hover {
+  background: #361717;
+  border-color: #8c2e2e;
+  color: #ffcccc;
+}
+.btn-submit-research {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+}
 .inspector {
   border: 1px solid #242424;
   border-radius: 10px;
@@ -1059,6 +1188,24 @@ nav button[aria-selected="true"] {
   padding: 14px;
   border-radius: 7px;
   margin: 12px 0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+@keyframes target-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.6);
+    border-color: #d4af37;
+  }
+  50% {
+    box-shadow: 0 0 16px 4px rgba(212, 175, 55, 0.4);
+    border-color: #f3d06a;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0);
+    border-color: #2d2d2d;
+  }
+}
+.card.target-highlight {
+  animation: target-pulse 2.2s ease-out;
 }
 .card h3 {
   font-size: 13px;
@@ -1157,13 +1304,13 @@ main {
 }
 header {
   flex-shrink: 0;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 .workspace {
   flex: 1;
   min-height: 0;
   gap: 24px;
-  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 1fr);
+  grid-template-columns: minmax(0, 55fr) minmax(300px, 45fr);
 }
 .conversation {
   min-width: 0;
@@ -1241,6 +1388,11 @@ textarea,
 }
 .assistant-message .message-role {
   color: #d4af37;
+}
+.role-whyj {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .reply-summary {
   font-size: 14px;

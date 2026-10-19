@@ -23,6 +23,7 @@ export function startWorkspaceServer(
     "/app.js": "app.js",
     "/style.css": "style.css",
     "/markdown.js": "markdown.js",
+    "/icons.js": "icons.js",
   };
   const headers = {
     "Cache-Control": "no-store",
