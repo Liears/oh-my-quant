@@ -1,6 +1,6 @@
 import { renderMarkdown, parseInline } from "./markdown.js";
 
-const $ = (id) => document.getElementById(id);
+const $ = (id) => (typeof document !== "undefined" ? document.getElementById(id) : null);
 let token,
   run,
   events,
@@ -16,8 +16,10 @@ let workspaceMeta = { projects: [], studies: {} };
 
 function getCustomProjects() {
   try {
-    const raw = localStorage.getItem("whyj_projects_v1");
-    if (raw) return JSON.parse(raw);
+    if (typeof localStorage !== "undefined") {
+      const raw = localStorage.getItem("whyj_projects_v1");
+      if (raw) return JSON.parse(raw);
+    }
   } catch {}
   return [
     { id: "002048.SZ", name: "002048.SZ 结构跟踪", symbol: "002048.SZ", benchmark: "000300.SH", pinned: false }
@@ -25,12 +27,14 @@ function getCustomProjects() {
 }
 function saveCustomProjects(list) {
   try {
-    localStorage.setItem("whyj_projects_v1", JSON.stringify(list));
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("whyj_projects_v1", JSON.stringify(list));
+    }
   } catch {}
 }
-async function fetchWorkspaceMeta() {
+export async function fetchWorkspaceMeta(apiFn = api) {
   try {
-    const meta = await api("/api/workspace/meta");
+    const meta = await apiFn("/api/workspace/meta");
     if (meta && Array.isArray(meta.projects)) {
       workspaceMeta = meta;
       saveCustomProjects(meta.projects);
@@ -47,20 +51,28 @@ async function fetchWorkspaceMeta() {
   };
   return workspaceMeta;
 }
-async function persistWorkspaceMeta() {
-  saveCustomProjects(workspaceMeta.projects);
-  const updated = await api("/api/workspace/meta", workspaceMeta, "POST");
+export async function persistWorkspaceMeta(meta = workspaceMeta, apiFn = api) {
+  if (meta?.projects) saveCustomProjects(meta.projects);
+  const updated = await apiFn("/api/workspace/meta", meta, "POST");
   if (updated && updated.revision) {
-    workspaceMeta.revision = updated.revision;
+    meta.revision = updated.revision;
   }
   return updated;
 }
 const date = new Intl.DateTimeFormat("sv-SE", {
   timeZone: "Asia/Shanghai",
 }).format(new Date());
-$("end").value = date;
-$("end").max = date;
-$("start").value = `${date.slice(0, 4)}-01-01`;
+if (typeof document !== "undefined") {
+  const endEl = $("end");
+  if (endEl) {
+    endEl.value = date;
+    endEl.max = date;
+  }
+  const startEl = $("start");
+  if (startEl) {
+    startEl.value = `${date.slice(0, 4)}-01-01`;
+  }
+}
 const el = (tag, text, cls) => {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;
@@ -85,7 +97,9 @@ async function api(path, body, method) {
   return value;
 }
 function error(e) {
-  $("alert").textContent = e.message;
+  if (typeof document !== "undefined" && $("alert")) {
+    $("alert").textContent = e.message;
+  }
 }
 function follow(value) {
   run = value;
@@ -228,6 +242,90 @@ async function openProjectFolder(project) {
     error(e);
   }
 }
+export async function executeStudyDelete(studyId, options = {}) {
+  const apiFn = options.api || api;
+  const meta = options.meta || workspaceMeta;
+  const res = await apiFn(`/api/runs/${studyId}/delete`, {}, "POST");
+  if (res && res.revision) {
+    meta.revision = res.revision;
+  }
+  if (res && res.meta && res.meta.studies) {
+    meta.studies = res.meta.studies;
+    if (res.meta.projects) meta.projects = res.meta.projects;
+  } else if (meta.studies) {
+    delete meta.studies[studyId];
+  }
+  if (typeof options.onRunReset === "function") {
+    options.onRunReset();
+  }
+  return res;
+}
+
+export async function executeProjectDelete(project, projectStudies, options = {}) {
+  const apiFn = options.api || api;
+  const meta = options.meta || workspaceMeta;
+  const persistFn = options.persistMeta || persistWorkspaceMeta;
+  const failedStudies = [];
+  const deletedStudyIds = new Set();
+
+  for (const s of projectStudies) {
+    try {
+      const res = await apiFn(`/api/runs/${s.id}/delete`, {}, "POST");
+      deletedStudyIds.add(s.id);
+      if (res && res.revision) {
+        meta.revision = res.revision;
+      }
+      if (res && res.meta && res.meta.studies) {
+        meta.studies = res.meta.studies;
+      } else if (meta.studies) {
+        delete meta.studies[s.id];
+      }
+    } catch (err) {
+      failedStudies.push({ study: s, error: err });
+    }
+  }
+
+  for (const id of deletedStudyIds) {
+    if (meta.studies) delete meta.studies[id];
+  }
+
+  if (failedStudies.length > 0) {
+    const names = failedStudies
+      .map((f) => f.study.id.slice(0, 8))
+      .join(", ");
+    const failureError = new Error(
+      `部分研究删除失败 (${names})，已保留项目及未删除研究。`,
+    );
+    if (typeof options.onError === "function") {
+      options.onError(failureError, { failedStudies, deletedStudyIds });
+    }
+    return {
+      ok: false,
+      error: failureError,
+      deletedStudyIds: Array.from(deletedStudyIds),
+      failedStudies,
+    };
+  }
+
+  meta.projects = (meta.projects || []).filter((p) => p.id !== project.id);
+
+  if (typeof options.onRunReset === "function") {
+    options.onRunReset();
+  }
+
+  const updatedMeta = await persistFn(meta, apiFn);
+  if (updatedMeta && updatedMeta.revision) {
+    meta.revision = updatedMeta.revision;
+  }
+
+  return {
+    ok: true,
+    deletedStudyIds: Array.from(deletedStudyIds),
+    failedStudies: [],
+    meta,
+  };
+}
+
 function deleteProjectModal(project, projectStudies) {
   const wrap = el("div");
   const count = projectStudies.length;
@@ -245,55 +343,37 @@ function deleteProjectModal(project, projectStudies) {
         label: "删除",
         cls: "btn-danger",
         action: async () => {
-          const failedStudies = [];
-          const deletedStudyIds = new Set();
-          for (const s of projectStudies) {
-            try {
-              await api(`/api/runs/${s.id}/delete`, {}, "POST");
-              deletedStudyIds.add(s.id);
-            } catch (err) {
-              failedStudies.push({ study: s, error: err });
-            }
-          }
-          for (const id of deletedStudyIds) {
-            delete workspaceMeta.studies[id];
-          }
-          if (failedStudies.length > 0) {
-            const names = failedStudies
-              .map((f) => f.study.id.slice(0, 8))
-              .join(", ");
-            error(
-              new Error(
-                `部分研究删除失败 (${names})，已保留项目及未删除研究。`,
-              ),
-            );
-            try {
-              await persistWorkspaceMeta();
-            } catch (e) {
-              error(e);
+          try {
+            const result = await executeProjectDelete(project, projectStudies, {
+              meta: workspaceMeta,
+              api,
+              persistMeta: persistWorkspaceMeta,
+              onRunReset: () => {
+                if (currentProjectId === project.id) {
+                  currentProjectId = null;
+                  run = null;
+                  activeStudyId = null;
+                  if (typeof document !== "undefined") {
+                    document.body.classList.remove("has-run");
+                    $("answer")?.replaceChildren();
+                    $("progress")?.replaceChildren();
+                  }
+                  updateBreadcrumb(null, null);
+                  renderInspect();
+                }
+              },
+              onError: (err) => {
+                error(err);
+              },
+            });
+            if (!result.ok) {
+              await studies();
+              return;
             }
             await studies();
-            return;
-          }
-          workspaceMeta.projects = workspaceMeta.projects.filter(
-            (p) => p.id !== project.id,
-          );
-          if (currentProjectId === project.id) {
-            currentProjectId = null;
-            run = null;
-            activeStudyId = null;
-            document.body.classList.remove("has-run");
-            $("answer").replaceChildren();
-            $("progress").replaceChildren();
-            updateBreadcrumb(null, null);
-            renderInspect();
-          }
-          try {
-            await persistWorkspaceMeta();
           } catch (e) {
             error(e);
           }
-          await studies();
         },
       },
     ],
@@ -408,24 +488,23 @@ function deleteStudyModal(study) {
         cls: "btn-danger",
         action: async () => {
           try {
-            await api(`/api/runs/${study.id}/delete`, {}, "POST");
-            if (workspaceMeta.studies[study.id]) {
-              delete workspaceMeta.studies[study.id];
-              try {
-                await persistWorkspaceMeta();
-              } catch (e) {
-                error(e);
-              }
-            }
-            if (run?.id === study.id || run?.conversationId === study.id) {
-              run = null;
-              activeStudyId = null;
-              document.body.classList.remove("has-run");
-              $("answer").replaceChildren();
-              $("progress").replaceChildren();
-              updateBreadcrumb(null, null);
-              renderInspect();
-            }
+            await executeStudyDelete(study.id, {
+              meta: workspaceMeta,
+              api,
+              onRunReset: () => {
+                if (run?.id === study.id || run?.conversationId === study.id) {
+                  run = null;
+                  activeStudyId = null;
+                  if (typeof document !== "undefined") {
+                    document.body.classList.remove("has-run");
+                    $("answer")?.replaceChildren();
+                    $("progress")?.replaceChildren();
+                  }
+                  updateBreadcrumb(null, null);
+                  renderInspect();
+                }
+              },
+            });
             await studies();
           } catch (e) {
             error(e);
@@ -1379,7 +1458,11 @@ function renderInspect(focus) {
     );
   }
 }
-$("research").onsubmit = async (event) => {
+
+export async function initApp() {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+
+  $("research").onsubmit = async (event) => {
   event.preventDefault();
   if (submitting || run?.status === "running") return;
   const question = $("question").value;
@@ -1607,17 +1690,22 @@ window.addEventListener("keydown", (e) => {
     hideModal();
   }
 });
-try {
-  const status = await api("/api/status");
-  token = status.token;
-  initAsideResizer();
-  await studies();
-  const urlParams = new URLSearchParams(window.location.search);
-  const targetId = urlParams.get("id") || status.current;
-  if (targetId) {
-    $("question").value = "";
-    follow(await api(`/api/runs/${targetId}`));
+  try {
+    const status = await api("/api/status");
+    token = status.token;
+    initAsideResizer();
+    await studies();
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetId = urlParams.get("id") || status.current;
+    if (targetId) {
+      if ($("question")) $("question").value = "";
+      follow(await api(`/api/runs/${targetId}`));
+    }
+  } catch (e) {
+    error(e);
   }
-} catch (e) {
-  error(e);
+}
+
+if (typeof document !== "undefined" && typeof window !== "undefined") {
+  void initApp();
 }

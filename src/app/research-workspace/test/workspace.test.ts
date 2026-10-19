@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import type { Model } from "@earendil-works/pi-ai";
@@ -20,6 +21,8 @@ import type {
   WorkspaceEvidence,
   WorkspaceRun,
 } from "../../../types/workspace.ts";
+// @ts-expect-error app.js is a plain JS module without ambient types
+import { executeStudyDelete, executeProjectDelete, persistWorkspaceMeta } from "../web/app.js";
 
 const roots: string[] = [],
   servers: Array<{ stop(force?: boolean): unknown }> = [];
@@ -879,3 +882,316 @@ test("corrupt metadata is rejected without overwriting original bytes", async ()
   expect(diskBytes).toBe(corruptBytes);
 });
 
+function makeTestRendererApi(f: { url: URL; token: string }) {
+  return async (path: string, body?: unknown, method?: string) => {
+    const effectiveMethod = method || (body !== undefined ? "POST" : "GET");
+    const options: RequestInit = {
+      method: effectiveMethod,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Workspace-Token": f.token,
+      },
+    };
+    if (effectiveMethod === "POST") {
+      options.body = JSON.stringify(body ?? {});
+    }
+    const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+    const res = await fetch(new URL(cleanPath, f.url), options);
+    const data = (await res.json()) as any;
+    if (!res.ok) {
+      const err = new Error(data.error || "请求失败");
+      (err as any).status = res.status;
+      (err as any).code = data.code;
+      throw err;
+    }
+    return data;
+  };
+}
+
+function makeTestPersistMeta(api: (path: string, body?: unknown, method?: string) => Promise<any>) {
+  return async (meta: WorkspaceMetadata) => {
+    return api("/api/workspace/meta", meta, "POST");
+  };
+}
+
+test("AC1 & AC5: executeProjectDelete removes project with renamed/moved/archived study metadata without 409 conflict", async () => {
+  const f = await fixture();
+  const api = makeTestRendererApi(f);
+  const persistMeta = makeTestPersistMeta(api);
+
+  // 1. Create 2 real saved studies
+  const r1 = (await (
+    await f.post("api/runs", { question: "AC1 Study 1", scope })
+  ).json()) as WorkspaceRun;
+  await f.wait(r1.id);
+  await f.post(`api/runs/${r1.id}/save`);
+
+  const r2Id = randomUUID();
+  const r2Run: WorkspaceRun = {
+    version: 1,
+    id: r2Id,
+    studyId: r2Id,
+    parentId: null,
+    question: "AC1 Study 2",
+    scope,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    status: "complete",
+    saved: false,
+    model: "fixture",
+    evidence: [evidence(scope.symbol)],
+    events: [],
+    answer: {
+      summary: "样本结构观察",
+      classification: "上涨",
+      signal: "观察",
+      claims: [{ text: "样本", evidence: ["E1"] }],
+      next: [],
+      limitations: [],
+    },
+    error: null,
+    clarification: null,
+  };
+  const r2 = f.store.save(r2Run);
+
+  expect(f.store.list().some((s) => s.id === r1.id)).toBe(true);
+  expect(f.store.list().some((s) => s.id === r2.id)).toBe(true);
+
+  // 2. Set up initial metadata with a custom project and customized study metadata
+  const proj = {
+    id: "000001.SZ",
+    symbol: "000001.SZ",
+    name: "平安银行专项",
+    benchmark: "000300.SH",
+    createdAt: new Date().toISOString(),
+  };
+  const initMeta = (await api("/api/workspace/meta")) as WorkspaceMetadata;
+  initMeta.projects.push(proj);
+  initMeta.studies[r1.id] = {
+    projectId: proj.id,
+    customTitle: "平安银行自定义标题",
+  };
+  initMeta.studies[r2.id] = {
+    projectId: proj.id,
+    archived: true,
+    archivedAt: new Date().toISOString(),
+  };
+  const savedInitMeta = (await persistMeta(initMeta)) as WorkspaceMetadata;
+  expect(savedInitMeta.revision).toBeDefined();
+
+  // 3. Client loads the metadata snapshot (holding revision R0)
+  const clientMeta = (await api("/api/workspace/meta")) as WorkspaceMetadata;
+  expect(clientMeta.revision).toBe(savedInitMeta.revision);
+  expect(clientMeta.studies[r1.id]?.customTitle).toBe("平安银行自定义标题");
+  expect(clientMeta.studies[r2.id]?.archived).toBe(true);
+
+  // 4. Execute the actual renderer action for project deletion
+  const projectStudies = [
+    { id: r1.id, question: r1.question },
+    { id: r2.id, question: r2.question },
+  ];
+  let runResetCalled = false;
+  const result = await executeProjectDelete(proj, projectStudies, {
+    meta: clientMeta,
+    api,
+    persistMeta,
+    onRunReset: () => {
+      runResetCalled = true;
+    },
+  });
+
+  // Verify operation succeeded without 409 conflict
+  expect(result.ok).toBe(true);
+  expect(result.failedStudies).toEqual([]);
+  expect(result.deletedStudyIds).toContain(r1.id);
+  expect(result.deletedStudyIds).toContain(r2.id);
+  expect(runResetCalled).toBe(true);
+
+  // 5. Verify backend storage: both study files deleted
+  expect(f.store.list().some((s) => s.id === r1.id)).toBe(false);
+  expect(f.store.list().some((s) => s.id === r2.id)).toBe(false);
+
+  // 6. Verify disk metadata: project and studies removed, clean revision
+  const diskMeta = loadWorkspaceMetadata((f as any).metaPath);
+  expect(diskMeta.projects.some((p) => p.id === proj.id)).toBe(false);
+  expect(diskMeta.studies[r1.id]).toBeUndefined();
+  expect(diskMeta.studies[r2.id]).toBeUndefined();
+  expect(clientMeta.revision).toBe(diskMeta.revision);
+});
+
+test("AC2 & AC5: executeStudyDelete removes study without redundant write or reporting false failure", async () => {
+  const f = await fixture();
+  const api = makeTestRendererApi(f);
+  const persistMeta = makeTestPersistMeta(api);
+
+  // 1. Create and save a study
+  const r = (await (
+    await f.post("api/runs", { question: "AC2 Study", scope })
+  ).json()) as WorkspaceRun;
+  await f.wait(r.id);
+  await f.post(`api/runs/${r.id}/save`);
+
+  // 2. Set study metadata (custom title & project association)
+  const meta = (await api("/api/workspace/meta")) as WorkspaceMetadata;
+  meta.studies[r.id] = {
+    customTitle: "待删除的研究",
+    projectId: "002048.SZ",
+  };
+  const savedMeta = (await persistMeta(meta)) as WorkspaceMetadata;
+
+  // 3. Client loads metadata snapshot
+  const clientMeta = (await api("/api/workspace/meta")) as WorkspaceMetadata;
+  expect(clientMeta.revision).toBe(savedMeta.revision);
+
+  // 4. Execute the actual renderer action for study deletion
+  let runResetCalled = false;
+  const res = await executeStudyDelete(r.id, {
+    meta: clientMeta,
+    api,
+    onRunReset: () => {
+      runResetCalled = true;
+    },
+  });
+
+  expect(res.ok).toBe(true);
+  expect(res.id).toBe(r.id);
+  expect(res.revision).toBeDefined();
+  expect(runResetCalled).toBe(true);
+
+  // Client in-memory state is synchronized directly without redundant persistWorkspaceMeta()
+  expect(clientMeta.studies[r.id]).toBeUndefined();
+  expect(clientMeta.revision).toBe(res.revision);
+
+  // 5. Backend store and disk metadata are clean
+  expect(f.store.list().some((s) => s.id === r.id)).toBe(false);
+  const diskMeta = loadWorkspaceMetadata((f as any).metaPath);
+  expect(diskMeta.studies[r.id]).toBeUndefined();
+  expect(diskMeta.revision).toBe(res.revision);
+
+  // 6. Submitting a subsequent valid client edit succeeds immediately (not 409)
+  clientMeta.projects.push({
+    id: "AC2.PROJ",
+    symbol: "AC2.PROJ",
+    name: "后续新项目",
+    createdAt: new Date().toISOString(),
+  });
+  const nextSaveRes = (await persistMeta(clientMeta)) as WorkspaceMetadata;
+  expect(nextSaveRes.revision).toBeDefined();
+  expect(nextSaveRes.projects.some((p) => p.id === "AC2.PROJ")).toBe(true);
+});
+
+test("AC3 & AC5: mixed-success deletion visibly reports failures, retains project and failed-study associations", async () => {
+  const f = await fixture();
+  const api = makeTestRendererApi(f);
+  const persistMeta = makeTestPersistMeta(api);
+
+  // 1. Create a successful study and a failing study
+  const rSuccess = (await (
+    await f.post("api/runs", { question: "AC3 Success Study", scope })
+  ).json()) as WorkspaceRun;
+  await f.wait(rSuccess.id);
+  await f.post(`api/runs/${rSuccess.id}/save`);
+
+  const failStudyId = "11111111-2222-3333-4444-555555555555"; // simulated failing study
+
+  const proj = {
+    id: "PARTIAL.PROJ",
+    symbol: "PARTIAL.PROJ",
+    name: "部分删除项目",
+    createdAt: new Date().toISOString(),
+  };
+
+  // 2. Set metadata with both studies associated with project
+  const initMeta = (await api("/api/workspace/meta")) as WorkspaceMetadata;
+  initMeta.projects.push(proj);
+  initMeta.studies[rSuccess.id] = {
+    projectId: proj.id,
+    customTitle: "成功删除的研究",
+  };
+  initMeta.studies[failStudyId] = {
+    projectId: proj.id,
+    customTitle: "失败保留的研究",
+  };
+  await persistMeta(initMeta);
+
+  // 3. Client loads snapshot
+  const clientMeta = (await api("/api/workspace/meta")) as WorkspaceMetadata;
+  expect(clientMeta.projects.some((p) => p.id === proj.id)).toBe(true);
+  expect(clientMeta.studies[rSuccess.id]).toBeDefined();
+  expect(clientMeta.studies[failStudyId]).toBeDefined();
+
+  // Create an api wrapper that fails specifically on failStudyId (simulating failure / busy run)
+  const mixedApi = async (path: string, body?: unknown, method?: string) => {
+    if (path.includes(failStudyId)) {
+      const err = new Error("正在运行的研究不能直接删除，请先停止。");
+      (err as any).status = 400;
+      throw err;
+    }
+    return api(path, body, method);
+  };
+
+  const projectStudies = [
+    { id: rSuccess.id, question: "AC3 Success Study" },
+    { id: failStudyId, question: "AC3 Fail Study" },
+  ];
+
+  let capturedError: Error | null = null;
+  const result = await executeProjectDelete(proj, projectStudies, {
+    meta: clientMeta,
+    api: mixedApi,
+    persistMeta,
+    onError: (err: Error) => {
+      capturedError = err;
+    },
+  });
+
+  // Verify failure reported
+  expect(result.ok).toBe(false);
+  expect(result.failedStudies.length).toBe(1);
+  expect(result.failedStudies[0].study.id).toBe(failStudyId);
+  expect(result.deletedStudyIds).toEqual([rSuccess.id]);
+  expect(capturedError).not.toBeNull();
+  expect(capturedError!.message).toContain("部分研究删除失败");
+
+  // Verify client memory state
+  expect(clientMeta.projects.some((p) => p.id === proj.id)).toBe(true);
+  expect(clientMeta.studies[failStudyId]?.projectId).toBe(proj.id);
+  expect(clientMeta.studies[rSuccess.id]).toBeUndefined();
+
+  // Verify disk state: project and failed-study associations preserved, successful deletion cleaned
+  const diskMeta = loadWorkspaceMetadata((f as any).metaPath);
+  expect(diskMeta.projects.some((p) => p.id === proj.id)).toBe(true);
+  expect(diskMeta.studies[failStudyId]?.projectId).toBe(proj.id);
+  expect(diskMeta.studies[rSuccess.id]).toBeUndefined();
+  expect(f.store.list().some((s) => s.id === rSuccess.id)).toBe(false);
+});
+
+test("AC4: corrupt metadata halts study deletion with HTTP 500 without modifying storage or corrupt bytes", async () => {
+  const f = await fixture();
+  const metaPath = (f as any).metaPath as string;
+
+  // 1. Create and save a study
+  const r = (await (
+    await f.post("api/runs", { question: "AC4 Study", scope })
+  ).json()) as WorkspaceRun;
+  await f.wait(r.id);
+  await f.post(`api/runs/${r.id}/save`);
+  expect(f.store.list().some((s) => s.id === r.id)).toBe(true);
+
+  // 2. Corrupt the metadata file with malformed JSON
+  const corruptBytes = '{"projects": [{"id": "corrupt_data", "name';
+  writeFileSync(metaPath, corruptBytes, "utf8");
+
+  // 3. Attempt to delete study
+  const delRes = await f.post(`api/runs/${r.id}/delete`);
+  expect(delRes.status).toBe(500);
+  const body = (await delRes.json()) as { code?: string; error?: string };
+  expect(body.code).toBe("ESTORAGEFORMAT");
+
+  // 4. CRITICAL: The study file in store must be PRESERVED (not deleted)
+  expect(f.store.list().some((s) => s.id === r.id)).toBe(true);
+
+  // 5. CRITICAL: Corrupt bytes on disk must be 100% PRESERVED (not replaced or wiped)
+  const currentBytes = readFileSync(metaPath, "utf8");
+  expect(currentBytes).toBe(corruptBytes);
+});
