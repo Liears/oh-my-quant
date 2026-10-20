@@ -149,8 +149,10 @@ aside footer {
   line-height: 1.8;
 }
 .btn-new-study {
-  width: 100%;
-  padding: 11px 16px;
+  width: fit-content;
+  min-width: 152px;
+  margin: 0;
+  padding: 7px 18px;
   font-size: 13px;
   font-weight: 650;
   letter-spacing: 0.5px;
