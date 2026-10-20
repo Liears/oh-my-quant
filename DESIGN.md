@@ -1,8 +1,8 @@
 # WhyJ Quant Design System
 
-Updated: 2026-10-15
+Updated: 2026-10-19
 
-This is the visual specification for the website, CLI/TUI, Desktop, and generated reports. It defines the warm palette implemented in the shared theme, website, CLI/TUI, Desktop source, generated reports, and exported JQ assets. The canonical workspace preview is captured from the updated website. Desktop installation and shortcut-icon acceptance remain separate release checks.
+This is the visual specification for the website, CLI/TUI, Desktop, and generated reports. It defines the target warm palette across these surfaces. This website integration implements the website and blog roles; it does not establish that CLI/TUI, Desktop, or report renderers have migrated. The canonical workspace preview is captured from the updated website. Desktop installation and shortcut-icon acceptance remain separate release checks.
 
 ## 1. Visual Direction
 
@@ -14,7 +14,7 @@ Use the [historical design reference](./docs/assets/workspace-design-reference.p
 
 The preview above shows the current website workspace. The linked historical reference is retained only as design input; its staircase logo, version label, example data, and market-color convention are not current product requirements. The current brand mark is JQ.
 
-The single current product preview is [workspace-preview.png](./docs/assets/workspace-preview.png), captured from the website's `#workspace` in English with Market research selected, Overview visible, and the red-up convention. README and presentation materials reuse that exact file. The website's translated, interactive, and responsive states may vary deliberately; they are not independently maintained mockups. Do not label the website preview as a CLI screenshot.
+The single current product preview is [workspace-preview.png](./docs/assets/workspace-preview.png), captured from the website's `#workspace` in English with Market research selected, Overview visible, and the red-up convention. README and presentation materials may still use their prior captures until separately updated. The website's translated, interactive, and responsive states may vary deliberately; they are not independently maintained mockups. Do not label the website preview as a CLI screenshot.
 
 Prioritize the research answer, its evidence, and the next action. Keep chrome quiet. Use alignment and spacing to establish hierarchy before adding containers, borders, or color.
 
@@ -52,7 +52,7 @@ The following exact colors were sampled from the supplied PNG, excluding antiali
 | Quiet bronze-gray | `#8C856B` | Low-emphasis labels in the reference |
 | Warm divider | `#3A362C` | Subtle separation |
 
-Cream should replace the previous near-white reading tone. Warm gray should replace cool neutral gray. Gold remains the only brand accent; it should not dominate paragraphs or data tables.
+Cream is for titles, the product name, essential values, and selective emphasis, including a key sentence within a paragraph. Do not use it as the default color of long paragraphs. Long-form reading uses a softer warm gray, `#B8B4A8`, with restrained links at `#C4B68E`; these are editorial role choices, not sampled reference colors. Supporting text stays `#8F8A7B`. Gold remains the only brand accent; it should not dominate paragraphs or data tables.
 
 ### Semantic roles
 
@@ -61,7 +61,9 @@ Cream should replace the previous near-white reading tone. Warm gray should repl
 | `surface` | `#0C0C0C` | Main canvas and terminal background |
 | `surfaceContainer` | `#141312` | Quiet panels, menus, and input regions |
 | `surfaceContainerHigh` | `#1C1B18` | Raised controls or overlays when separation is needed |
-| `onSurface` | `#FFF3C4` | Primary text and essential values |
+| `onSurface` | `#FFF3C4` | Titles, emphasized phrases or key sentences, product identity, and essential values |
+| `readingText` | `#B8B4A8` | Long-form paragraphs, list items, table values, code, and bibliography text |
+| `readingLink` | `#C4B68E` | Underlined links within reading prose; gold on hover/focus |
 | `onSurfaceVariant` | `#8F8A7B` | Supporting text on the three surfaces above |
 | `primary` | `#C99A2E` | JQ mark, selected indicator, primary action, and focus ring |
 | `onPrimary` | `#0C0C0C` | Text and icons on a gold fill |
@@ -81,7 +83,8 @@ Calculated against `surface` (`#0C0C0C`):
 | Pair | Contrast |
 |---|---|
 | Cream text / warm black | 17.58:1 |
-| Warm-gray text / warm black | 5.67:1 |
+| Reading text (`#B8B4A8`) / warm black | 9.44:1 |
+| Supporting warm-gray text (`#8F8A7B`) / warm black | 5.67:1 |
 | Gold / warm black, including dark text on gold | 7.59:1 |
 | Decorative divider / warm black | 1.62:1 |
 
@@ -109,7 +112,9 @@ Keep signs, numbers, labels, and legends visible. Distinguish `0.00%` from `N/A`
 
 ## 4. Typography
 
-Use Geist Sans for website copy and graphical chrome. Use Geist Mono for commands, code, prices, dates, and aligned numbers. Keep fonts self-hosted and retain the [Geist license](./docs/assets/geist-license.txt).
+For blog reading, use `--reading-text` for prose and preserve `--ink` for headings and selective strong emphasis. A key sentence within a paragraph may use cream `#FFF3C4`, not just an individual word or phrase. Mark the selected sentence with Markdown `**...**` / HTML `<strong>` so color and font weight convey emphasis together. Keep surrounding prose in the reading color; avoid highlighting whole paragraphs or many consecutive sentences. References inherit the prose role; their annotations use the supporting role. Expanded tables must keep the same reading color as inline tables. Use opaque semantic colors rather than reducing opacity on a whole article, which would also dim images and controls. Diagrams retain their own readable label and data-series roles. Print overrides reading text to `#222` and links to `#111` on white.
+
+Use Geist Sans for website copy and graphical chrome. Use Geist Mono for commands, code, prices, dates, and aligned numbers. Keep fonts self-hosted and retain the [Geist license](./site/public/fonts/OFL-Geist.txt).
 
 The roles follow Material's naming model; the values below are a compact WhyJ scale, not the default Roboto scale.
 
@@ -145,16 +150,18 @@ The full product name is **WhyJ Quant**. The mark is the compact **JQ** monogram
 
 J sits inside Q and joins its short tail. Keep the approved geometry: a 64-unit viewBox; Q centered at `(31, 31)` with radius `19`; a `13 x 14` tail diagonal and a `3`-unit terminal horizontal. The monochrome, favicon, and application versions share the same geometry.
 
+The following links retain the design revision's brand asset references; variants not present in this website checkout link to that exact revision. The website uses [its local mark](./site/public/logo-mark.svg) and [favicon](./site/public/favicon.svg).
+
 | Asset | Role |
 |---|---|
-| [logo-mark.svg](./docs/assets/logo-mark.svg) | Master JQ geometry |
-| [logo-wordmark.svg](./docs/assets/logo-wordmark.svg) | Outlined Geist Semibold wordmark |
-| [logo-lockup-dark.svg](./docs/assets/logo-lockup-dark.svg) / [logo-lockup-light.svg](./docs/assets/logo-lockup-light.svg) | Dark-background and light-background lockups |
-| [logo-lockup-mono.svg](./docs/assets/logo-lockup-mono.svg) | Single-color lockup |
-| [app-icon.svg](./docs/assets/app-icon.svg) | Application container source |
-| [app-icon.ico](./docs/assets/app-icon.ico) | Seven Windows icon sizes, 16 through 256px |
-| [icons/](./docs/assets/icons/) | PNG exports named `16x16.png` through `1024x1024.png` |
-| [Asset preview](./docs/assets/index.html) | Actual exported variants and downloads |
+| [logo-mark.svg](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/logo-mark.svg) | Master JQ geometry |
+| [logo-wordmark.svg](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/logo-wordmark.svg) | Outlined Geist Semibold wordmark |
+| [logo-lockup-dark.svg](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/logo-lockup-dark.svg) / [logo-lockup-light.svg](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/logo-lockup-light.svg) | Dark-background and light-background lockups |
+| [logo-lockup-mono.svg](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/logo-lockup-mono.svg) | Single-color lockup |
+| [app-icon.svg](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/app-icon.svg) | Application container source |
+| [app-icon.ico](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/app-icon.ico) | Seven Windows icon sizes, 16 through 256px |
+| [icons/](https://github.com/yangjingo/oh-my-quant/tree/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/icons/) | PNG exports named `16x16.png` through `1024x1024.png` |
+| [Asset preview](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/index.html) | Actual exported variants and downloads |
 
 Use lowercase kebab-case filenames based on asset role: `logo-mark` for the JQ symbol, `logo-wordmark` for the product name, `logo-lockup-{dark,light,mono}` for symbol-and-name combinations, and `app-icon` for the application container. The dark/light suffix identifies the intended background. Keep the nine raster exports as `icons/widthxheight.png`; `workspace-preview.png` is current, while `workspace-design-reference.png` is historical. The website retains the conventional public name `favicon.svg`, copied from `app-icon.svg`. Preserve the existing [ZCode naming reference](https://github.com/zai-org/ZCode/tree/main/public/logo/icons).
 
@@ -162,18 +169,18 @@ Use the same SVG in website and Desktop chrome. Use ASCII `JQ` in terminal heade
 
 ## 6. Implementation and Verification
 
-The warm palette is implemented across the [shared theme](./src/types/theme-colors.ts), [website tokens](./site/public/styles.css), [Desktop chrome](./desktop/src/style.css), active report renderers, and SVG masters. The PNG icons and Windows ICO are exported from the same JQ geometry and colors.
+The [website tokens](./site/public/styles.css) and blog reading template implement this palette in this integration. The [shared theme](./src/types/theme-colors.ts), [Desktop chrome](./desktop/src/style.css), report renderers, and application icon exports require separate implementation and verification; this document does not certify their current state.
 
 | Area | Implemented roles |
 |---|---|
 | Canvas and panels | `#0C0C0C`, `#141312`, `#1C1B18` |
-| Primary and supporting text | `#FFF3C4`, `#8F8A7B` |
+| Headings/emphasis, reading text, and supporting text | `#FFF3C4`, `#B8B4A8`, `#8F8A7B` |
 | Brand and focus | `#C99A2E` |
 | Decorative dividers | `#3A362C` |
 | Domain green / red | `#75A26F` / `#D87565` |
-| Current product preview | One website capture reused by README and slides |
+| Current design preview | Website capture; README and slides may retain earlier captures |
 
-Preserve semantic mappings, explicit market conventions, and immutable historical reports. These changes affect newly generated reports; saved historical reports retain their original bytes. The historical reference remains unchanged and is labeled as design input. Never create a second current palette in a report template or a client-specific patch.
+Preserve semantic mappings, explicit market conventions, and immutable historical reports. When report renderers adopt this design, apply it to newly generated reports; saved historical reports retain their original bytes. The historical reference remains unchanged and is labeled as design input. Never create a second current palette in a report template or a client-specific patch.
 
 Maintain the committed assets directly. When a master changes, update its SVG variants, website/Desktop copies, size-named PNGs, and Windows ICO together. Keep the PNG set only in `docs/assets/icons/`; Desktop consumes its committed `app-icon.ico` and `logo-mark.svg`. Builds use those files directly, without a separate brand-generation script. Verify both the color assignments and the rendered result.
 
