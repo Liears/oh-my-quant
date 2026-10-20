@@ -69,6 +69,13 @@ aside {
 }
 
 /* Lucide and JQ SVG Icons */
+/* The document-wide `svg { width: 100%; height: auto; margin: 15px 0 }` rule
+   below styles Markdown content; these inline glyphs must opt out of its
+   box margins, so reset it here with higher specificity. */
+.lucide,
+.jq-logo-mark {
+  margin: 0;
+}
 .lucide {
   vertical-align: middle;
   display: inline-block;
@@ -1393,6 +1400,17 @@ textarea,
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+.role-whyj span {
+  white-space: nowrap;
+}
+/* Inside an inline-flex role line the logo's `width` attribute alone loses to
+   the document-wide `svg { width: 100% }` rule and stretches into a large
+   circle, so pin its box here. */
+.role-whyj .jq-logo-mark {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 .reply-summary {
   font-size: 14px;
