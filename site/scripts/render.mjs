@@ -50,7 +50,6 @@ export function renderPage(content, route) {
   Object.assign(values, {
     "download.version": content.release.version,
     "download.size": `${Math.round(content.release.windows.sizeBytes / 1_000_000)} MB`,
-    "download.url": content.release.windows.url,
     "download.releaseUrl": content.release.releaseUrl,
     "download.checksumsUrl": content.release.checksumsUrl,
     "locale.lang": locale === "zh" ? "zh-CN" : "en",

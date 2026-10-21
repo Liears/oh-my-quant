@@ -6,7 +6,7 @@ An open-source AI research terminal for exploring markets, testing ideas, and ke
 
 [Website](https://oh-my-quant.vercel.app/en/) / [中文](https://oh-my-quant.vercel.app) / [Documentation](#documentation) / [Blog](https://oh-my-quant.vercel.app/en/blog/)
 
-[![WhyJ Quant website demo: research tools, sample analysis, and a market overview](./docs/assets/website-workspace.png)](https://oh-my-quant.vercel.app/en/)
+[![WhyJ Quant website demo: research tools, sample analysis, and a market overview](./docs/assets/workspace-preview.png)](https://oh-my-quant.vercel.app/en/)
 
 *Interactive website demo with synthetic data. The CLI runs in your own terminal.*
 
@@ -65,7 +65,7 @@ Source checkouts also include an experimental local Web research workspace: `bun
 | `/artifact` | Browse reports and restore their source research |
 | `/resume` | Continue a saved session |
 
-Use `/help` in the terminal or `whyj --help` in your shell. The [command reference](./docs/quant-harness/slash-commands.md) covers the full interface and one-shot usage.
+Use `/help` in the terminal or `whyj --help` in your shell. The [command reference](./docs/quant-harness/product-guide.md#commands) covers the full interface and one-shot usage.
 
 ## Documentation
 

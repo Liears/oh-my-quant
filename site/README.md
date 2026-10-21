@@ -29,7 +29,7 @@ bun run --cwd site preview
 | `templates/home.html` | 首页结构、功能介绍、演示内容与外链 |
 | `templates/header.html` | 首页与 Blog 共用的 Feature 目录、导航和语言入口 |
 | `templates/layout.html` | 共用页面外壳、元信息、字体和页脚 |
-| `templates/download.html` | 已讨论的 Desktop/CLI 下载区；桌面双列、手机原生单选切换 |
+| `templates/download.html` | Desktop 下载区；桌面和手机均为单张居中卡片，CLI 安装入口暂时下线 |
 | `content/downloads.json` | 经 GitHub Release 核实的 Windows 安装包版本、大小、链接和日期 |
 | `public/download.css` | 下载区的暖黑金排版与响应式样式 |
 | `templates/blog.html` | 中英文 Blog 列表；原文和译文状态明确区分 |
@@ -46,6 +46,8 @@ bun run --cwd site preview
 | `vercel.json` | 构建路径、安全响应头与字体缓存 |
 
 字体来自 Google Fonts 的 Geist v5 / Geist Mono v6，使用固定资源版本。品牌文字采用 DESIGN 规定的 Geist，不使用旧图片 Logo 的衬线字体。
+
+官网导航、页脚、演示标题与 favicon 统一使用 JQ 融合标识。`public/logo-mark.svg` 和 `public/favicon.svg` 分别对应 `docs/assets/logo-mark.svg` 和 `docs/assets/app-icon.svg`，更新共享素材时一并更新副本。副本随站点提交，独立构建直接使用这些文件，不需要品牌生成脚本。桌面与手机导航均移除 Docs 入口；正文中的具体文档引用按其用途保留。
 
 本轮排版、留白和交互调整依据用户指定的 taste-skill；设计判断与保留项见 [设计复核](./DESIGN-REVIEW.md)。
 
@@ -79,7 +81,13 @@ Feature 目录指向首页已有的自然语言研究、因子与回测、报告
 
 页面是产品官网，不是在线量化服务。三种研究场景均标明交互示意与合成数据；设置只改变网页示例，localStorage 只保存涨跌色、Overview 显示与动效偏好。不收集 API key、不读取本机配置、不连接证券账户。
 
-红绿仅用于涨跌和风险，`Market Colors` 翻转涨跌色，风险保持独立语义；平盘保持中性。默认黑金配色与颜色值对应 DESIGN。网页支持系统减少动态效果偏好。
+### 工作台预览
+
+工作台展示以 `templates/home.html` 的 `#workspace` 为交互内容来源。README 和 `docs/slides.html` 共用 `docs/assets/workspace-preview.png`，不另外绘制 CLI 或维护第二份示例。`docs/assets/workspace-design-reference.png` 只是历史配色与留白参考，不作为当前产品预览。
+
+更新静态预览时：访问英文 `/en/`，清除 `whyj-quant-site-preferences-v1` 后刷新，选择 Market research、Overview 开启、red-up，并关闭动效；桌面视口设为 1440px，再截取 `#workspace`。不裁掉 Interactive demo / Synthetic data 标记。刷新同一 PNG 后，README 与幻灯片同时更新；不要增加根目录生成脚本。页面翻译、用户切换场景/偏好和响应式重排是预期变化，不应从某个保存了偏好的浏览器状态制作默认截图。
+
+红绿仅用于涨跌和风险，`Market Colors` 翻转涨跌色，风险保持独立语义；平盘保持中性。默认暖黑、奶油白、暖灰与克制金色对应 DESIGN；CLI、Desktop 源码、报告模板和 JQ 导出素材已同步。网页支持系统减少动态效果偏好。
 
 发布前检查：两种语言的首页和 Blog 均可直接访问；语言切换保留页面和锚点；桌面与手机无横向溢出；Feature 目录与全部标签可用；键盘方向键切换标签；复制结果明确；偏好刷新及切换语言后保留；配色不改变风险语义；安装命令与外链仍和产品一致。研究示例不是产品性能或真实模型运行证明。
 
@@ -87,9 +95,9 @@ Feature 目录指向首页已有的自然语言研究、因子与回测、报告
 
 下载界面来自 `feat/website-warm-preview` 在 `10184e1` 之后的未提交 Hero2 / DownloadOptions 预览，原来只存在于独立工作树，未随已提交设计进入本次网站。当前将其布局、文案和原生控件移植到 `templates/download.html`，使用现有 Lucide sprite 和复制处理器；未引入 React/Tailwind 运行链。没有自动引入该工作树的首页重做、默认语言调整或 PR #27 演示区。
 
-中文仍为 `/`，英文为 `/en/`。顶部 Features 在两种语言中均保留英文，开始使用统一跳到 `#download`；旧 `#install` 为定位别名。旧下载路径重定向到各自语言的下载锚点并保留查询参数。桌面版和 CLI 并列，手机使用原生单选按钮切换，无 JavaScript 仍可选择和下载。正文博客模板保持独立。
+中文仍为 `/`，英文为 `/en/`。顶部 Features 在两种语言中均保留英文，开始使用统一跳到 `#download`；旧 `#install` 为定位别名。旧下载路径重定向到各自语言的下载锚点并保留查询参数。当前仅展示 Desktop 下载卡片，无 JavaScript 仍可展开配置说明和下载；CLI 安装入口及页脚 npm 链接暂时下线。没有剩余安装复制按钮，因此移除了对应复制处理器。正文博客模板保持独立。
 
-安装包不随网站构建发布，直接链接 GitHub Release 的 Windows x64 产物及 SHA256SUMS。版本、大小与验证日期集中在 `content/downloads.json`；修改时重新核实发布资产，构建会拒绝版本与链接不一致的清单。macOS/Linux 只提供 CLI，不显示不存在的桌面安装包。
+安装包不随网站构建发布。主下载按钮进入对应版本的 GitHub Release 页面，让用户先查看版本说明、支持平台和 Assets，再选择安装包；官网不直接触发 EXE 下载。SHA256SUMS 保留独立校验链接。版本、大小与验证日期集中在 `content/downloads.json`；修改时重新核实发布资产，构建会拒绝版本与链接不一致的清单。明确提示尚无 macOS/Linux 桌面安装包，不再引导访客安装 npm CLI。CLI/TUI 的后续 Desktop 复用决策见 #51 / #29。
 
 ## Vercel
 

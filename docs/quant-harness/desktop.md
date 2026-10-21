@@ -2,11 +2,13 @@
 
 维护方向选择 Desktop-first，同时保留 CLI。`apps/desktop`、`apps/cli` 与共享工作区的分阶段改造仍是提案，尚未实施；问题、边界、兼容成本及后续验收见[产品形态博客](../blog/08-research-workbench.md)。本文继续描述现有 `desktop/` PTY 宿主与构建方法，不把计划当作现状。
 
-更新：2026-10-14。CLI 与桌面源码统一为 1.4.0；已发布安装包、构建结果和安装验收分别以对应 Release/工作流记录为准。
+更新：2026-10-21。Desktop 1.4.0 已从 main `4a83606` 构建并发布，见 [GitHub Release](https://github.com/yangjingo/oh-my-quant/releases/tag/v1.4.0) 和 [构建、安装与发布记录](https://github.com/yangjingo/oh-my-quant/actions/runs/39576756091)。CLI/npm 与 Desktop 独立发布，源码版本不代表 npm 已更新。
 
 桌面版合入 `main` 后与 CLI 在同一分支维护；实现位于 `desktop/`，设计属于 Quant Harness。版本号同时来自根目录和 `desktop/package.json`，构建时必须一致。
 
 ## 安装与使用
+
+官网主下载按钮进入对应版本的 GitHub Release 发布页，在 Assets 中选择 Windows x64 安装包，并用同页 `SHA256SUMS.txt` 核对完整性；不直接触发 EXE 下载。发布与官网更新步骤见 [Desktop 发布交接](./ci-release.md#desktop-release-and-website-handoff)。
 
 从 GitHub Release 下载对应版本的 `WhyJ-Quant-Setup-<version>-win-x64.exe`。当前源码的安装向导在写入程序前显示目标目录、所需空间和可用空间；可选择当前用户有写权限的目录，例如 `D:\Apps\WhyJ Quant`，也支持中文和空格路径。点击“安装”前可以取消。安装仅面向当前用户，创建桌面和开始菜单快捷方式；重装/升级默认沿用已登记的安装目录。已发布旧版一键安装包不会随源码修复改变行为。
 
@@ -49,6 +51,10 @@ bun run dist:win
 首次下载归档进入 `desktop/.downloads`；脚本核对固定 SHA-256，Python 全部依赖由带哈希的 `python-requirements.txt` 锁定。`-Offline` 仅在归档和 uv 缓存完备时可用。修改 Python 依赖后使用 `uv pip compile --python-version 3.13 --python-platform windows --generate-hashes --no-emit-index-url python-requirements.in -o python-requirements.txt` 更新锁文件并重新验收。
 
 `bun run build` 生成 Electron 主进程、沙箱 preload、xterm renderer 和独立的 `runtime/whyj.exe`。`bun run dist:win` 生成 `release/` 下的 NSIS 向导安装包。目录选择使用 [electron-builder 的 assisted installer 配置](https://www.electron.build/nsis/)，`desktop/assets/installer.nsh` 保持当前用户安装并补充数据目录提示；保留既有 appId，沿用安装目录登记。打包文件采用白名单，不包含 `.env`、`.ohquant`、测试数据或开发机器设置。
+
+顶栏使用共享 JQ SVG，窗口和安装器使用包含 16/24/32/48/64/128/256px 的 `assets/app-icon.ico`。图标来源位于 [共享素材](../assets/index.html)，尺寸 PNG 只保留在 `docs/assets/icons/`。Desktop 仅保留实际使用的 `assets/logo-mark.svg` 和 `assets/app-icon.ico`，构建直接复制已提交素材，不再通过单独的图标生成脚本。修改共享素材时一并更新这两份副本。CLI/TUI 的 JQ 字符标记与桌面 SVG 分别适应终端和图形界面。新安装器的实际图标与升级缓存仍须在打包后验收。
+
+安装验收在一次性 Windows CI 账户中完成首次安装和重装，检查快捷方式目标、原安装目录与研究数据保留。桌面 smoke 检查 JQ SVG 的实际加载和暖色文字，并将程序、安装器、桌面快捷方式与开始菜单快捷方式由 Windows Shell 返回的图标保存为 `desktop-evidence` artifact 中的 `shell-icon-0.png` 至 `shell-icon-3.png`，与 `startup.png` 一起审阅。这些验证截图不提交到仓库；干净账户上的结果不代表所有用户机器已有的图标缓存都会立即刷新。
 
 ## 运行与信任边界
 

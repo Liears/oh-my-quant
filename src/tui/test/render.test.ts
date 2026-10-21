@@ -1,3 +1,4 @@
+import { WHYJ_THEME } from "../../types/theme-colors.ts";
 import { describe, expect, it } from "bun:test";
 import { Buffer, sanitizeTerminalText, strWidth, wrap } from "../src/buffer.ts";
 import { capSections, conversationMaxScrollUp, drawComposer, drawConversation, drawPortfolio, drawStatus, layout, overviewMaxScrollTop, buildOverviewView, buildConversationView } from "../src/render.ts";
@@ -528,8 +529,8 @@ describe("panel isolation", () => {
     expect(addedY).toBeGreaterThanOrEqual(0);
     const removedX = rows[removedY].indexOf("-old value");
     const addedX = rows[addedY].indexOf("+new value");
-    expect(buf.cells[removedY * buf.w + removedX].fg).toBe("#E5494D");
-    expect(buf.cells[addedY * buf.w + addedX].fg).toBe("#1E9F4D");
+    expect(buf.cells[removedY * buf.w + removedX].fg).toBe(WHYJ_THEME.negative);
+    expect(buf.cells[addedY * buf.w + addedX].fg).toBe(WHYJ_THEME.positive);
   });
 
   it("truncates long tool result previews after three lines", () => {
@@ -879,12 +880,14 @@ describe("drawStatus", () => {
     hud: { contextUsage: { tokens: 73400, contextWindow: 1000000, percent: 7.34 }, turnCount: 7, ttftMs: 6360, tpotMs: 38 },
   };
 
-  it.each([undefined, "full", "context", "off"] as const)("shows only plain model, source and research theme with legacy HUD mode %s", hudMode => {
+  it.each([undefined, "full", "context", "off"] as const)("highlights only the portfolio with legacy HUD mode %s", hudMode => {
     const buf = new Buffer(140, 1);
     drawStatus(buf, 0, 140, { ...state, hudMode });
     expect(buf.toPlain()[0].trimEnd()).toBe("glm-5.3-flash · tushare · Ascend昇腾产业链组合");
-    for (const cell of buf.cells.filter(cell => cell.ch.trim())) {
-      expect(cell.fg).toBe(S.muted.fg);
+    const portfolioStart = strWidth("glm-5.3-flash · tushare · ");
+    for (const [index, cell] of buf.cells.entries()) {
+      if (!cell.ch.trim()) continue;
+      expect(cell.fg).toBe(index >= portfolioStart ? S.gold.fg : S.muted.fg);
       expect(cell.bold).not.toBe(true);
       expect(cell.dim).not.toBe(true);
     }

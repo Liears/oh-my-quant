@@ -146,15 +146,57 @@ export function startWorkspaceServer(
           if (match) {
             const id = match[1]!;
             if (match[2] === "delete") {
-              const result = manager.delete(id);
+              let meta: WorkspaceMetadata;
               try {
-                const meta = loadWorkspaceMetadata(metaPath);
-                if (meta.studies[id]) {
-                  delete meta.studies[id];
-                  saveWorkspaceMetadata(meta, metaPath);
+                meta = loadWorkspaceMetadata(metaPath);
+              } catch (err: any) {
+                if (err?.code === "ESTORAGEFORMAT") {
+                  return json(
+                    {
+                      error:
+                        err?.message ||
+                        "工作区元数据读取失败，文件损坏已保留原样。",
+                      code: err?.code,
+                    },
+                    500,
+                  );
                 }
-              } catch {}
-              return json(result);
+                throw err;
+              }
+              let result: { ok: boolean; id: string };
+              try {
+                result = manager.delete(id);
+              } catch (err: any) {
+                return json(
+                  { error: err?.message || "删除研究失败", code: err?.code },
+                  400,
+                );
+              }
+              if (meta.studies && meta.studies[id]) {
+                delete meta.studies[id];
+                try {
+                  meta = saveWorkspaceMetadata(meta, metaPath);
+                } catch (err: any) {
+                  const status =
+                    err?.code === "ESTORAGECONFLICT"
+                      ? 409
+                      : err?.code === "ESTORAGEFORMAT"
+                        ? 500
+                        : 500;
+                  return json(
+                    {
+                      error: err?.message || "工作区元数据保存失败",
+                      code: err?.code,
+                    },
+                    status,
+                  );
+                }
+              }
+              return json({
+                ...result,
+                revision: meta.revision,
+                meta,
+              });
             }
             if (match[2] === "followup")
               return json(manager.followup(id, body.question), 202);

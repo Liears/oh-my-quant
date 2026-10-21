@@ -1,10 +1,10 @@
 # Quant UI/UX：把异步状态变成可理解的界面
 
-更新：2026-10-13。本文统一维护界面职责、异步一致性、结构化文本渲染与色彩消费规则。视觉真源是 [DESIGN](../../DESIGN.md)，字段与键位由 [配置](./configuration.md)、[Slash 参考](./slash-commands.md) 维护。旧布局与命令方案的取舍见 [终端演进记录](../blog/10-layout-and-visual-language.md#visual-language)，复验入口见文末；工程叙述分为 [状态一致性](../blog/06-terminal-consistency.md)、[布局与视觉语义](../blog/10-layout-and-visual-language.md)、[功能发现](../blog/11-discoverable-interactions.md)和[失败恢复体验](../blog/12-recovery-as-ux.md)，不以博客分析替代本页行为契约。
+更新：2026-10-13。本文统一维护界面职责、异步一致性、结构化文本渲染与色彩消费规则。视觉真源是 [DESIGN](../../DESIGN.md)，字段与键位由 [配置](./configuration.md)、[Slash 参考](./product-guide.md#commands) 维护。旧布局与命令方案的取舍见 [终端演进记录](../blog/10-layout-and-visual-language.md#visual-language)，复验入口见文末；工程叙述分为 [状态一致性](../blog/06-terminal-consistency.md)、[布局与视觉语义](../blog/10-layout-and-visual-language.md)、[功能发现](../blog/11-discoverable-interactions.md)和[失败恢复体验](../blog/12-recovery-as-ux.md)，不以博客分析替代本页行为契约。
 
 ## 用户任务与界面责任
 
-主要研究流程为配置 → 观察组合 → 数据检查 → 分析/比较 → 报告 → 恢复。Portfolio 是观察标的/分组；公开价格和模拟曲线不等于个人账户业绩。完整任务质量由 [PRD](./PRD.md) 与带日期验收记录维护。
+主要研究流程为配置 → 观察组合 → 数据检查 → 分析/比较 → 报告 → 恢复。Portfolio 是观察标的/分组；公开价格和模拟曲线不等于个人账户业绩。完整任务质量由 [产品范围与验收](./product-guide.md#requirements) 与带日期验收记录维护。
 
 ```text
 Header：品牌 / 活动
@@ -16,7 +16,7 @@ Modal：Settings / Doctor / Portfolio / Resume / Artifact / Task
 
 TUI 处理按键、焦点和渲染；AppRuntime/runtime 处理动作、状态与数据。TUI 不直接选择 provider 或读写业务存储。关闭 Overview 让研究区域扩展；小屏布局、中文宽度、截断和密度由 cell 规则实现，字体及真实字号由终端配置决定。
 
-底部状态栏只显示模型、数据来源与当前研究主题（沿用活动组合名称），例如 `glm-5.3-flash · tushare · Ascend昇腾产业链组合`。三个值统一使用常规字重与柔和灰色，以 ` · ` 分隔，不添加图标或字段标签。不再显示上下文、TTFT、TPOT 和轮数；旧 `hudMode` 设置不能重新开启这些指标，设置面板也不再提供 Status HUD 控制。空字段及其分隔符省略；窄屏截断模型名，其他字段保持完整、空间不足时省略。CLI 字体族及中文字体回退仍由终端配置决定。
+底部状态栏只显示模型、数据来源与当前研究主题（沿用活动组合名称），例如 `glm-5.3-flash · tushare · Ascend昇腾产业链组合`。三个值统一使用常规字重；组合名称使用主题金色强调，模型、数据来源与分隔点使用柔和灰色，以 ` · ` 分隔，不添加图标或字段标签。不再显示上下文、TTFT、TPOT 和轮数；旧 `hudMode` 设置不能重新开启这些指标，设置面板也不再提供 Status HUD 控制。空字段及其分隔符省略；窄屏截断模型名，其他字段保持完整、空间不足时省略。CLI 字体族及中文字体回退仍由终端配置决定。
 
 一次只研究一个组合。`/portfolio` 中打开组合后选择 `Research this portfolio`，或执行 `/portfolio select GROUP`。选择保存为观察组合文件的 `activeGroupId`；旧文件未选择或 ID 已失效时使用第一个组合，不合并其他组或未分组标的。Overview 只取当前组合，底部直接使用 Overview 实际显示的组合标题，避免刷新期间两处不同名。切换会中断正在进行的研究请求，清除上一组合的展示并隔离迟到行情；已保存的其他组合保留。当前 CLI 研究入口不暴露 `compare_portfolios`，也拒绝跨组任务声明；市场基准可以单独指定，历史比较报告仍可读取。
 

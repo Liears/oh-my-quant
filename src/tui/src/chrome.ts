@@ -1,38 +1,20 @@
 import { Buffer, charWidth, strWidth, truncate } from "./buffer.ts";
-import { S, HEADER_H, COMPOSER_H, STATUS_H, DIVIDER_CHAR, UI_DENSITY, GOLD_HIGHLIGHT, GOLD, CASH_DARK, CASH_WARM, STEP_DIM } from "./styles.ts";
-import { mixHex } from "./theme.ts";
+import { S, HEADER_H, COMPOSER_H, STATUS_H, DIVIDER_CHAR, UI_DENSITY, GOLD_HIGHLIGHT } from "./styles.ts";
+import { BRAND_MARK, BRAND_NAME } from "./brand.ts";
 import type { ComposerSuggestion } from "./input.ts";
 import type { AppState } from "../../types/ui.ts";
 
-const STEPS = "▁▃▅▇█";
-
-function stepColor(activity: string, i: number, n: number): string {
-  if (activity === "ready") {
-    const t = n > 0 ? i / n : 0;
-    return mixHex(CASH_DARK, GOLD, t);
-  }
-  const speed = activity === "starting" ? 500 : activity === "thinking" || activity === "compacting" ? 300 : 200;
-  const pos = Math.floor(Date.now() / speed) % (n * 2);
-  const wave = pos < n ? pos : n * 2 - pos;
-  if (i === wave) return GOLD;
-  if (i === wave - 1 || i === wave + 1) return CASH_WARM;
-  return STEP_DIM;
-}
-
 export function drawHeader(buf: Buffer, st: AppState): void {
   const C = buf.w;
-  const n = STEPS.length - 1;
-  for (let i = 0; i < STEPS.length; i++) {
-    buf.set(2 + i, 0, STEPS[i], { fg: stepColor(st.activity, i, n) });
-  }
-  const logoX = 2 + STEPS.length + 1;
-  buf.text(logoX, 0, "WhyJ Quant", UI_DENSITY === "compact" ? S.cream : S.creamB);
+  buf.text(2, 0, BRAND_MARK, S.goldB);
+  const logoX = 2 + BRAND_MARK.length + 1;
+  buf.text(logoX, 0, BRAND_NAME, UI_DENSITY === "compact" ? S.cream : S.creamB);
   if (UI_DENSITY === "compact") {
     buf.text(logoX + 11, 0, `v${st.version}`, S.dim);
     buf.hline(0, 1, C, DIVIDER_CHAR, S.rule);
     return;
   }
-  buf.text(2 + STEPS.length + 2, 1, `v${st.version}`, S.dim);
+  buf.text(logoX + 1, 1, `v${st.version}`, S.dim);
   buf.hline(0, 2, C, DIVIDER_CHAR, S.rule);
 }
 
@@ -140,11 +122,12 @@ export function drawStatus(buf: Buffer, row: number, width: number, st: AppState
   const modelLimit = Math.min(width, Math.max(12, Math.floor(width * 0.45)));
   let x = buf.text(0, row, truncate(st.model, modelLimit), S.muted, width, width);
   const displayedPortfolio = st.panel.find(section => section.kind === "group" || section.kind === "holdings")?.title ?? st.activePortfolio;
-  for (const value of [st.source, displayedPortfolio]) {
+  for (const [value, style] of [[st.source, S.muted], [displayedPortfolio, S.gold]] as const) {
     if (!value) continue;
-    const text = `${x > 0 ? " · " : ""}${value}`;
-    if (strWidth(text) > width - x) continue;
-    x = buf.text(x, row, text, S.muted, width - x, width);
+    const separator = x > 0 ? " · " : "";
+    if (strWidth(separator + value) > width - x) continue;
+    x = buf.text(x, row, separator, S.muted, width - x, width);
+    x = buf.text(x, row, value, style, width - x, width);
   }
 }
 

@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import { parse } from "yaml";
 import { checkPullRequest, primaryIssue, validateDescription } from "./pr-policy.mjs";
 import { isOptionalPrivateEvidence } from "./documentation-links.mjs";
+import { verifyReleaseTag } from "./desktop-release-tag.mjs";
 
 const body = `Closes #17
 
@@ -163,4 +164,23 @@ test("PRs always create desktop checks and only explicit dispatch may publish", 
   assert.equal(workflow.jobs.publish.if, "github.event_name == 'workflow_dispatch' && inputs.publish_release");
   assert.deepEqual(workflow.jobs.publish.needs, ["checks", "windows"]);
   assert.equal(workflow.jobs.checks.uses, "./.github/workflows/ci.yml");
+});
+
+test("Desktop release tags must resolve to the tested installer source", () => {
+  const current = "a".repeat(40), old = "b".repeat(40), tagObject = "c".repeat(40);
+  const ref = "refs/tags/v1.4.0";
+  for (const refs of ["", `${current}\t${ref}\n`, `${tagObject}\t${ref}\n${current}\t${ref}^{}\n`])
+    assert.doesNotThrow(() => verifyReleaseTag("1.4.0", current, tag => { assert.equal(tag, ref); return refs; }));
+  for (const refs of [`${old}\t${ref}\n`, `${tagObject}\t${ref}\n${old}\t${ref}^{}\n`])
+    assert.throws(() => verifyReleaseTag("1.4.0", current, () => refs), /tested build/);
+  assert.throws(() => verifyReleaseTag("1.4.0", current, () => { throw new Error("remote lookup failed"); }), /remote lookup failed/);
+  assert.throws(() => verifyReleaseTag("1.4.0", current, () => "invalid remote output"), /Unexpected/);
+  assert.throws(() => verifyReleaseTag("1.4.0", undefined, () => ""), /exact tested commit/);
+});
+
+test("Desktop publication runs the tag guard before creating a Release", () => {
+  const workflow = parse(readFileSync(new URL("../workflows/desktop.yml", import.meta.url), "utf8"));
+  const command = workflow.jobs.publish.steps.find(step => step.name === "Publish the tested installer").run;
+  const guard = command.indexOf("node .github/scripts/desktop-release-tag.mjs");
+  assert.ok(guard >= 0 && guard < command.indexOf("gh release create"));
 });
