@@ -13,7 +13,7 @@ bun install
 bun run src/index.ts
 ~~~
 
-使用已安装的 CLI 时运行 `whyj`。源码启动和已发布安装包是两种入口，不据此保证功能完全一致。所选数据源或 Skill 可能还需 Python、包版本、账号与接口权限，依赖不因启动成功而自动满足。
+使用已安装的 CLI 时运行 `whyj`。源码启动和已发布安装包是两种入口，不据此保证功能完全一致。`.github/workflows/npm-publish.yml` 手动发布会把 CLI 推到 npm，它和 Windows 桌面安装包各自发布，因此 `npm i -g whyj-quant` 装到的版本可能早于桌面版；安装后运行 `whyj --version` 确认实际版本。所选数据源或 Skill 可能还需 Python、包版本、账号与接口权限，依赖不因启动成功而自动满足。
 
 输入 `/help` 查看命令；`/help config`、`/portfolio --help` 查看具体用法。帮助查询不执行目标操作。TUI 面板通常使用方向键、Enter 和 Esc，具体按屏幕提示；详细键位以命令参考为准。
 

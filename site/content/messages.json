@@ -779,6 +779,10 @@
     "en": "Requires Node.js / npm or Bun",
     "zh": "需要 Node.js / npm 或 Bun"
   },
+  "download.cliVersionNote": {
+    "en": "The CLI on npm can trail the desktop installer. Run whyj --version after installing to see what you have.",
+    "zh": "npm 上的 CLI 版本可能落后于桌面安装包，安装后运行 whyj --version 查看实际版本。"
+  },
   "download.thenRun": {
     "en": "Then run",
     "zh": "然后运行"
