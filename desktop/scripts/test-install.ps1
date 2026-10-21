@@ -49,6 +49,8 @@ Write-Host 'PASS first install: non-system drive, Unicode/spaces, per-user short
 Install-App @('/S', '/currentuser')
 Write-Host 'PASS reinstall: selected directory and existing research data retained'
 $env:WHYJ_SMOKE_EXE = $exe
+$env:WHYJ_SMOKE_DESKTOP_SHORTCUT = Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'WhyJ Quant.lnk'
+$env:WHYJ_SMOKE_START_SHORTCUT = Join-Path ([Environment]::GetFolderPath('Programs')) 'WhyJ Quant.lnk'
 Push-Location $repoRoot
 try {
   bun run --cwd desktop test:smoke

@@ -1,6 +1,6 @@
 # WhyJ Quant Design System
 
-Updated: 2026-10-15
+Updated: 2026-10-21
 
 This is the visual specification for the website, CLI/TUI, Desktop, and generated reports. It defines the warm palette implemented in the shared theme, website, CLI/TUI, Desktop source, generated reports, and exported JQ assets. The canonical workspace preview is captured from the updated website. Desktop installation and shortcut-icon acceptance remain separate release checks.
 
@@ -52,7 +52,7 @@ The following exact colors were sampled from the supplied PNG, excluding antiali
 | Quiet bronze-gray | `#8C856B` | Low-emphasis labels in the reference |
 | Warm divider | `#3A362C` | Subtle separation |
 
-Cream should replace the previous near-white reading tone. Warm gray should replace cool neutral gray. Gold remains the only brand accent; it should not dominate paragraphs or data tables.
+Cream is for titles, the product name, essential values, and selective emphasis, including a key sentence within a paragraph. Do not use it as the default color of long paragraphs. Long-form reading uses a softer warm gray, `#B8B4A8`, with restrained links at `#C4B68E`; these are editorial role choices, not sampled reference colors. Supporting text stays `#8F8A7B`. Gold remains the only brand accent; it should not dominate paragraphs or data tables.
 
 ### Semantic roles
 
@@ -61,7 +61,9 @@ Cream should replace the previous near-white reading tone. Warm gray should repl
 | `surface` | `#0C0C0C` | Main canvas and terminal background |
 | `surfaceContainer` | `#141312` | Quiet panels, menus, and input regions |
 | `surfaceContainerHigh` | `#1C1B18` | Raised controls or overlays when separation is needed |
-| `onSurface` | `#FFF3C4` | Primary text and essential values |
+| `onSurface` | `#FFF3C4` | Titles, emphasized phrases or key sentences, product identity, and essential values |
+| `readingText` | `#B8B4A8` | Long-form paragraphs, list items, table values, code, and bibliography text |
+| `readingLink` | `#C4B68E` | Underlined links within reading prose; gold on hover/focus |
 | `onSurfaceVariant` | `#8F8A7B` | Supporting text on the three surfaces above |
 | `primary` | `#C99A2E` | JQ mark, selected indicator, primary action, and focus ring |
 | `onPrimary` | `#0C0C0C` | Text and icons on a gold fill |
@@ -81,7 +83,8 @@ Calculated against `surface` (`#0C0C0C`):
 | Pair | Contrast |
 |---|---|
 | Cream text / warm black | 17.58:1 |
-| Warm-gray text / warm black | 5.67:1 |
+| Reading text (`#B8B4A8`) / warm black | 9.44:1 |
+| Supporting warm-gray text (`#8F8A7B`) / warm black | 5.67:1 |
 | Gold / warm black, including dark text on gold | 7.59:1 |
 | Decorative divider / warm black | 1.62:1 |
 
@@ -109,7 +112,9 @@ Keep signs, numbers, labels, and legends visible. Distinguish `0.00%` from `N/A`
 
 ## 4. Typography
 
-Use Geist Sans for website copy and graphical chrome. Use Geist Mono for commands, code, prices, dates, and aligned numbers. Keep fonts self-hosted and retain the [Geist license](./docs/assets/geist-license.txt).
+For blog reading, use `--reading-text` for prose and preserve `--ink` for headings and selective strong emphasis. A key sentence within a paragraph may use cream `#FFF3C4`, not just an individual word or phrase. Mark the selected sentence with Markdown `**...**` / HTML `<strong>` so color and font weight convey emphasis together. Keep surrounding prose in the reading color; avoid highlighting whole paragraphs or many consecutive sentences. References inherit the prose role; their annotations use the supporting role. Expanded tables must keep the same reading color as inline tables. Use opaque semantic colors rather than reducing opacity on a whole article, which would also dim images and controls. Diagrams retain their own readable label and data-series roles. Print overrides reading text to `#222` and links to `#111` on white.
+
+Use Geist Sans for website copy and graphical chrome. Use Geist Mono for commands, code, prices, dates, and aligned numbers. Keep fonts self-hosted and retain the [Geist license](./site/public/fonts/OFL-Geist.txt).
 
 The roles follow Material's naming model; the values below are a compact WhyJ scale, not the default Roboto scale.
 
@@ -167,7 +172,7 @@ The warm palette is implemented across the [shared theme](./src/types/theme-colo
 | Area | Implemented roles |
 |---|---|
 | Canvas and panels | `#0C0C0C`, `#141312`, `#1C1B18` |
-| Primary and supporting text | `#FFF3C4`, `#8F8A7B` |
+| Headings/emphasis, blog reading text, and supporting text | `#FFF3C4`, `#B8B4A8`, `#8F8A7B` |
 | Brand and focus | `#C99A2E` |
 | Decorative dividers | `#3A362C` |
 | Domain green / red | `#75A26F` / `#D87565` |
