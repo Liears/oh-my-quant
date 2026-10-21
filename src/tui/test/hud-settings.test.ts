@@ -5,7 +5,6 @@ import { join, resolve, sep } from "node:path";
 import { QuantTui } from "../src/tui.ts";
 import { PanelController } from "../src/panel.ts";
 import { Buffer } from "../src/buffer.ts";
-import { drawStatus } from "../src/chrome.ts";
 import type { InputAction } from "../src/input.ts";
 import { createInitialAppState } from "../../app-runtime.ts";
 import { loadSettings, saveSettings } from "../../storage/index.ts";
@@ -36,35 +35,23 @@ function select(label: string): void {
   throw new Error(`Missing setting ${label}`);
 }
 
-it("saves HUD mode through the real keyboard boundary, repaints and does not fetch market data", () => {
+it("removes the obsolete HUD control while keeping compaction settings and market refresh isolated", () => {
   const tui = new QuantTui(createInitialAppState("fixture"));
   tui.screen.out = { columns: 120, rows: 32, write: () => true } as unknown as NodeJS.WriteStream;
   tui.screen.resize();
   let refreshes = 0;
   tui.onPanelRefresh(() => { refreshes++; });
   const dispatch = Reflect.get(tui, "handleKeyAction").bind(tui) as (action: Extract<InputAction, { type: "key" }>) => void;
-  const press = (name: string) => dispatch({ type: "key", name, ctrl: false, meta: false, shift: false });
   tui.openConfig();
   panel = Reflect.get(tui, "panel") as PanelController;
-  select("Status HUD");
-  for (const [width, height] of [[60, 20], [80, 24], [120, 32]]) expect(rendered(width, height)).toContain("> Status HUD");
-  press("return");
-  expect(tui.state.hudMode).toBe("context");
-  expect(createInitialAppState("restarted").hudMode).toBe("context");
-  press("escape");
+  select("Compact At");
+  for (const [width, height] of [[60, 20], [80, 24], [120, 32]]) {
+    expect(rendered(width, height)).toContain("> Compact At");
+    expect(rendered(width, height)).not.toContain("Status HUD");
+  }
+  dispatch({ type: "key", name: "escape", ctrl: false, meta: false, shift: false });
   expect(refreshes).toBe(0);
   expect(tui.state.composerStatus).toBeNull();
-  const buffer = new Buffer(120, 1);
-  tui.state.hud = { contextUsage: { tokens: 1000, contextWindow: 128000, percent: 1 }, ttftMs: 250, tpotMs: 25, turnCount: 1 };
-  drawStatus(buffer, 0, 120, tui.state);
-  expect(buffer.toPlain()[0]).toContain("Ctx");
-  expect(buffer.toPlain()[0]).not.toContain("TTFT");
-  tui.state.hudMode = "off"; buffer.clear(); drawStatus(buffer, 0, 120, tui.state);
-  expect(buffer.toPlain()[0]).not.toContain("Ctx");
-  expect(buffer.toPlain()[0]).toContain(tui.state.model);
-  tui.state.hudMode = "full"; buffer.clear(); drawStatus(buffer, 0, 120, tui.state);
-  expect(buffer.toPlain()[0]).toContain("TTFT 250ms");
-  expect(buffer.toPlain()[0]).toContain("TPOT 25ms/t");
 });
 
 it("validates and persists the actual compaction threshold with cancel and auto reset", () => {
@@ -88,13 +75,10 @@ it("validates and persists the actual compaction threshold with cancel and auto 
   expect(resolveCompactTriggerTokens(automatic.env, window)).toBe(Math.max(1, window - 16384));
 });
 
-it("keeps drafts and visible HUD state on concurrent save conflicts", () => {
-  panel = new PanelController(); panel.open(); select("Status HUD");
+it("keeps compaction drafts on concurrent save conflicts", () => {
+  panel = new PanelController(); panel.open(); select("Compact At");
   const external = loadSettings(); external.model = "sonnet"; external.preferences.defaultBenchmark = "SPY"; saveSettings(external);
-  panel.handleKey("", { name: "return" });
-  expect(panel.hudMode()).toBe("full");
-  expect(rendered()).toContain("Settings changed");
-  select("Compact At"); panel.handleKey("", { name: "return" }); panel.handleKey("12000", {}); panel.handleKey("", { name: "return" });
+  panel.handleKey("", { name: "return" }); panel.handleKey("12000", {}); panel.handleKey("", { name: "return" });
   expect(rendered()).toContain("Settings changed");
   expect(loadSettings().env.WHYJ_QUANT_COMPACT_TRIGGER_TOKENS).toBeUndefined();
 });

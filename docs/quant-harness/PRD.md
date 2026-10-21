@@ -55,7 +55,7 @@ F01–F24 覆盖 GOAL1、GOAL2 的产品与工程目标，F25 保留旧 roadmap 
 |---|---|---|---|
 | F01 | GOAL1：Pi 模型配置与引导 | 部分完成 | [模型配置](./configuration.md)与 [Pi 导入](./configuration.md#pi-import)：API-key/环境凭证、多 provider/模型、元数据及阶梯价格已有验证；原生路径经 localhost 请求验证。[OAuth](./configuration.md#oauth) 已接通独立凭证、跨进程刷新、登录界面、取消及退出，并验证真实 Pi 提示的单文件构建；选定有效账号可显式链接 Pi auth.json 并共享锁刷新，合成目录/CLI/四 worker 已验证。[真实 DeepSeek API-key 双 CLI 并行](./configuration.md#pi-verification) 两次检查通过；真实 OAuth 账号/轮换、其它供应商权限与长期兼容性仍待补齐 |
 | F02 | GOAL1：金融数据/工具配置引导 | 已完成 | [数据配置](../../src/runtime/data/data-settings.ts)、[能力清单](../../src/runtime/data/tool-readiness.ts) 与 [端点探测](../../src/runtime/data/tool-probe.ts) 已接入 CLI/TUI；市场/凭证/依赖、验证后保存、失败保留与取消逐项通过；仅证明配置/诊断功能，不宣称全部市场或权限可用 |
-| F03 | GOAL1：TTFT/TPOT 自动测试与上下文 HUD | 已完成 | [固定输入基准](./evaluation.md#model-performance)、分位数/失败计数、HUD/压缩阈值设置与恢复隔离逐项通过；R04 记录真实连接 5/5 样本，限应用侧单次模型请求，不代表完整研究任务性能 |
+| F03 | GOAL1：TTFT/TPOT 自动测试与上下文管理 | 已完成 | [固定输入基准](./evaluation.md#model-performance)、分位数/失败计数、压缩阈值设置与恢复隔离；CLI 底部按当前显示约定只保留模型、数据来源和研究主题。R04 记录真实连接 5/5 样本，限应用侧单次模型请求，不代表完整研究任务性能 |
 | F04 | GOAL1：参考 terminal.png 统一视觉/皮肤 | 部分完成 | [设计源](../../DESIGN.md) 与 [共享主题](../../src/types/theme-colors.ts) 已统一；选中态/表格/多尺寸设置回归通过。报告浏览器验收 修复图表裁剪、320px 页头/长文本溢出及分享预览空白；仍缺全界面真实终端视觉对照 |
 | F05 | GOAL1：符合日常研究的终端布局 | 已完成 | 终端流程已覆盖空配置下 80×24/120×32 的模型与行情验证、可见组合编辑、分析/比较、自动报告和恢复；60×20 有明确收缩策略。隔离生产 PTY 另覆盖单股压缩重启及真实模型双组合流程，慢输出只保留最新完整帧。获取中、陈旧、失败、空数据与局部结果状态分开显示；物理终端字体/输入法的视觉差异归 F04，不再阻塞布局流程完成 |
 | F06 | GOAL1：金色层级、间隔、涨跌红绿 | 已完成 | 共享主题固定品牌金色，Market Colors 默认红涨绿跌、可选绿涨红跌；行情、风险、状态、零值和缺失使用独立语义 token。TUI、Overview、报告、K 线/ECharts 与静态回退在两种约定、深浅主题和三尺寸均有回归及画面复核，数值同时保留符号或文字，不依赖颜色独立传意 |
@@ -115,8 +115,8 @@ F01–F24 覆盖 GOAL1、GOAL2 的产品与工程目标，F25 保留旧 roadmap 
 - **F01 真实 API-key 双 CLI 补充（2026-09-16）**：[隔离导入与并行实测](./configuration.md#pi-verification) 让全局 Pi 0.73.0 与内置 Pi 库 0.85.1 的 WhyJ 同时使用 DeepSeek `deepseek-v4-flash`：Pi print-mode 得到 `ok`、WhyJ model-only Doctor 为 `pass`。状态制品不含密钥/回复正文；此一例不能替代真实 OAuth 轮换、跨供应商权限或全终端研究任务，F01 保持部分完成。
 - **F02 目标流程**：选市场/研究对象 → 显示可用数据源及依赖 → 填写凭证 → 小范围数据检查 → 展示能力与失败原因 → 保存。验收必须覆盖无 key 的 AKShare、Python/package 缺失、401、权限不足、空数据、超时和取消；失败不得清掉已保存的可用设置。区分数据源鉴权与工具所需能力，不能用“所有工具已注册”代表所有数据权限齐备。
 - **F02 已有验收范围**：上述流程、工具要求投影及选择端点的响应检查已有可调用入口；R03 当时为 95 工具，R05 新增四个组合工具及独立 FX 检查。既有验证覆盖保存、取消/冲突/迟到隔离、失败 JSON、多尺寸界面及选定 AKShare 日线/基金样本，不扩展为所有来源可用。端点检查不执行原工具计算或写入，不把单次响应当长期权限、实时性或字段财务准确性证明。其他真实 provider 的账户权限与矩阵仍在 F08 验收，不因本项完成而升级。
-- **F03 目标流程**：模型连接验证后可单独运行性能测试；固定输入、模型、thinking、工具开关、样本次数与时间记录到结果中。至少报告成功/失败数、TTFT/TPOT 的样本口径和分位数，未测不得显示 0。HUD 显示当前会话模型、上下文和延迟，恢复/切换后不串用旧指标；上下文阈值与显示选项有明确配置入口。
-- **F03 已有验收范围**：`bench:model`、Status HUD、Compact At 与模型/恢复隔离通过 13 项新增回归及现有自动压缩测试；原阶段另有 glm-5.3-flash 5/5 样本，不是当前连接保证。输入 off 被 Pi 约束为 low，报告保留两者；小样本和应用侧时延不扩展为供应商 SLA 或研究质量指标。
+- **F03 目标流程**：模型连接验证后可单独运行性能测试；固定输入、模型、thinking、工具开关、样本次数与时间记录到结果中。至少报告成功/失败数、TTFT/TPOT 的样本口径和分位数，未测不得显示 0。运行时指标在恢复/切换后不串用旧值；自动压缩阈值有明确配置入口。CLI 底部只显示模型、数据来源与研究主题，不显示上下文、延迟或轮数，也不提供 Status HUD 开关。
+- **F03 已有验收范围**：原阶段的 `bench:model`、Status HUD、Compact At 与模型/恢复隔离通过 13 项新增回归及现有自动压缩测试；Status HUD 显示和开关现已移除，指标计算与 Compact At 保留。原阶段另有 glm-5.3-flash 5/5 样本，不是当前连接保证。输入 off 被 Pi 约束为 low，报告保留两者；小样本和应用侧时延不扩展为供应商 SLA 或研究质量指标。
 
 TTFT 的首输出包含非空 text/thinking delta 或具名 tool call，空 block start 不计；TPOT 用输出 token 与首输出到终止事件耗时估算，单 token/无 usage/仅最终消息时不伪填 0，见 [性能测试](./evaluation.md#model-performance) 与 [hud.ts](../../src/runtime/workspace/hud.ts)。这是应用侧观测，不能直接解释为供应商纯推理性能。`WHYJ_PERF` 是分段日志开关；可复跑基准由 `bench:model` 提供。Doctor 的 exit 0/ok/ready 表示报告生成，实际连接判定看 phase 和是否跳过网络，详见 [配置测试](./configuration.md#测试方式)。
 
