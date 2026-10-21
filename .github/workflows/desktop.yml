@@ -108,5 +108,5 @@ jobs:
           version=$(node -p "require('./desktop/package.json').version")
           node .github/scripts/desktop-release-tag.mjs
           cp desktop/RELEASE-NOTES.md release/notes.md
-          printf '\n验证记录：[Windows 构建与安装验收](%s/%s/actions/runs/%s)。\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >> release/notes.md
+          printf '\nVerification: [Windows build and installation acceptance](%s/%s/actions/runs/%s).\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >> release/notes.md
           gh release create "v$version" release/*.exe release/SHA256SUMS.txt --target "$GITHUB_SHA" --title "WhyJ Quant Desktop $version" --notes-file release/notes.md --latest

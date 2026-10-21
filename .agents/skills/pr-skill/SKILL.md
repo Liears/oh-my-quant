@@ -30,6 +30,8 @@ Update the relevant current `docs/` pages in every PR. Explain changed behavior,
 
 Prefer existing pages. Update navigation and generated documentation when applicable. Keep commands, links, and evidence aligned with the implementation.
 
+For Desktop releases, prepare and review English `desktop/RELEASE-NOTES.md` using the [Desktop release-note contract](../../../docs/quant-harness/ci-release.md#desktop-release-notes). Verify change references against the actual release range, retain upgrade/verification limits, and read back the published body and asset metadata. A prose correction does not authorize retagging or replacing installers.
+
 ## Visual Evidence
 
 For visible Web, desktop, TUI, or HTML-report changes:

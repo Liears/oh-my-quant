@@ -1,12 +1,47 @@
-1.4.0 将 Windows 桌面版与主分支的 Pi 1.2、研究运行时和文档统一。版本化安装包由 Windows 工作流构建并完成安装验收后发布；仓库版本标签本身不代表安装包已经可下载。本次保留小窗口和字号调整后的终端边界、多行粘贴以及窗口状态修复。
+# WhyJ Quant Desktop 1.4.0
 
-- Electron 内直接使用原 CLI 界面，命令、设置、组合、历史会话与报告保持一致。
-- 内置 Bun、Python 3.13.12、AKShare 1.18.63、AKQuant 和 Git，无需另装开发环境。
-- 首次使用默认选择免 Token 的 AKShare；按 **Ctrl+P** 配置自己的 AI 模型连接。
-- 支持中文输入、复制、多行安全粘贴、字号调整和窗口状态保存。
-- 安装向导支持选择程序目录（包括其他盘及中文/空格路径），安装前显示空间信息；重装/升级默认保留原目录。研究数据目录单独保留，不随程序安装盘改变。
-- 数据保存在 `%APPDATA%/WhyJ Quant/workspace/.ohquant`，升级保留设置、会话和报告。
+This Windows release updates the packaged research terminal from 1.3.1 with Pi 1.2, a configurable installation directory, and the shared JQ visual identity.
 
-支持 Windows 10 1809+ / Windows 11 x64。模型和行情服务需要网络及相应账号权限。此版本未作 Authenticode 签名，Windows 可能提示未知发布者；启用严格应用控制的设备可能阻止运行，本机已观察到这种限制。
+## Highlights
 
-1.3.1 的安装验收覆盖无开发运行时 PATH 启动、CLI 面板、设置持久化、中文多行粘贴、窗口缩放、随包 Python/Git、重启与退出。1.4.0 的安装包仍需对新构建执行同一验收，结果以对应 Windows 工作流为准。外部模型和行情供应商另行验证；安装包发布时附带 `SHA256SUMS.txt`。
+- **Choose where to install.** The per-user Windows installer supports other drives and paths containing spaces or Chinese characters, while research data stays in its existing location. ([#16](https://github.com/yangjingo/oh-my-quant/pull/16))
+- **A consistent JQ identity.** The Desktop shell, terminal and newly generated reports share the JQ mark and warm color roles. Existing report files retain their original appearance. ([#28](https://github.com/yangjingo/oh-my-quant/pull/28))
+- **Clearer research controls.** Interrupt research with Ctrl+G, retry failed quotes with Ctrl+R, and find configuration and report guidance from the terminal. ([#15](https://github.com/yangjingo/oh-my-quant/pull/15))
+
+## What's Changed
+
+### Runtime and Research
+
+- Adopt Pi 1.2 and consolidate research task, evidence and report workflows. This change landed directly without a PR. ([d00a856](https://github.com/yangjingo/oh-my-quant/commit/d00a856))
+- Reuse Pi APIs for explicitly selected community skills and MCP configuration. Skills are not downloaded on startup; MCP configuration does not start a JQ MCP client. ([#35](https://github.com/yangjingo/oh-my-quant/pull/35))
+- Add research data contracts and price-volume calculations. ([#6](https://github.com/yangjingo/oh-my-quant/pull/6))
+
+### Fixes
+
+- Correct backtest equity and compound annual return calculations. ([#4](https://github.com/yangjingo/oh-my-quant/pull/4))
+- Improve Chinese answer qualification checks and reuse unchanged message layouts during long conversations. ([#15](https://github.com/yangjingo/oh-my-quant/pull/15))
+
+### Documentation and Maintenance
+
+- Consolidate product scope, requirements and usage into the current Quant Harness guide. ([#66](https://github.com/yangjingo/oh-my-quant/pull/66))
+- Stabilize CI policy and test lifecycles, including deterministic overview recovery and skill cancellation tests. These are verification improvements, not new application features. ([#41](https://github.com/yangjingo/oh-my-quant/pull/41), [#42](https://github.com/yangjingo/oh-my-quant/pull/42), [#45](https://github.com/yangjingo/oh-my-quant/pull/45))
+
+## Installation and Upgrade
+
+Download `WhyJ-Quant-Setup-1.4.0-win-x64.exe` from this Release's Assets and compare its SHA-256 with `SHA256SUMS.txt`. Windows 10 1809+ and Windows 11 x64 are supported. Bun, Python 3.13.12, AKShare 1.18.63, AKQuant and Git are bundled.
+
+Reinstallation keeps the existing installation directory by default. Settings, sessions and reports remain in `%APPDATA%/WhyJ Quant/workspace/.ohquant`, independently of the application directory. AKShare is the default data source; configure an AI model connection with Ctrl+P.
+
+## Known Limitations
+
+- The installer is not Authenticode-signed. Windows may show an unknown-publisher warning, and strict application-control policies may block startup.
+- Model and market-data services require network access and any credentials required by the selected provider. Live provider behavior is not certified by installer checks.
+- The packaged Desktop still hosts the terminal interface. The separate Web research workspace introduced in [#27](https://github.com/yangjingo/oh-my-quant/pull/27) is not the Desktop entry; Electron workspace integration and packaging remain tracked by [#47](https://github.com/yangjingo/oh-my-quant/issues/47) and [#48](https://github.com/yangjingo/oh-my-quant/issues/48).
+
+## Verification
+
+The published installer was built from [4a83606](https://github.com/yangjingo/oh-my-quant/commit/4a8360671f0a303c9d226af56ae7b4141e1849f8). Publication requires both platform CI checks and Windows installation acceptance. Automated coverage includes startup without developer runtimes on PATH, bundled Python/Git, settings persistence, Unicode multiline paste, resizing, restart/exit, custom installation paths, shortcuts, reinstallation and retained research data. These checks do not replace interactive acceptance on a user's Windows machine.
+
+## Full Changelog
+
+[v1.3.1...v1.4.0](https://github.com/yangjingo/oh-my-quant/compare/v1.3.1...v1.4.0)
