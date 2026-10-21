@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { setImmediate } from "node:timers/promises";
-import { AppRuntime, createInitialAppState } from "../../app-runtime.ts";
+import { AppRuntime, createInitialAppState, createRuntimeAgent } from "../../app-runtime.ts";
 import { QuantTui } from "../src/tui.ts";
 import { PanelController } from "../src/panel.ts";
 import { nextInputAction, type InputAction } from "../src/input.ts";
@@ -134,20 +134,20 @@ it("produces the same verified Quant Harness task through the real TUI and headl
 
 // Real key decoding, TUI, Pi loop, calculations, archives and report restoration.
 // The model's scripted SSE and provider observations are deterministic fixtures.
-it.each([80, 120])("completes a keyboard portfolio comparison, automatic report and recovery at width %s", async width => {
+it.each([80, 120])("completes single-portfolio research, automatic report and recovery at width %s", async width => {
   const previous = process.env.OHQUANT_DIR, noProxy = process.env.NO_PROXY;
   const root = mkdtempSync(join(tmpdir(), "whyj-tui-workflow-"));
   process.env.OHQUANT_DIR = root; process.env.NO_PROXY = "127.0.0.1,localhost";
   let requestCount = 0, sourceCalls = 0;
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
     const payload = await request.json() as { tools?: Array<{ function: { name: string } }> };
-    const research = payload.tools?.some(tool => tool.function.name === "compare_portfolios") ?? false;
+    expect(payload.tools?.some(tool => tool.function.name === "compare_portfolios")).not.toBe(true);
+    const research = payload.tools?.some(tool => tool.function.name === "check_risk") ?? false;
     const call = research && ++requestCount === 1;
     const delta = call ? { role: "assistant", tool_calls: [{ index: 0, id: "workflow-comparison", type: "function", function: {
-      name: "compare_portfolios", arguments: JSON.stringify({ group_a: "Core", group_b: "Stable", start: "2026-01-01", end: "2026-02-09",
-        benchmark: "SPY", base_currency: "USD", currencies: { AAPL: "USD", MSFT: "USD", SPY: "USD" }, weighting: "buy-and-hold" }),
+      name: "check_risk", arguments: JSON.stringify({ symbol: "AAPL", start: "2026-01-01", end: "2026-02-09" }),
     } }] } : { role: "assistant", content: research
-      ? "Fixture comparison completed. Synthetic observations; no investment recommendation." : "Model connection verified." };
+      ? "Fixture research completed. Synthetic observations; no investment recommendation." : "Model connection verified." };
     const chunk = { id: "workflow", object: "chat.completion.chunk", created: 0, model: "workflow-fixture" };
     return new Response([{ ...chunk, choices: [{ index: 0, delta, finish_reason: null }] },
       { ...chunk, choices: [{ index: 0, delta: {}, finish_reason: call ? "tool_calls" : "stop" }] }]
@@ -172,8 +172,8 @@ it.each([80, 120])("completes a keyboard portfolio comparison, automatic report 
   try {
     expect(loadSettings().providers?.custom?.apiKey).toBeUndefined();
     const dependencies = createDefaultSessionDependencies({ cwd: process.cwd(), sessionsRoot: join(root, "sessions") });
-    const agent = createQuantResearchAgent({ dependencies: { ...dependencies, loadSkills: async () => [],
-      tools: dependencies.tools.filter(tool => tool.name === "compare_portfolios") } });
+    const agent = createRuntimeAgent({ ...dependencies, loadSkills: async () => [],
+      tools: dependencies.tools.filter(tool => ["check_risk", "compare_portfolios"].includes(tool.name)) });
     const opened: string[] = [];
     tui = new QuantTui(createInitialAppState("workflow-fixture"));
     tui.screen.out = { columns: width, rows: width === 80 ? 24 : 32, write: () => true } as unknown as NodeJS.WriteStream;
@@ -246,20 +246,20 @@ it.each([80, 120])("completes a keyboard portfolio comparison, automatic report 
     const groups = loadPanelPortfolio().groups;
     expect(groups.map(group => [group.name, group.symbolCodes])).toEqual([["Core", ["AAPL"]], ["Stable", ["MSFT"]]]);
     expect((Reflect.get(tui, "panel") as PanelController).isOpen()).toBe(false);
-    await command("比较 Core 与 Stable 两组组合，2026-01-01 至 2026-02-09，SPY 基准，USD、买入持有，输出收益和回撤报告。");
+    await command("研究当前 Core 组合，2026-01-01 至 2026-02-09，输出风险报告。");
     expect(tui.state.messages.filter(message => message.role === "error")).toEqual([]);
     expect(tui.state.model).toBe("workflow-fixture");
     expect(requestCount).toBe(2); expect(opened).toHaveLength(1);
     const state = await agent.getResearchState();
     expect(state.operations).toHaveLength(1); expect(state.operations[0]!.status).toBe("verified");
     const metrics = state.operations[0]!.findings!.metrics;
-    expect(metrics.find(metric => metric.label === "Portfolio A / Total return")!.value).toBeCloseTo(0.39, 12);
-    expect(metrics.find(metric => metric.label === "Portfolio B / Total return")!.value).toBe(0);
-    expect(visible()).toContain("Fixture comparison completed");
+    expect(state.operations[0]!.tool).toBe("check_risk");
+    expect(metrics.find(metric => metric.label === "Maximum drawdown")!.value).toBe(0);
+    expect(visible()).toContain("Fixture research completed");
     const reports = listRestorableArtifactReports(); expect(reports).toHaveLength(1);
-    const original = readFileSync(opened[0]!, "utf8"); expect(original).toContain("compare_portfolios");
+    const original = readFileSync(opened[0]!, "utf8"); expect(original).toContain("check_risk");
     const sourceSession = (await agent.getSessionMetadata())!.id, callsBeforeRestore = sourceCalls;
-    await command("/clear"); expect(tui.state.messages.some(message => message.text?.includes("Fixture comparison completed"))).toBe(false);
+    await command("/clear"); expect(tui.state.messages.some(message => message.text?.includes("Fixture research completed"))).toBe(false);
     await command("/artifact"); expect(visible()).toContain("Artifacts"); raw("\r"); await settle();
     expect(opened).toEqual([opened[0]!, opened[0]!]); expect(sourceCalls).toBe(callsBeforeRestore);
     expect((await agent.getSessionMetadata())!.id).toBe(sourceSession);

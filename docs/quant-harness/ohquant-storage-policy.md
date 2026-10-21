@@ -41,7 +41,7 @@ src/storage/
 | `.ohquant/model-auth/{UUID}.json` | private durable | 否 | 独立登录含明文 OAuth access/refresh token；显式 Pi 导入只含 provider 和 Pi auth.json 绝对路径指针。两种文件均禁止公开缓存、报告分享和自动清理。 |
 | Pi agent 目录 `auth.json`（外部） | Pi-owned private durable | 否 | 只有已审阅且应用的 OAuth 链接会在后续请求中读取；令牌过期时使用同路径 Pi 文件锁轮换选定 provider，保留其他账号及原文件权限。Sign out 只删除 WhyJ 指针。 |
 | `.ohquant/watchlist.json` | durable | 否 | Composer 自动补全 symbol 列表。 |
-| `.ohquant/panel-portfolio.json` | durable | 否 | 自定义组合：代码、名称、instrument、分组关系与编辑时间。报价在刷新时获取；禁止私有金额和仓位。 |
+| `.ohquant/panel-portfolio.json` | durable | 否 | 自定义组合：代码、名称、instrument、分组关系、当前研究组合 ID（activeGroupId）与编辑时间。报价在刷新时获取；禁止私有金额和仓位。 |
 | `.ohquant/data/{source}/{symbol}/snapshot.json` | cache | 是 | 同一原子快照内的公开 bars、meta 与 revision。旧 daily/meta 仅作 stale 迁移输入。 |
 | `.ohquant/data/{source}/{symbol}/revisions/` | research data | 否 | 不可变公开行情版本，供 DatasetRef 复现研究输入；不自动清除。人工清理会让旧引用显式失效，不转用新行情。 |
 | `.ohquant/data/akshare/{code.OF}/nav-revisions/` | research data | 否 | 不可变公开基金 NAV 和可选的当前申购费观察；每个已提交修订另有绑定整份快照的 `.commit` 标记，没有 latest head/TTL，不保存模拟投入或账户金额。 |

@@ -30,6 +30,7 @@ export interface PanelPortfolioFile {
   updated: string;
   symbols: PanelPortfolioEntry[];
   groups: PortfolioGroup[];
+  activeGroupId?: string;
 }
 
 export const panelPortfolioPath = resolvePanelPortfolioPath;
@@ -61,6 +62,7 @@ function readPanelFile(path: string): PanelPortfolioFile {
   }
   return {
     revision,
+    ...(typeof raw.activeGroupId === "string" && raw.activeGroupId.trim() ? { activeGroupId: raw.activeGroupId.trim() } : {}),
     updated: typeof raw?.updated === "string" ? raw.updated : "", symbols,
     groups: !Array.isArray(raw?.groups) && symbols.length > 0
       ? [{ id: "default", name: "Default", symbolCodes: symbols.map(s => s.code) }] : groups,
@@ -127,6 +129,7 @@ function writePanelFile(path: string, data: PanelPortfolioFile): string {
     updated: new Date().toISOString().slice(0, 10),
     symbols: data.symbols.map(({ code, name, added, instrument }) => ({ code, name, added, instrument })),
     groups: (data.groups ?? []).map(({ id, name, symbolCodes }) => ({ id, name, symbolCodes })),
+    ...(data.activeGroupId ? { activeGroupId: data.activeGroupId } : {}),
   };
   return writeDurableJson(path, payload);
 }

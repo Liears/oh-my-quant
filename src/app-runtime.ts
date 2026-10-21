@@ -36,6 +36,7 @@ import type { CurrentSessionMeta } from "./tui/src/panel.ts";
 import { fetchOverviewHoldings, fetchOverviewQuotes } from "./runtime/workspace/overview-data.ts";
 import type { OverviewHoldingFetcher, OverviewQuoteFetcher } from "./runtime/workspace/overview-data.ts";
 import { OverviewRefresh } from "./runtime/workspace/overview-refresh.ts";
+import { researchSelectionKey, singlePortfolioToolDenial, withSinglePortfolioResearch } from "./runtime/research/active-portfolio.ts";
 import type { OverviewRefreshMeasurement, OverviewRefreshOptions } from "./runtime/workspace/overview-refresh.ts";
 import { agentStatusText, errorText, formatAgentError, formatSlashRuntimeError } from "./runtime/errors.ts";
 import {
@@ -101,7 +102,7 @@ type AutoArtifactRunner = (agent: QuantAgentSession) => Promise<{ success: boole
 type ArtifactRestoreRunner = (reportId: string, agent: QuantAgentSession) => Promise<CommandResult>;
 
 export function createRuntimeAgent(dependencies?: QuantAgentDependencies): QuantAgentSession {
-  return createQuantResearchAgent({ skillPaths, dependencies });
+  return createQuantResearchAgent({ skillPaths, dependencies: withSinglePortfolioResearch(dependencies ?? createDefaultSessionDependencies({ skillPaths })) });
 }
 
 async function runAutoArtifact(agent: QuantAgentSession): Promise<{ success: boolean; message: string }> {
@@ -140,6 +141,7 @@ export class AppRuntime {
   private latestCompletedAssistantText: string | null = null;
   private autoArtifactRunning = false;
   private activePrompts = 0;
+  private researchPortfolioKey: string | null = null;
   private interruption: Promise<boolean> | null = null;
   private interruptionVersion = 0;
   private researchInterrupted = false;
@@ -169,7 +171,11 @@ export class AppRuntime {
       timeoutMs: marketRefreshTimeoutMs, intervalMs: marketRefreshIntervalMs });
   }
 
-  refreshOverviewPanel(): Promise<void> { return this.overview.refresh(); }
+  async refreshOverviewPanel(): Promise<void> {
+    if (this.activePrompts > 0 && this.researchPortfolioKey !== researchSelectionKey()) await this.interruptResearch();
+    this.emitLocalStorageState();
+    await this.overview.refresh();
+  }
   retryFailedOverviewQuotes(): Promise<void> { return this.overview.retryFailed(); }
 
   /** Stop the current operation, retaining the session and its research evidence. */
@@ -210,6 +216,8 @@ export class AppRuntime {
   async submitResearch(task: ResearchTaskSpec, expectedRevision: string | null = null, signal?: AbortSignal): Promise<void> {
     if (!this.agent || this.slashRunning || isAgentTurnActive(this.agent)) throw new Error("Research requires a ready, idle session.");
     const snapshot = structuredClone(task);
+    const denied = singlePortfolioToolDenial("research_task", { action: "declare", task: snapshot });
+    if (denied) throw new Error(denied);
     await new QuantResearchHarness(this.agent).update({ version: 1, type: "declare", expectedRevision, task: snapshot }, signal);
     signal?.throwIfAborted();
     const abort = () => this.agent?.abort();
@@ -538,6 +546,7 @@ export class AppRuntime {
         return;
       }
       this.pendingAutoArtifactInput = input;
+      this.researchPortfolioKey = researchSelectionKey();
       this.prepareHudForRequest();
       if (!isAgentTurnActive(this.agent)) this.setActivity("thinking");
       const startedAt = perfNow();

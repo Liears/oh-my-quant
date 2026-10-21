@@ -909,6 +909,13 @@ describe("drawStatus", () => {
     drawStatus(buf, 0, 80, { ...state, source: "" });
     expect(buf.toPlain()[0].trimEnd()).toBe("glm-5.3-flash · Ascend昇腾产业链组合");
   });
+
+  it("uses the portfolio actually shown in Overview instead of an independent stale name", () => {
+    const buf = new Buffer(140, 1);
+    drawStatus(buf, 0, 140, { ...state, activePortfolio: "Old portfolio",
+      panel: [{ kind: "group", groupId: "current", title: "当前研究组合", rows: [], collapsed: false }] });
+    expect(buf.toPlain()[0].trimEnd()).toBe("glm-5.3-flash · tushare · 当前研究组合");
+  });
 });
 
 describe("portfolio display", () => {

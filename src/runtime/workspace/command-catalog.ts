@@ -46,7 +46,7 @@ export function buildCommandHelpText(): string {
     "No / prefix → AI analysis",
     "Command usage → /help COMMAND or /COMMAND --help",
     "Current research task → /resume --task",
-    "Compare portfolios → ask the agent with groups, dates, benchmark and currency",
+    "Research portfolio → /portfolio, or /portfolio select GROUP; one portfolio at a time",
     "Plugin management → /config --extensions list",
     "Pi connection import → /config --pi list",
   ];

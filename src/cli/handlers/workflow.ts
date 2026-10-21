@@ -5,6 +5,7 @@ import {
   metrics,
 } from "../../quant/index.ts";
 import { collectPanelPortfolioSymbols, generateComparisonId, loadPanelPortfolio, loadBars as loadBarsFromStorage, saveComparison } from "../../storage/index.ts";
+import { selectResearchPortfolio } from "../../runtime/workspace/overview.ts";
 
 const compareUsage = "Use /compare run --rule volatility|drawdown|sector";
 
@@ -19,7 +20,7 @@ export const compareHandler: CommandHandler = async (flags, positional) => {
     return { success: false, message: compareUsage };
   }
 
-  const portfolio = loadPanelPortfolio();
+  const portfolio = selectResearchPortfolio(loadPanelPortfolio());
   const symbolCodes = collectPanelPortfolioSymbols(portfolio).map((s) => s.code);
   if (symbolCodes.length === 0) {
     return { success: false, message: "The panel portfolio is empty. Ask the agent to update local portfolio files, then reopen /portfolio." };

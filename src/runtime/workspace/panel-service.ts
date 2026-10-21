@@ -1,6 +1,7 @@
 import type { AppState, PanelSection } from "../../types/ui.ts";
 import { normalizeMarketColorScheme, type MarketColorScheme } from "../../types/theme-colors.ts";
 import { normalizeHudMode, type HudMode } from "../../types/config.ts";
+import { selectResearchPortfolio, type OverviewPortfolio } from "./overview.ts";
 
 interface RuntimeSettingsLike {
   preferences: {
@@ -12,15 +13,12 @@ interface RuntimeSettingsLike {
   showPortfolioPanel?: boolean;
 }
 
-interface PanelPortfolioLike {
-  symbols: Array<{ code: string; name?: string }>;
-  groups: Array<{ name: string }>;
-}
+type PanelPortfolioLike = OverviewPortfolio;
 
 export function activePanelPortfolioName(portfolio: PanelPortfolioLike, fallback: string): string {
-  if (portfolio.groups.length === 1 && portfolio.groups[0]?.name) return portfolio.groups[0].name;
-  if (portfolio.groups.length > 1) return `${portfolio.groups.length} groups`;
-  if (portfolio.symbols.length > 0) return `${portfolio.symbols.length} symbols`;
+  const active = selectResearchPortfolio(portfolio);
+  if (active.groups?.[0]?.name) return active.groups[0].name;
+  if (active.symbols.length > 0) return "Portfolio";
   return fallback;
 }
 

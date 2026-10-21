@@ -3,6 +3,7 @@ import { listLocalPortfolios, loadPanelPortfolio, syncPanelPortfolioFromLocalPor
 import type { CommandHandler } from "../types.ts";
 
 const usage = [
+  "/portfolio select GROUP",
   "/portfolio create NAME",
   "/portfolio add GROUP CODE [NAME]   (fund: 022364.OF; US: AAPL; HK: 00700.HK)",
   "/portfolio remove GROUP CODE",
@@ -29,7 +30,8 @@ export const portfolioHandler: CommandHandler = async (_flags, positional, ctx) 
       return { success: true, message: [...(lines.length ? lines : ["No portfolios yet."]), "", usage].join("\n"), data };
     }
     let edit: PortfolioEdit;
-    if (action === "create") edit = { type: "create", name: positional.slice(1).join(" ") };
+    if (action === "select" && group && !rest.length) edit = { type: "select", group };
+    else if (action === "create") edit = { type: "create", name: positional.slice(1).join(" ") };
     else if (action === "rename") edit = { type: "rename", group, name: rest.join(" ") };
     else if (action === "delete" && group && !rest.length) edit = { type: "delete", group };
     else if (action === "add" && rest[0]) edit = { type: "add", group, code: rest[0], name: rest.slice(1).join(" ") };

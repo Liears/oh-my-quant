@@ -56,6 +56,8 @@ Shell 层级使用 `whyj --help`、`whyj --version` 或 `whyj --json --version` 
 
 TUI 打开组合编辑器：方向键选择，Enter 创建/打开/保存，Esc 返回或取消。可创建空组合、重命名、增删标的，删除整个组合时在面板内确认。每次修改即保存并刷新 Overview。
 
+一次研究一个组合：打开组合后选择 `Research this portfolio`，或用 `/portfolio select GROUP` 设置当前研究组合。右上角和底部使用同一个组合；未设置时使用第一个组合。切换保留其他组合，停止正在运行的旧研究请求；删除当前组合后回到剩余的第一个组合。CLI 研究入口不再接受跨组合比较。
+
 非 TUI 或需要直接输入时使用：
 
 ```text
@@ -65,6 +67,7 @@ TUI 打开组合编辑器：方向键选择，Enter 创建/打开/保存，Esc �
 /portfolio add Core AAPL Apple
 /portfolio add Core 00700.HK 腾讯
 /portfolio list
+/portfolio select Core
 /portfolio remove Core AAPL
 /portfolio rename Core 长期观察
 /portfolio delete 长期观察
@@ -72,7 +75,7 @@ TUI 打开组合编辑器：方向键选择，Enter 创建/打开/保存，Esc �
 
 GROUP 可用组合名称或 list 输出的 ID；名称有空格时用 ID 引用。开放式基金请带 `.OF`，A 股建议带交易所后缀；`.SH/.SZ/.OF` 不会因为数字相同被合并。支持空组合和同一标的加入多个组合，删除一个组合不移除其他组合的成员。
 
-只保存代码、名称、instrument 和分组关系，不保存持仓金额、仓位或私人净值。启动、刷新、普通 `/portfolio` 均不读取旧 holdings 文件。只有显式 `/portfolio import` 才列出旧文件，`/portfolio import <name|file|index>` 才追加导入一个组合；导入不覆盖现有自定义组合。
+只保存代码、名称、instrument、分组关系和当前研究组合 ID，不保存持仓金额、仓位或私人净值。启动、刷新、普通 `/portfolio` 均不读取旧 holdings 文件。只有显式 `/portfolio import` 才列出旧文件，`/portfolio import <name|file|index>` 才追加导入一个组合；导入不覆盖现有自定义组合。
 
 ### `/config`
 

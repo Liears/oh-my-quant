@@ -11,6 +11,9 @@ import { savePanelPortfolio, loadPanelPortfolio } from "../../storage/index.ts";
 import { buildOverviewLines } from "../../tui/src/overview-render.ts";
 import type { PanelSection } from "../../types/ui.ts";
 import type { LiveBarsFetchResult } from "../../source/index.ts";
+import { Buffer } from "../../tui/src/buffer.ts";
+import { drawStatus } from "../../tui/src/chrome.ts";
+import { createInitialAppState } from "../../app-runtime.ts";
 
 let root: string, previous: string | undefined;
 const disposables: Array<{ dispose(): void }> = [];
@@ -28,6 +31,41 @@ function bars(): LiveBarsFetchResult {
   return { source: "akshare", window: "requested", asOfDate: "2026-09-11", attempts: [{ source: "akshare", status: "success" }],
     bars: [100, 105].map((close, i) => ({ date: `2026-09-${10 + i}`, open: close, high: close, low: close, close, volume: 1, amount: close })) };
 }
+
+it("publishes only the selected group, synchronizes the footer, and rejects the previous group's late quotes", async () => {
+  savePanelPortfolio({ ...loadPanelPortfolio(), activeGroupId: "a",
+    symbols: [{ code: "AAPL", name: "Apple", added: "" }, { code: "MSFT", name: "Microsoft", added: "" }],
+    groups: [{ id: "a", name: "Core", symbolCodes: ["AAPL"] }, { id: "b", name: "Growth", symbolCodes: ["MSFT"] }] });
+  const panels: PanelSection[][] = [], seen: string[][] = [];
+  let release!: () => void;
+  const refresh = new OverviewRefresh({ intervalMs: 0, timeoutMs: 1000, onPanel: panel => panels.push(panel),
+    quoteFetcher: async entries => entries.map(entry => ({ ...entry, price: 100, pct: 1 })),
+    holdingFetcher: async entries => {
+      seen.push(entries.map(entry => entry.code));
+      if (seen.length === 1) await new Promise<void>(resolve => { release = resolve; });
+      return entries.map(entry => ({ ...entry, price: 200, pct: 2 }));
+    },
+  });
+  disposables.push(refresh);
+  const first = refresh.refresh(); await setImmediate();
+  expect(seen[0]).toEqual(["AAPL"]);
+  savePanelPortfolio({ ...loadPanelPortfolio(), activeGroupId: "b" });
+  const changedAt = panels.length;
+  await Promise.all([first, refresh.refresh()]);
+  expect(seen[1]).toEqual(["MSFT"]);
+  for (const panel of panels.slice(changedAt)) {
+    const groups = panel.filter(section => section.kind === "group");
+    expect(groups.map(group => group.title)).toEqual(["Growth"]);
+    const buf = new Buffer(100, 1);
+    drawStatus(buf, 0, 100, { ...createInitialAppState("fixture"), panel, activePortfolio: "stale-name" });
+    expect(buf.toPlain()[0]).toContain("Growth");
+    expect(buf.toPlain()[0]).not.toContain("Core");
+  }
+  const current = structuredClone(panels);
+  release(); await setImmediate();
+  expect(panels).toEqual(current);
+  expect(loadPanelPortfolio().groups).toHaveLength(2);
+});
 
 it("uses the shared live pool and reports timings through the real AppRuntime entry without starting an agent", async () => {
   const seen: string[] = [], panels: PanelSection[][] = [], measurements: OverviewRefreshMeasurement[] = [];

@@ -6,6 +6,7 @@ import {
 import { normalizeSymbol } from "../../market/symbols.ts";
 
 export type PortfolioEdit =
+  | { type: "select"; group: string }
   | { type: "create"; name: string }
   | { type: "rename"; group: string; name: string }
   | { type: "delete"; group: string }
@@ -40,6 +41,7 @@ function applyPortfolioEdit(data: PanelPortfolioFile, edit: PortfolioEdit): Pane
     data = createGroup(data, edit.name).data;
   } else {
     const group = target!;
+    if (edit.type === "select") data = { ...data, activeGroupId: group.id };
     if (edit.type === "rename") data = renameGroup(data, group.id, edit.name);
     if (edit.type === "delete") data = deleteGroup(data, group.id);
     if (edit.type === "add") {
@@ -57,6 +59,9 @@ function applyPortfolioEdit(data: PanelPortfolioFile, edit: PortfolioEdit): Pane
     if (edit.type === "remove" || edit.type === "delete") {
       const remaining = new Set(data.groups.flatMap(item => item.symbolCodes));
       for (const code of group.symbolCodes) if (!remaining.has(code)) data = removeSymbol(data, code);
+    }
+    if (edit.type === "delete" && data.activeGroupId === group.id) {
+      data = { ...data, activeGroupId: data.groups[0]?.id };
     }
   }
   return data;

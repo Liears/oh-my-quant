@@ -1,5 +1,5 @@
 import { loadPanelPortfolio } from "../../storage/index.ts";
-import { buildOverviewPanelSections, collectOverviewSymbols, MARKET_INDICES } from "./overview.ts";
+import { buildOverviewPanelSections, collectOverviewSymbols, MARKET_INDICES, selectResearchPortfolio } from "./overview.ts";
 import type { OverviewPortfolio } from "./overview.ts";
 import { fetchOverviewQuotes, fetchOverviewHoldings, OverviewRequestPool } from "./overview-data.ts";
 import type { OverviewQuoteFetcher, OverviewHoldingFetcher, OverviewRequestTiming } from "./overview-data.ts";
@@ -58,6 +58,7 @@ export class OverviewRefresh {
   private generation = 0;
   private disposed = false;
   private sections: PanelSection[] = [];
+  private portfolioKey: string | undefined;
   private status: Outcome | "idle" | "fetching" = "idle";
   private progress: { settled: number; total: number } | null = null;
   private readonly lastQuotes = new Map<string, OverviewQuote>();
@@ -153,9 +154,14 @@ export class OverviewRefresh {
     let publishPartial: (() => boolean) | undefined;
     const budget = new OverviewBudget(run.controller, run.startedAt, this.options.timeoutMs ?? 120_000);
     try {
+      const portfolio = selectResearchPortfolio((this.options.loadPortfolio ?? loadPanelPortfolio)());
+      const portfolioKey = JSON.stringify([portfolio.groups, portfolio.symbols]);
+      if (this.portfolioKey !== undefined && this.portfolioKey !== portfolioKey) {
+        this.sections = buildOverviewPanelSections({ portfolio, marketQuotes: [], portfolioRows: [], pullMeta: { sources: [], asOfDates: [] } });
+      }
+      this.portfolioKey = portfolioKey;
       this.progress = null; this.status = "fetching"; this.render();
       signal.throwIfAborted();
-      const portfolio = (this.options.loadPortfolio ?? loadPanelPortfolio)();
       const portfolioSymbols = collectOverviewSymbols(portfolio);
       const validKeys = new Set([...MARKET_INDICES.map(entry => quoteKey("market", entry)), ...portfolioSymbols.map(entry => quoteKey("portfolio", entry))]);
       for (const key of this.lastQuotes.keys()) if (!validKeys.has(key)) this.lastQuotes.delete(key);

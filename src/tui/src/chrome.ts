@@ -139,7 +139,8 @@ export function drawStatus(buf: Buffer, row: number, width: number, st: AppState
   if (width <= 0) return;
   const modelLimit = Math.min(width, Math.max(12, Math.floor(width * 0.45)));
   let x = buf.text(0, row, truncate(st.model, modelLimit), S.muted, width, width);
-  for (const value of [st.source, st.activePortfolio]) {
+  const displayedPortfolio = st.panel.find(section => section.kind === "group" || section.kind === "holdings")?.title ?? st.activePortfolio;
+  for (const value of [st.source, displayedPortfolio]) {
     if (!value) continue;
     const text = `${x > 0 ? " · " : ""}${value}`;
     if (strWidth(text) > width - x) continue;
