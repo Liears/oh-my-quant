@@ -2,11 +2,13 @@
 
 维护方向选择 Desktop-first，同时保留 CLI。`apps/desktop`、`apps/cli` 与共享工作区的分阶段改造仍是提案，尚未实施；问题、边界、兼容成本及后续验收见[产品形态博客](../blog/08-research-workbench.md)。本文继续描述现有 `desktop/` PTY 宿主与构建方法，不把计划当作现状。
 
-更新：2026-10-14。CLI 与桌面源码统一为 1.4.0；已发布安装包、构建结果和安装验收分别以对应 Release/工作流记录为准。
+更新：2026-10-21。Desktop 1.4.0 已从 main `4a83606` 构建并发布，见 [GitHub Release](https://github.com/yangjingo/oh-my-quant/releases/tag/v1.4.0) 和 [构建、安装与发布记录](https://github.com/yangjingo/oh-my-quant/actions/runs/39576756091)。CLI/npm 与 Desktop 独立发布，源码版本不代表 npm 已更新。
 
 桌面版合入 `main` 后与 CLI 在同一分支维护；实现位于 `desktop/`，设计属于 Quant Harness。版本号同时来自根目录和 `desktop/package.json`，构建时必须一致。
 
 ## 安装与使用
+
+官网主下载按钮进入对应版本的 GitHub Release 发布页，在 Assets 中选择 Windows x64 安装包，并用同页 `SHA256SUMS.txt` 核对完整性；不直接触发 EXE 下载。发布与官网更新步骤见 [Desktop 发布交接](./ci-release.md#desktop-release-and-website-handoff)。
 
 从 GitHub Release 下载对应版本的 `WhyJ-Quant-Setup-<version>-win-x64.exe`。当前源码的安装向导在写入程序前显示目标目录、所需空间和可用空间；可选择当前用户有写权限的目录，例如 `D:\Apps\WhyJ Quant`，也支持中文和空格路径。点击“安装”前可以取消。安装仅面向当前用户，创建桌面和开始菜单快捷方式；重装/升级默认沿用已登记的安装目录。已发布旧版一键安装包不会随源码修复改变行为。
 

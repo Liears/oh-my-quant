@@ -708,8 +708,8 @@
     "zh": "在独立桌面窗口中开始研究，安装包已包含运行环境。"
   },
   "download.windowsAction": {
-    "zh": "下载 Windows 版",
-    "en": "Download for Windows"
+    "zh": "前往 GitHub 下载",
+    "en": "Download on GitHub"
   },
   "download.releaseNotes": {
     "zh": "发布说明",

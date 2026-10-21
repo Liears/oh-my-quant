@@ -97,7 +97,7 @@ Feature 目录指向首页已有的自然语言研究、因子与回测、报告
 
 中文仍为 `/`，英文为 `/en/`。顶部 Features 在两种语言中均保留英文，开始使用统一跳到 `#download`；旧 `#install` 为定位别名。旧下载路径重定向到各自语言的下载锚点并保留查询参数。当前仅展示 Desktop 下载卡片，无 JavaScript 仍可展开配置说明和下载；CLI 安装入口及页脚 npm 链接暂时下线。没有剩余安装复制按钮，因此移除了对应复制处理器。正文博客模板保持独立。
 
-安装包不随网站构建发布，直接链接 GitHub Release 的 Windows x64 产物及 SHA256SUMS。版本、大小与验证日期集中在 `content/downloads.json`；修改时重新核实发布资产，构建会拒绝版本与链接不一致的清单。明确提示尚无 macOS/Linux 桌面安装包，不再引导访客安装 npm CLI。CLI/TUI 的后续 Desktop 复用决策见 #51 / #29。
+安装包不随网站构建发布。主下载按钮进入对应版本的 GitHub Release 页面，让用户先查看版本说明、支持平台和 Assets，再选择安装包；官网不直接触发 EXE 下载。SHA256SUMS 保留独立校验链接。版本、大小与验证日期集中在 `content/downloads.json`；修改时重新核实发布资产，构建会拒绝版本与链接不一致的清单。明确提示尚无 macOS/Linux 桌面安装包，不再引导访客安装 npm CLI。CLI/TUI 的后续 Desktop 复用决策见 #51 / #29。
 
 ## Vercel
 
