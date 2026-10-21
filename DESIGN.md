@@ -1,8 +1,8 @@
 # WhyJ Quant Design System
 
-Updated: 2026-10-19
+Updated: 2026-10-21
 
-This is the visual specification for the website, CLI/TUI, Desktop, and generated reports. It defines the target warm palette across these surfaces. This website integration implements the website and blog roles; it does not establish that CLI/TUI, Desktop, or report renderers have migrated. The canonical workspace preview is captured from the updated website. Desktop installation and shortcut-icon acceptance remain separate release checks.
+This is the visual specification for the website, CLI/TUI, Desktop, and generated reports. It defines the warm palette implemented in the shared theme, website, CLI/TUI, Desktop source, generated reports, and exported JQ assets. The canonical workspace preview is captured from the updated website. Desktop installation and shortcut-icon acceptance remain separate release checks.
 
 ## 1. Visual Direction
 
@@ -14,7 +14,7 @@ Use the [historical design reference](./docs/assets/workspace-design-reference.p
 
 The preview above shows the current website workspace. The linked historical reference is retained only as design input; its staircase logo, version label, example data, and market-color convention are not current product requirements. The current brand mark is JQ.
 
-The single current product preview is [workspace-preview.png](./docs/assets/workspace-preview.png), captured from the website's `#workspace` in English with Market research selected, Overview visible, and the red-up convention. README and presentation materials may still use their prior captures until separately updated. The website's translated, interactive, and responsive states may vary deliberately; they are not independently maintained mockups. Do not label the website preview as a CLI screenshot.
+The single current product preview is [workspace-preview.png](./docs/assets/workspace-preview.png), captured from the website's `#workspace` in English with Market research selected, Overview visible, and the red-up convention. README and presentation materials reuse that exact file. The website's translated, interactive, and responsive states may vary deliberately; they are not independently maintained mockups. Do not label the website preview as a CLI screenshot.
 
 Prioritize the research answer, its evidence, and the next action. Keep chrome quiet. Use alignment and spacing to establish hierarchy before adding containers, borders, or color.
 
@@ -150,18 +150,16 @@ The full product name is **WhyJ Quant**. The mark is the compact **JQ** monogram
 
 J sits inside Q and joins its short tail. Keep the approved geometry: a 64-unit viewBox; Q centered at `(31, 31)` with radius `19`; a `13 x 14` tail diagonal and a `3`-unit terminal horizontal. The monochrome, favicon, and application versions share the same geometry.
 
-The following links retain the design revision's brand asset references; variants not present in this website checkout link to that exact revision. The website uses [its local mark](./site/public/logo-mark.svg) and [favicon](./site/public/favicon.svg).
-
 | Asset | Role |
 |---|---|
-| [logo-mark.svg](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/logo-mark.svg) | Master JQ geometry |
-| [logo-wordmark.svg](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/logo-wordmark.svg) | Outlined Geist Semibold wordmark |
-| [logo-lockup-dark.svg](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/logo-lockup-dark.svg) / [logo-lockup-light.svg](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/logo-lockup-light.svg) | Dark-background and light-background lockups |
-| [logo-lockup-mono.svg](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/logo-lockup-mono.svg) | Single-color lockup |
-| [app-icon.svg](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/app-icon.svg) | Application container source |
-| [app-icon.ico](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/app-icon.ico) | Seven Windows icon sizes, 16 through 256px |
-| [icons/](https://github.com/yangjingo/oh-my-quant/tree/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/icons/) | PNG exports named `16x16.png` through `1024x1024.png` |
-| [Asset preview](https://github.com/yangjingo/oh-my-quant/blob/10184e1a2ad99d976c33e6c55d6872d7083fe827/docs/assets/index.html) | Actual exported variants and downloads |
+| [logo-mark.svg](./docs/assets/logo-mark.svg) | Master JQ geometry |
+| [logo-wordmark.svg](./docs/assets/logo-wordmark.svg) | Outlined Geist Semibold wordmark |
+| [logo-lockup-dark.svg](./docs/assets/logo-lockup-dark.svg) / [logo-lockup-light.svg](./docs/assets/logo-lockup-light.svg) | Dark-background and light-background lockups |
+| [logo-lockup-mono.svg](./docs/assets/logo-lockup-mono.svg) | Single-color lockup |
+| [app-icon.svg](./docs/assets/app-icon.svg) | Application container source |
+| [app-icon.ico](./docs/assets/app-icon.ico) | Seven Windows icon sizes, 16 through 256px |
+| [icons/](./docs/assets/icons/) | PNG exports named `16x16.png` through `1024x1024.png` |
+| [Asset preview](./docs/assets/index.html) | Actual exported variants and downloads |
 
 Use lowercase kebab-case filenames based on asset role: `logo-mark` for the JQ symbol, `logo-wordmark` for the product name, `logo-lockup-{dark,light,mono}` for symbol-and-name combinations, and `app-icon` for the application container. The dark/light suffix identifies the intended background. Keep the nine raster exports as `icons/widthxheight.png`; `workspace-preview.png` is current, while `workspace-design-reference.png` is historical. The website retains the conventional public name `favicon.svg`, copied from `app-icon.svg`. Preserve the existing [ZCode naming reference](https://github.com/zai-org/ZCode/tree/main/public/logo/icons).
 
@@ -169,18 +167,18 @@ Use the same SVG in website and Desktop chrome. Use ASCII `JQ` in terminal heade
 
 ## 6. Implementation and Verification
 
-The [website tokens](./site/public/styles.css) and blog reading template implement this palette in this integration. The [shared theme](./src/types/theme-colors.ts), [Desktop chrome](./desktop/src/style.css), report renderers, and application icon exports require separate implementation and verification; this document does not certify their current state.
+The warm palette is implemented across the [shared theme](./src/types/theme-colors.ts), [website tokens](./site/public/styles.css), [Desktop chrome](./desktop/src/style.css), active report renderers, and SVG masters. The PNG icons and Windows ICO are exported from the same JQ geometry and colors.
 
 | Area | Implemented roles |
 |---|---|
 | Canvas and panels | `#0C0C0C`, `#141312`, `#1C1B18` |
-| Headings/emphasis, reading text, and supporting text | `#FFF3C4`, `#B8B4A8`, `#8F8A7B` |
+| Headings/emphasis, blog reading text, and supporting text | `#FFF3C4`, `#B8B4A8`, `#8F8A7B` |
 | Brand and focus | `#C99A2E` |
 | Decorative dividers | `#3A362C` |
 | Domain green / red | `#75A26F` / `#D87565` |
-| Current design preview | Website capture; README and slides may retain earlier captures |
+| Current product preview | One website capture reused by README and slides |
 
-Preserve semantic mappings, explicit market conventions, and immutable historical reports. When report renderers adopt this design, apply it to newly generated reports; saved historical reports retain their original bytes. The historical reference remains unchanged and is labeled as design input. Never create a second current palette in a report template or a client-specific patch.
+Preserve semantic mappings, explicit market conventions, and immutable historical reports. These changes affect newly generated reports; saved historical reports retain their original bytes. The historical reference remains unchanged and is labeled as design input. Never create a second current palette in a report template or a client-specific patch.
 
 Maintain the committed assets directly. When a master changes, update its SVG variants, website/Desktop copies, size-named PNGs, and Windows ICO together. Keep the PNG set only in `docs/assets/icons/`; Desktop consumes its committed `app-icon.ico` and `logo-mark.svg`. Builds use those files directly, without a separate brand-generation script. Verify both the color assignments and the rendered result.
 
