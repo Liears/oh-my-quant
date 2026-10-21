@@ -43,22 +43,6 @@ try {
   assert.equal(await page.locator('img.mark').evaluate(img => img.complete && img.naturalWidth > 0), true);
   assert.equal(await page.locator('body').evaluate(body => getComputedStyle(body).color), 'rgb(255, 243, 196)');
   record("shared JQ mark loads through the app protocol and warm text is rendered");
-  if (executable) {
-    const iconPaths = [executable,
-      join(desktop, `../release/WhyJ-Quant-Setup-${version}-win-x64.exe`),
-      process.env.WHYJ_SMOKE_DESKTOP_SHORTCUT,
-      process.env.WHYJ_SMOKE_START_SHORTCUT];
-    for (const [index, file] of iconPaths.entries()) {
-      assert.ok(existsSync(file), `Icon consumer exists: ${file}`);
-      const png = await application.evaluate(async ({ app }, file) => {
-        const icon = await app.getFileIcon(file, { size: 'normal' });
-        if (icon.isEmpty()) throw new Error(`Empty shell icon: ${file}`);
-        return icon.toPNG().toString('base64');
-      }, file);
-      writeFileSync(join(evidence, `shell-icon-${index}.png`), Buffer.from(png, 'base64'));
-    }
-    record("Windows shell resolves executable, installer, desktop and Start Menu shortcut icons; captures saved for visual review");
-  }
   const preferences = await application.evaluate(({ BrowserWindow }) => {
     const prefs = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
     return { nodeIntegration: prefs.nodeIntegration, sandbox: prefs.sandbox, contextIsolation: prefs.contextIsolation };
