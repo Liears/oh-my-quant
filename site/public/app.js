@@ -154,20 +154,3 @@ function updateLanguageLink() {
 }
 updateLanguageLink();
 window.addEventListener("hashchange", updateLanguageLink);
-
-for (const button of document.querySelectorAll("[data-copy]")) {
-  button.addEventListener("click", async () => {
-    const status = document.querySelector("#copy-status");
-    try {
-      await navigator.clipboard.writeText(button.dataset.copy);
-      status.textContent = `${text.copied}${button.dataset.copy}`;
-    } catch {
-      status.textContent = `${text.copyFailed}${button.dataset.copy}`;
-      const range = document.createRange();
-      range.selectNodeContents(button.parentElement.querySelector("code"));
-      const selection = window.getSelection();
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-  });
-}

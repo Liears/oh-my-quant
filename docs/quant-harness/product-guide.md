@@ -86,7 +86,7 @@ bun install
 bun run src/index.ts
 ~~~
 
-使用已安装的 CLI 时运行 `whyj`。源码启动和已发布安装包是两种入口，不据此保证功能完全一致。所选数据源或 Skill 可能还需 Python、包版本、账号与接口权限，依赖不因启动成功而自动满足。
+使用已安装的 CLI 时运行 `whyj`。源码启动和已发布安装包是两种入口，不据此保证功能完全一致。CLI 与 Windows 桌面安装包独立发布，npm 上的 CLI 可能早于桌面版；现有 CLI 用户可运行 `whyj --version` 确认实际版本。官网目前暂时撤下 CLI 安装卡片、仅提供 Desktop 下载入口；这不删除 CLI/TUI 实现，也不影响源码开发入口。后续 TUI 复用与 Desktop 界面演进由 [架构决策 #51](https://github.com/yangjingo/oh-my-quant/issues/51) 和 [规划 #29](https://github.com/yangjingo/oh-my-quant/issues/29) 跟进。所选数据源或 Skill 可能还需 Python、包版本、账号与接口权限，依赖不因启动成功而自动满足。
 
 输入 `/help` 查看命令；`/help config`、`/portfolio --help` 查看具体用法。帮助查询不执行目标操作。TUI 面板通常使用方向键、Enter 和 Esc，具体按屏幕提示；详细键位以命令参考为准。
 

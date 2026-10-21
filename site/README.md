@@ -29,7 +29,7 @@ bun run --cwd site preview
 | `templates/home.html` | 首页结构、功能介绍、演示内容与外链 |
 | `templates/header.html` | 首页与 Blog 共用的 Feature 目录、导航和语言入口 |
 | `templates/layout.html` | 共用页面外壳、元信息、字体和页脚 |
-| `templates/download.html` | 已讨论的 Desktop/CLI 下载区；桌面双列、手机原生单选切换 |
+| `templates/download.html` | Desktop 下载区；桌面和手机均为单张居中卡片，CLI 安装入口暂时下线 |
 | `content/downloads.json` | 经 GitHub Release 核实的 Windows 安装包版本、大小、链接和日期 |
 | `public/download.css` | 下载区的暖黑金排版与响应式样式 |
 | `templates/blog.html` | 中英文 Blog 列表；原文和译文状态明确区分 |
@@ -95,9 +95,9 @@ Feature 目录指向首页已有的自然语言研究、因子与回测、报告
 
 下载界面来自 `feat/website-warm-preview` 在 `10184e1` 之后的未提交 Hero2 / DownloadOptions 预览，原来只存在于独立工作树，未随已提交设计进入本次网站。当前将其布局、文案和原生控件移植到 `templates/download.html`，使用现有 Lucide sprite 和复制处理器；未引入 React/Tailwind 运行链。没有自动引入该工作树的首页重做、默认语言调整或 PR #27 演示区。
 
-中文仍为 `/`，英文为 `/en/`。顶部 Features 在两种语言中均保留英文，开始使用统一跳到 `#download`；旧 `#install` 为定位别名。旧下载路径重定向到各自语言的下载锚点并保留查询参数。桌面版和 CLI 并列，手机使用原生单选按钮切换，无 JavaScript 仍可选择和下载。正文博客模板保持独立。
+中文仍为 `/`，英文为 `/en/`。顶部 Features 在两种语言中均保留英文，开始使用统一跳到 `#download`；旧 `#install` 为定位别名。旧下载路径重定向到各自语言的下载锚点并保留查询参数。当前仅展示 Desktop 下载卡片，无 JavaScript 仍可展开配置说明和下载；CLI 安装入口及页脚 npm 链接暂时下线。没有剩余安装复制按钮，因此移除了对应复制处理器。正文博客模板保持独立。
 
-安装包不随网站构建发布，直接链接 GitHub Release 的 Windows x64 产物及 SHA256SUMS。版本、大小与验证日期集中在 `content/downloads.json`；修改时重新核实发布资产，构建会拒绝版本与链接不一致的清单。macOS/Linux 只提供 CLI，不显示不存在的桌面安装包。
+安装包不随网站构建发布，直接链接 GitHub Release 的 Windows x64 产物及 SHA256SUMS。版本、大小与验证日期集中在 `content/downloads.json`；修改时重新核实发布资产，构建会拒绝版本与链接不一致的清单。明确提示尚无 macOS/Linux 桌面安装包，不再引导访客安装 npm CLI。CLI/TUI 的后续 Desktop 复用决策见 #51 / #29。
 
 ## Vercel
 

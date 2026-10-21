@@ -1,5 +1,20 @@
 # 官网交付与部署记录
 
+## 2026-10-21：暂时撤下公开 CLI 安装入口（Issue #63 / PR #64）
+
+维护者要求官网先保留 Desktop 下载，将 CLI/TUI 的 Desktop 复用决策交给 #51，并关联 #29。此次移除中英文 CLI 卡片、移动端版本切换、安装复制动作和页脚 npm 链接；保留 Windows 安装包、校验和、发布说明、旧下载路由和锚点。CLI/TUI 源码与 npm 发行物没有删除或重新发布。
+
+- 网站候选来自 PR #64 的 `c53397e`；随后同步 #42 的 main `0328bf0`，网站构建输入未变。本记录本身不上传到网站。
+- 独立发布副本只包含 `site/{public,scripts,content,templates,package.json,vercel.json}`，Node 构建通过。
+- Preview：`dpl_8zUcBdw7QXKYcWwFeGsgv42WwRom` / <https://oh-my-quant-g4yphat9e-yangjing-s-projects.vercel.app>，inspect 确认 Preview / Ready。浏览器访问进入 Vercel 登录页，因此未宣称完成 Preview 线上视觉验收，也未关闭保护。
+- 英文首页构建 SHA-256：`82e78f188ead4dc3f5fd29784fdef00d26449067907e2be18d13ebe7df18d0cf`。
+- 中文首页构建 SHA-256：`bb95f68c4459a4152878e4043e11afb2d8157588061605e4bb714275c5261eb6`。
+- 文章 HTML SHA-256 仍为 `801399b7ff9882334600b1284b7472c88a94bc15ba1f3a4c3c91cfdd0c6392cb`；此次未修改文章。
+- 本地 Chromium 在中英文各 1440、390、320px 验证：单张 Desktop 卡片，无 CLI 控件/npm 页脚链接，无横向溢出，安装说明可用 Enter 展开和关闭，浏览器无错误。实际截图和 DOM 回执保存在忽略的 `output/pr63/`，不入库。
+- 同步 main 后完整 release gate：2727 项测试通过、0 失败；类型、架构、质量、构建与文档检查通过。最终 CI 以 PR head 和最终描述触发的检查为准。
+- 此提交记录的是发布准备状态。PR 合并后提升同一 Preview，核验正式域名与旧下载路径；Production ID、线上验收和清理结果记录在 [PR #64 的交付评论](https://github.com/yangjingo/oh-my-quant/pull/64)。不能用此处的 Preview Ready 代替 Production 已生效。
+- 本轮发布前的 Production / 回滚目标：`dpl_EJBM6M7D21rJRBkBqYj7Q42iJ4RY`。
+
 ## 2026-10-20：补齐 Production 发布与旧下载地址修复（Issue #57）
 
 PR #54 已合并为 main `1c7e58202a8d7395667238bb6bd1b484e7bfba70`，但本轮开始时正式域名仍指向 v14 `dpl_2tXXYp3oRuDWYgFJ4UXAEWuTQm9S`。这次从该 main 提取完整网站的公开构建输入，独立 Node 构建通过后发布 Preview 并提升 Production。没有上传主工作树中其他尚未提交的修改。
