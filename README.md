@@ -65,7 +65,7 @@ Source checkouts also include an experimental local Web research workspace: `bun
 | `/artifact` | Browse reports and restore their source research |
 | `/resume` | Continue a saved session |
 
-Use `/help` in the terminal or `whyj --help` in your shell. The [command reference](./docs/quant-harness/slash-commands.md) covers the full interface and one-shot usage.
+Use `/help` in the terminal or `whyj --help` in your shell. The [command reference](./docs/quant-harness/product-guide.md#commands) covers the full interface and one-shot usage.
 
 ## Documentation
 
