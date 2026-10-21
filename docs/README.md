@@ -1,6 +1,6 @@
 # oh-my-quant 文档
 
-更新：2026-10-14。现行文档实际归入两个目录：[Agent Runtime](./agent-runtime/README.md) 与 [Quant Harness](./quant-harness/README.md)。Agent 说明通用运行机制；Quant Harness 说明围绕 Agent 构建的完整量化应用，包括数据、计算、执行、报告、UI/UX 和使用验证。博客保留真实取舍与反思，不另建旧稿归档层。
+更新：2026-10-21。现行文档实际归入两个目录：[Agent Runtime](./agent-runtime/README.md) 与 [Quant Harness](./quant-harness/README.md)。Agent 说明通用运行机制；Quant Harness 说明围绕 Agent 构建的完整量化应用，包括数据、计算、执行、报告、UI/UX 和使用验证。博客保留真实取舍与反思，不另建旧稿归档层。
 
 ## 从问题进入
 
@@ -8,14 +8,14 @@
 |---|---|
 | 模型/工具循环、会话、取消、压缩与扩展 | [Agent Runtime 设计](./agent-runtime/README.md) |
 | 量化应用如何把数据、计算、研究与交互连接起来 | [Quant Harness 总览](./quant-harness/README.md) |
-| 首次配置、完成研究与恢复报告 | [用户手册](./quant-harness/user-guide.md) · [演示](./slides.html) |
-| 当前范围、缺口与实施顺序 | [GOALS](./quant-harness/GOALS.md) → [PRD](./quant-harness/PRD.md) → [Roadmap](./quant-harness/roadmap.md) |
+| 首次配置、完成研究与恢复报告 | [用户手册](./quant-harness/product-guide.md#workflow) · [演示](./slides.html) |
+| 当前范围、缺口与实施顺序 | [产品范围与需求](./quant-harness/product-guide.md#requirements) → [Roadmap](./quant-harness/roadmap.md) |
 | 配置、数据源与工具为何不同步 | [配置](./quant-harness/configuration.md) → [数据源](./quant-harness/source-data-providers.md) → [UI/UX](./quant-harness/quant-uiux.md) |
 | 怎样验证，哪些结论尚未得到证明 | [评测指南](./quant-harness/evaluation.md) · [测试与反例](./blog/05-evaluation-beyond-green.md) |
 | 仓库质量管理、PR 评审与 npm 发布 | [维护规范](./quant-harness/ci-release.md) · [Agentic / Vibe Repo Ops](./blog/agentic/vibe-repo-ops.md) |
 | 产品、架构与 UI/UX 的选择理由 | [技术博客](./blog/README.md) · [离线版](./blog/index.html) |
 
-当前工作区不等于发布版。产品完成度由 PRD 维护；代码和测试链接定位可重复检查，不把旧验证记成本轮成绩。这里的“归档整理”是把现行文档归入责任目录，不恢复 archive、旧稿汇编或重定向页面。
+当前工作区不等于发布版。产品范围与带日期的验收判定由产品与使用指南维护；代码和测试链接定位可重复检查，不把旧验证记成本轮成绩。这里的“归档整理”是把现行文档归入责任目录，不恢复 archive、旧稿汇编或重定向页面。
 
 <a id="design"></a>
 
@@ -71,8 +71,7 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 | 文档 | 唯一职责 |
 |---|---|
 | [总览与研究编排](./quant-harness/README.md) | 完整应用的阅读入口，以及任务、范围守卫、证据、接受条件与研究恢复 |
-| [GOALS](./quant-harness/GOALS.md) | 产品目标、原始需求与非目标 |
-| [PRD](./quant-harness/PRD.md) | 当前状态、缺口与验收条件 |
+| [产品与使用指南](./quant-harness/product-guide.md) | 目标、F01–F27 范围与验收边界、任务流程和命令参考 |
 | [Roadmap](./quant-harness/roadmap.md) | 实施顺序，不复制完成度 |
 | [模块架构](./quant-harness/module-architecture.md) | 应用模块、依赖方向、公共入口与 runtime 组装 |
 | [存储策略](./quant-harness/ohquant-storage-policy.md) | 应用文件布局、设置、会话、缓存、不可变归档与私有状态 |
@@ -107,8 +106,7 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 | 文档 | 唯一职责 |
 |---|---|
 | [配置参考](./quant-harness/configuration.md) | 模型/数据设置、OAuth、Pi 导入、优先级、保存冲突与诊断 |
-| [用户手册](./quant-harness/user-guide.md) | 首次配置、研究、报告恢复、排错与本地 Demo 路线 |
-| [命令参考](./quant-harness/slash-commands.md) | 一级命令、参数、TUI 与非 TUI 行为 |
+| [使用流程与命令](./quant-harness/product-guide.md#workflow) | 同一指南内按任务阅读，或跳转至命令参数参考 |
 | [评测指南](./quant-harness/evaluation.md) | 研究/技能评测、数据测量、模型延迟与 HUD；区分自动门槛和人工审阅 |
 
 <a id="validation"></a>
@@ -121,7 +119,7 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 <a id="essays"></a>
 ## 技术博客
 
-面向技术负责人，解释产品、技术架构与 UI/UX 的真实取舍。正文负责叙述问题与反思，具体接口回到设计文档，完成度回到 PRD。每篇配图在「配图素材」中单独登记。
+面向技术负责人，解释产品、技术架构与 UI/UX 的真实取舍。正文负责叙述问题与反思，具体接口回到设计文档，范围与验收边界回到产品与使用指南。每篇配图在「配图素材」中单独登记。
 
 | 正文 | 主问题 | 视角 |
 |---|---|---|
@@ -161,15 +159,29 @@ Quant Harness 是应用范围，不是某一个同名源文件的范围。`src/r
 <a id="assets"></a>
 ## 配图素材
 
-### 公共视觉素材（5）
+### 公共视觉素材
 
-这些素材不是独立的设计规范或运行证明。无正文引用只能作为使用情况线索，不能单独作为删除依据。
+保留产品素材、选定的设计参考及正式文档插图；验收截图使用附件或 CI artifact，不入库。素材不作为运行证明。
 
 | 文件 | 内容与用途 | 定位 |
 |---|---|---|
-| [assets/website-workspace.png](./assets/website-workspace.png) | 网站研究工作台演示，含市场研究、组合比较、报告入口及 Synthetic data 标记 | 当前英文 README 使用；合成演示素材，不证明真实模型、行情或网站部署状态 |
-| [assets/terminal-renderer-2026-10-13.png](./assets/terminal-renderer-2026-10-13.png) | 当前 QuantTui 的 120×32 缓冲区投影，默认 red-up | 讲解演示使用；隔离合成输入，非真实行情/模型回答或实体终端证明 |
-| [assets/terminal.png](./assets/terminal.png) | 早期终端首页视觉参考 | 保留 GOALS / PRD 的设计来源；已退出项目首页和演示，不作为当前界面截图 |
+| [assets/workspace-preview.png](./assets/workspace-preview.png) | 唯一当前产品预览，从官网 `#workspace` 截取 | README 与幻灯片引用同一文件；英文、Market research、Overview 开启、red-up、合成数据；非 CLI 截图或运行证明 |
+| [assets/workspace-design-reference.png](./assets/workspace-design-reference.png) | 历史设计参考，仅用于暖黑、奶油白与金色的视觉方向 | DESIGN 与产品指南明确以其为设计输入；旧 Logo、布局和示例数据不作为当前产品预览 |
+| [assets/logo-mark.svg](./assets/logo-mark.svg) | 透明 JQ 融合标记，J 嵌入 Q 并连接尾笔 | 品牌几何主文件，官网标识和 favicon 的共同来源 |
+| [assets/logo-wordmark.svg](./assets/logo-wordmark.svg) | Geist Semibold 的 WhyJ Quant 路径字标 | 字标主文件，不依赖查看设备安装字体 |
+| [assets/logo-lockup-dark.svg](./assets/logo-lockup-dark.svg) | 金色 JQ 与浅色字标，透明底 | 深色背景组合，由主文件生成 |
+| [assets/logo-lockup-light.svg](./assets/logo-lockup-light.svg) | 墨色 JQ 与字标，透明底 | 浅色背景组合，由主文件生成 |
+| [assets/logo-lockup-mono.svg](./assets/logo-lockup-mono.svg) | 单色组合，使用 currentColor | 内联时继承颜色；独立图片默认黑色 |
+| [assets/logo-mark-mono.svg](./assets/logo-mark-mono.svg) | 单色透明 JQ 标记 | 与主标记相同的几何 |
+| [assets/app-icon.svg](./assets/app-icon.svg) | 深底圆角应用图标源 | favicon、PNG 和 Windows ICO 共用轮廓 |
+| [assets/index.html](./assets/index.html) | JQ 素材的深浅底、小尺寸和下载预览 | 网页与 Desktop 使用 SVG，CLI 采用 JQ 字符标记 |
+| [assets/geist-license.txt](./assets/geist-license.txt) | Geist 字体 SIL OFL 许可 | 随路径字标保留字体来源与许可 |
+| [assets/app-icon.ico](./assets/app-icon.ico) | Windows 多尺寸图标，16/24/32/48/64/128/256px | Desktop 窗口与安装器的同源素材 |
+| [icons/16x16.png](./assets/icons/16x16.png) · [24x24.png](./assets/icons/24x24.png) · [32x32.png](./assets/icons/32x32.png) | 原生小尺寸 PNG | 文件名就是实际像素尺寸 |
+| [icons/48x48.png](./assets/icons/48x48.png) · [64x64.png](./assets/icons/64x64.png) · [128x128.png](./assets/icons/128x128.png) | 中尺寸 PNG | 从同一 SVG 导出 |
+| [icons/256x256.png](./assets/icons/256x256.png) · [512x512.png](./assets/icons/512x512.png) · [1024x1024.png](./assets/icons/1024x1024.png) | 大尺寸 PNG | 从同一 SVG 导出 |
+
+文件采用小写短横线命名：`logo-mark` 为标记，`logo-wordmark` 为字标，`logo-lockup-{dark,light,mono}` 为组合标识（dark/light 指使用背景），`app-icon` 为应用图标；当前预览为 `workspace-preview`，历史设计参考为 `workspace-design-reference`。`icons/` 参照 [ZCode](https://github.com/zai-org/ZCode/tree/main/public/logo/icons) 用 `宽x高.png`，不额外拆目录。品牌规范见根目录 [DESIGN.md](../DESIGN.md#brand-rules)。素材直接维护，不再保留单独的品牌生成脚本或重复的 Desktop PNG 集合。产品预览统一从官网截取并复用，具体状态见 [官网维护说明](../site/README.md#工作台预览)；旧终端参考、独立 CLI 预览和重复 logo.png 已删除。
 
 
 ### Repo Ops 合并稿与网站素材

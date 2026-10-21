@@ -639,14 +639,6 @@
     "zh": "演示设置 · 本次页面有效，浏览器存储不可用",
     "en": "Demo settings · This page only; browser storage is unavailable"
   },
-  "runtime.copied": {
-    "zh": "已复制：",
-    "en": "Copied: "
-  },
-  "runtime.copyFailed": {
-    "zh": "无法自动复制，请手动选择命令：",
-    "en": "Could not copy. Select the command manually: "
-  },
   "blog.heading": {
     "zh": "把研究中的思考，写下来。",
     "en": "Notes from the work."
@@ -683,10 +675,6 @@
     "zh": "即将发布",
     "en": "Coming soon"
   },
-  "footer.npm": {
-    "zh": "在 npm 查看软件包",
-    "en": "View package on npm"
-  },
   "blog.articles": {
     "zh": "文章列表",
     "en": "Articles"
@@ -712,12 +700,12 @@
     "zh": "你的研究，你的工作区。"
   },
   "download.headingSecond": {
-    "en": "Desktop or CLI.",
-    "zh": "Desktop 或 CLI，由你选择。"
+    "en": "Start on Desktop.",
+    "zh": "从 Desktop 开始。"
   },
   "download.intro": {
-    "en": "One research toolkit, two ways to work. Choose a dedicated desktop window or your favorite terminal.",
-    "zh": "同一套研究工具，两种工作方式。选择独立桌面窗口，或继续使用熟悉的终端。"
+    "en": "A dedicated desktop window for your research, with the runtimes included.",
+    "zh": "在独立桌面窗口中开始研究，安装包已包含运行环境。"
   },
   "download.windowsAction": {
     "zh": "下载 Windows 版",
@@ -731,10 +719,6 @@
     "zh": "此处下载的是最新公开版本。网站预览展示的新视觉设计，可能尚未包含在该安装包中。",
     "en": "Downloads follow the latest public release. The installer may not yet include the design updates shown on this website."
   },
-  "download.installGuide": {
-    "zh": "完整安装说明",
-    "en": "Full installation guide"
-  },
   "download.stepInstallBody": {
     "zh": "运行安装包，然后从桌面或开始菜单打开 WhyJ Quant。",
     "en": "Run the installer, then open WhyJ Quant from your desktop or Start Menu."
@@ -747,64 +731,20 @@
     "zh": "此 Windows 安装包未作代码签名，系统可能提示未知发布者。模型与行情服务需要网络及相应账号权限。",
     "en": "The Windows installer is unsigned, so your system may identify an unknown publisher. Model and market-data services require a network connection and appropriate access."
   },
-  "download.editionLabel": {
-    "en": "Choose Desktop or CLI",
-    "zh": "选择 Desktop 或 CLI"
-  },
   "download.desktopFormat": {
     "en": "Desktop app",
     "zh": "桌面应用"
-  },
-  "download.cliFormat": {
-    "en": "Terminal app",
-    "zh": "终端应用"
   },
   "download.desktopSummary": {
     "en": "A dedicated window for your research, data and reports. Runtimes included.",
     "zh": "在独立窗口中管理研究、数据与报告，安装包内含运行环境。"
   },
-  "download.cliSummary": {
-    "en": "The same research tools, directly in the terminal you already use.",
-    "zh": "在你熟悉的终端中，使用同一套研究工具。"
-  },
   "download.desktopPlatforms": {
-    "en": "Windows desktop available. macOS and Linux users can use the CLI.",
-    "zh": "已提供 Windows 桌面版；macOS 和 Linux 可使用 CLI。"
+    "en": "Windows desktop available. Desktop installers for macOS and Linux are not available yet.",
+    "zh": "已提供 Windows 桌面版，暂未提供 macOS 和 Linux 桌面安装包。"
   },
   "download.setupDetails": {
     "en": "Setup details",
     "zh": "安装与配置说明"
-  },
-  "download.cliRequirement": {
-    "en": "Requires Node.js / npm or Bun",
-    "zh": "需要 Node.js / npm 或 Bun"
-  },
-  "download.cliVersionNote": {
-    "en": "The CLI on npm can trail the desktop installer. Run whyj --version after installing to see what you have.",
-    "zh": "npm 上的 CLI 版本可能落后于桌面安装包，安装后运行 whyj --version 查看实际版本。"
-  },
-  "download.thenRun": {
-    "en": "Then run",
-    "zh": "然后运行"
-  },
-  "download.cliSetup": {
-    "en": "After launching whyj, use /config to connect your model and review data-source settings.",
-    "zh": "启动 whyj 后，使用 /config 连接模型并检查数据源设置。"
-  },
-  "download.networkNote": {
-    "en": "Model and market-data services require a network connection and appropriate access.",
-    "zh": "模型与行情服务需要网络连接及相应账号权限。"
-  },
-  "download.copyNpm": {
-    "en": "Copy npm install command",
-    "zh": "复制 npm 安装命令"
-  },
-  "download.copyBun": {
-    "en": "Copy Bun install command",
-    "zh": "复制 Bun 安装命令"
-  },
-  "download.copyLaunch": {
-    "en": "Copy launch command",
-    "zh": "复制启动命令"
   }
 }

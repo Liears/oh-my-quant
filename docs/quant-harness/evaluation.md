@@ -1,6 +1,6 @@
 # 评测与验证指南
 
-更新：2026-10-14。这里统一维护怎样验证、输入来自哪里、自动检查能证明什么；旧结果汇编已删除，有解释力的失败与修正写入[评测博客](../blog/05-evaluation-beyond-green.md)；原始回执留在内部输出，产品完成度回到 [PRD](./PRD.md)。六份旧评测文档已合并，历史版本的案例数和通过数不再混入现行操作入口。
+更新：2026-10-14。这里统一维护怎样验证、输入来自哪里、自动检查能证明什么；旧结果汇编已删除，有解释力的失败与修正写入[评测博客](../blog/05-evaluation-beyond-green.md)；原始回执留在内部输出，产品完成度回到 [产品范围与验收](./product-guide.md#requirements)。六份旧评测文档已合并，历史版本的案例数和通过数不再混入现行操作入口。
 
 - [跨领域套件](#suite)
 - [任务与恢复](#tasks)
@@ -298,8 +298,8 @@ CLI 在创建第一个 Session 前把选定技能的 `SKILL.md` 与目标 workfl
 
 ### 九项自动检查
 
-1. 精选 skill 的 source-backed 模式 blocked，limited supplied evidence 为 needs-input。
-2. 显式 skill XML、受限模式 preflight 和本例原始任务进入首个 provider payload。
+1. 所选 skill 已通过 Pi 加载并被当前会话发现。
+2. 显式 skill 调用及本例要求的输入进入首个 provider payload；不再检查已撤销的模式 preflight。
 3. 模型恰好调用一次只读工具，并选择本例预期 workflow；恐慌评分案例还须恰好调用一次指定计算工具。
 4. workflow 正文进入下一次 provider 请求。
 5. 工具调用没有错误。
