@@ -1166,6 +1166,38 @@ test("AC3 & AC5: mixed-success deletion visibly reports failures, retains projec
   expect(f.store.list().some((s) => s.id === rSuccess.id)).toBe(false);
 });
 
+test("AC4: project deletion preserves projects added by another tab before the delete response", async () => {
+  const f = await fixture();
+  const api = makeTestRendererApi(f);
+  const persistMeta = makeTestPersistMeta(api);
+  const run = (await (await f.post("api/runs", {
+    question: "Concurrent project metadata", scope,
+  })).json()) as WorkspaceRun;
+  await f.wait(run.id);
+  await f.post(`api/runs/${run.id}/save`);
+
+  const project = { id: "DELETE.PROJ", name: "Delete this project", symbol: "DELETE.PROJ" };
+  const initial = await api("/api/workspace/meta") as WorkspaceMetadata;
+  initial.projects.push(project);
+  initial.studies[run.id] = { projectId: project.id, customTitle: "Saved study" };
+  await persistMeta(initial);
+  const clientMeta = await api("/api/workspace/meta") as WorkspaceMetadata;
+
+  const otherTab = await api("/api/workspace/meta") as WorkspaceMetadata;
+  const concurrentProject = { id: "KEEP.PROJ", name: "Other tab's new project", symbol: "KEEP.PROJ" };
+  otherTab.projects.push(concurrentProject);
+  await persistMeta(otherTab);
+
+  const result = await executeProjectDelete(project, [{ id: run.id }], {
+    api, meta: clientMeta, persistMeta,
+  });
+  expect(result.ok).toBe(true);
+  const stored = await api("/api/workspace/meta") as WorkspaceMetadata;
+  expect(stored.projects.some(p => p.id === project.id)).toBe(false);
+  expect(stored.projects.find(p => p.id === concurrentProject.id)).toEqual(concurrentProject);
+  expect(clientMeta.projects).toEqual(stored.projects);
+});
+
 test("AC4: corrupt metadata halts study deletion with HTTP 500 without modifying storage or corrupt bytes", async () => {
   const f = await fixture();
   const metaPath = (f as any).metaPath as string;

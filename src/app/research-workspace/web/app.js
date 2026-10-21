@@ -277,6 +277,7 @@ export async function executeProjectDelete(project, projectStudies, options = {}
       }
       if (res && res.meta && res.meta.studies) {
         meta.studies = res.meta.studies;
+        if (res.meta.projects) meta.projects = res.meta.projects;
       } else if (meta.studies) {
         delete meta.studies[s.id];
       }
