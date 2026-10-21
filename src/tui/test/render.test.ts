@@ -883,7 +883,7 @@ describe("drawStatus", () => {
     drawStatus(buf, 0, 60, state);
     const short = buf.toPlain()[0];
     expect(short).toContain("◆ visual-fixture");
-    expect(short).toContain("Ctx ░░░░░ -");
+    expect(short).toContain(" · Ctx - · ");
     expect(short).toContain("TTFT 250ms");
     expect(short).toContain("TPOT 25ms/t");
     expect(short).toContain("T 2");
@@ -894,7 +894,7 @@ describe("drawStatus", () => {
     buf.clear(); drawStatus(buf, 0, 60, state);
     const long = buf.toPlain()[0];
     expect(long).toMatch(/^◆ custom\/very-long-model.*…/u);
-    expect(long).toContain("Ctx ░░░░░ -");
+    expect(long).toContain(" · Ctx - · ");
     expect(long).toContain("T 2");
     expect(long).not.toContain("financi");
     expect(long).not.toContain("No p");
@@ -937,6 +937,10 @@ describe("drawStatus", () => {
     expect(statusLine).toContain("TPOT");
     expect(statusLine).toContain("1.82s");
     expect(statusLine).toContain("84ms/t");
+    expect(statusLine.trimEnd()).toBe("◆ openai/gpt-5.5 · Ctx 12.3% 24.6K/200K · TTFT 1.82s · TPOT 84ms/t · T 7 · financial-datasets · core.json");
+    expect(statusLine).not.toMatch(/[█░]/u);
+    expect(buf.cells.filter(cell => cell.ch.trim())).toSatisfy(cells => cells.every(cell => !cell.bold && !cell.dim));
+    expect(buf.cells[3 * buf.w + 2].fg).toBe(S.cream.fg);
     const turnLabelX = statusLine.indexOf("T 7");
     const turnTCell = buf.cells[3 * buf.w + turnLabelX];
     const turnValueCell = buf.cells[3 * buf.w + turnLabelX + 2];

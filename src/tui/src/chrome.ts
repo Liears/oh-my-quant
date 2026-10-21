@@ -154,10 +154,9 @@ function formatContextUsage(usage: { tokens: number; contextWindow: number } | n
 }
 
 
-function progressBar(percent: number | null, width: number = 5): string {
-  if (percent === null || !Number.isFinite(percent)) return "░".repeat(width);
-  const filled = Math.max(0, Math.min(width, Math.round(percent / 100 * width)));
-  return "█".repeat(filled) + "░".repeat(width - filled);
+function formatContextPercent(percent: number | null): string {
+  if (percent === null || !Number.isFinite(percent)) return "-";
+  return `${Math.max(0, Math.min(100, percent)).toFixed(1)}%`;
 }
 
 function contextPressureLevel(percent: number | null): number {
@@ -230,33 +229,36 @@ function buildStatusGroups(st: AppState): StatusGroup[] {
   const contextPct = st.hud?.contextUsage?.percent ?? null;
   const rawTurns = st.hud?.turnCount;
   const turns = typeof rawTurns === "number" && Number.isFinite(rawTurns) && rawTurns > 0 ? rawTurns : null;
-  const groups: StatusGroup[] = [[{ text: `◆ ${st.model}`, style: S.gold }]];
+  const groups: StatusGroup[] = [[
+    { text: "◆ ", style: S.gold },
+    { text: st.model, style: S.cream },
+  ]];
   if (st.hudMode !== "off") groups.push([
-    { text: "·", style: S.dim },
+    { text: " · ", style: S.dim },
     { text: "Ctx ", style: S.dim },
-    { text: progressBar(contextPct), style: contextStyle(contextPct, turns) },
-    { text: ` ${formatContextUsage(st.hud?.contextUsage ?? null)}`, style: contextStyle(contextPct, turns) },
+    { text: formatContextPercent(contextPct), style: contextStyle(contextPct, turns) },
+    { text: st.hud?.contextUsage ? ` ${formatContextUsage(st.hud.contextUsage)}` : "", style: contextStyle(contextPct, turns) },
   ]);
   if (st.hudMode !== "off" && st.hudMode !== "context") groups.push([
-    { text: "·", style: S.dim },
+    { text: " · ", style: S.dim },
     { text: "TTFT ", style: S.dim },
     { text: formatLatency(st.hud?.ttftMs ?? null), style: ttftStyle(st.hud?.ttftMs ?? null, turns, contextPct) },
   ]);
   if (st.hudMode !== "off" && st.hudMode !== "context") groups.push([
-    { text: "·", style: S.dim },
+    { text: " · ", style: S.dim },
     { text: "TPOT ", style: S.dim },
     { text: formatLatency(st.hud?.tpotMs ?? null, true), style: tpotStyle(st.hud?.tpotMs ?? null, turns, contextPct) },
   ]);
   if (st.hudMode !== "off") groups.push([
-    { text: "·", style: S.dim },
+    { text: " · ", style: S.dim },
     { text: "T ", style: S.dim },
     { text: turns === null ? "-" : `${turns}`, style: turnStyle(turns, contextPct) },
   ]);
   if (st.source) {
-    groups.push([{ text: "·", style: S.dim }, { text: st.source, style: S.dim }]);
+    groups.push([{ text: " · ", style: S.dim }, { text: st.source, style: S.dim }]);
   }
   if (st.activePortfolio) {
-    groups.push([{ text: "·", style: S.dim }, { text: st.activePortfolio, style: S.dim }]);
+    groups.push([{ text: " · ", style: S.dim }, { text: st.activePortfolio, style: S.dim }]);
   }
   return groups;
 }
@@ -266,9 +268,11 @@ export function drawStatus(buf: Buffer, row: number, width: number, st: AppState
   if (width <= 0) return;
   const [model, ...groups] = buildStatusGroups(st);
   const modelLimit = Math.min(width, Math.max(12, Math.floor(width * 0.45)));
-  const modelText = truncate(model![0]!.text, modelLimit);
   let x = 0;
-  x = buf.text(x, row, modelText, model![0]!.style, width, width);
+  for (const segment of model!) {
+    const text = truncate(segment.text, modelLimit - x);
+    x = buf.text(x, row, text, segment.style, width - x, width);
+  }
   for (const group of groups) {
     if (group.reduce((sum, segment) => sum + strWidth(segment.text), 0) > width - x) continue;
     for (const segment of group) x = buf.text(x, row, segment.text, segment.style, width - x, width);
