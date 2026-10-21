@@ -887,7 +887,7 @@ describe("drawStatus", () => {
     const portfolioStart = strWidth("glm-5.3-flash · tushare · ");
     for (const [index, cell] of buf.cells.entries()) {
       if (!cell.ch.trim()) continue;
-      expect(cell.fg).toBe(index >= portfolioStart ? S.gold.fg : S.muted.fg);
+      expect(cell.fg).toBe(index >= portfolioStart ? S.cream.fg : S.muted.fg);
       expect(cell.bold).not.toBe(true);
       expect(cell.dim).not.toBe(true);
     }
