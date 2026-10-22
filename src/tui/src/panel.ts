@@ -23,7 +23,6 @@ import { describeModelProtocol } from "../../runtime/workspace/doctor-contract.t
 import type { DoctorResult } from "../../types/doctor.ts";
 import { artifactReference, createStoragePanelDataService, type ArtifactMeta, type PanelDataService, type StoredSessionSummary, type WhyjEnvAliasKey } from "../../runtime/workspace/panel-data.ts";
 import type { DataSource, OhQuantSettings } from "../../types/config.ts";
-import { normalizeHudMode } from "../../types/config.ts";
 import { normalizeMarketColorScheme, type MarketColorScheme } from "../../types/theme-colors.ts";
 
 export type PanelResult = { command?: string; restoreArtifact?: string; privateAnnualExport?: PrivateAnnualExportRequest; close?: boolean; refreshPanel?: boolean };
@@ -321,8 +320,6 @@ export class PanelController {
   marketColorScheme(): MarketColorScheme {
     return normalizeMarketColorScheme(this.cfg?.preferences.marketColorScheme);
   }
-
-  hudMode() { return normalizeHudMode(this.cfg?.preferences.hudMode); }
 
   /** Name of the currently highlighted item in the panel list. */
   selectedPortfolioName(): string {
@@ -697,12 +694,6 @@ export class PanelController {
             get: () => MARKET_COLOR_OPTIONS[this.marketColorScheme() === "green-up" ? 1 : 0]!,
             set: (v) => { if (this.cfg) this.cfg.preferences.marketColorScheme = v === MARKET_COLOR_OPTIONS[1] ? "green-up" : "red-up"; },
             options: MARKET_COLOR_OPTIONS,
-          },
-          {
-            label: "Status HUD", refreshPanel: false,
-            get: () => this.hudMode(),
-            set: value => { if (this.cfg) this.cfg.preferences.hudMode = normalizeHudMode(value); },
-            options: ["full", "context", "off"],
           },
           {
             label: "Compact At", refreshPanel: false,

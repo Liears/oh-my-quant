@@ -37,6 +37,7 @@ export class PortfolioPanel {
         edit: { type: "remove" as const, group: group.id, code },
       })),
       { label: "Delete portfolio", edit: { type: "delete", group: group.id } },
+      { label: "Research this portfolio", edit: { type: "select", group: group.id } },
     ];
   }
 

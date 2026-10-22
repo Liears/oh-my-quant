@@ -49,7 +49,7 @@ it.each(sizes)("keeps settings focus, draft, validation and controls separate at
   const panel = controller();
   try {
     panel.open("config");
-    const labels = ["Model 模型", "Market Data 行情", "Data Token 凭证", "Portfolios 观察组合", "External Skills", "Overview Dock", "Auto Artifacts 报告", "Market Colors", "Status HUD", "Compact At"];
+    const labels = ["Model 模型", "Market Data 行情", "Data Token 凭证", "Portfolios 观察组合", "External Skills", "Overview Dock", "Auto Artifacts 报告", "Market Colors", "Compact At"];
     for (const [index, label] of labels.entries()) {
       if (index) raw(panel, "\x1b[B");
       const lines = screen(panel, width, height);

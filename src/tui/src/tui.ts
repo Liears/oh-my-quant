@@ -411,7 +411,6 @@ export class QuantTui {
       if (result?.refreshPanel) this.panelRefreshHandler?.();
       this.state.source = this.panel.activeDataSource();
       this.state.marketColorScheme = this.panel.marketColorScheme();
-      this.state.hudMode = this.panel.hudMode();
       if (result?.close) {
         const name = this.panel.activePortfolioName();
         const showPanel = this.panel.showPortfolioPanel();

@@ -872,215 +872,55 @@ describe("render lines", () => {
 });
 
 describe("drawStatus", () => {
-  it("keeps narrow HUD fields whole and reserves space after a long model name", () => {
-    const state: AppState = {
-      model: "visual-fixture", modelLabel: "visual-fixture", version: "0", user: "u", activity: "ready",
-      cost: 0, cacheHit: 0, messages: [], panel: [], panelLoading: false, input: "",
-      composerQueue: [], composerStatus: null, activePortfolio: "No portfolios",
-      source: "financial-datasets", showPortfolioPanel: false,
-      hud: { contextUsage: null, turnCount: 2, ttftMs: 250, tpotMs: 25 },
-    };
+  const state: AppState = {
+    model: "glm-5.3-flash", modelLabel: "glm-5.3-flash", version: "0", user: "u", activity: "ready",
+    cost: 0, cacheHit: 0, messages: [], panel: [], panelLoading: false, input: "",
+    composerQueue: [], composerStatus: null, activePortfolio: "Ascend昇腾产业链组合",
+    source: "tushare", showPortfolioPanel: true,
+    hud: { contextUsage: { tokens: 73400, contextWindow: 1000000, percent: 7.34 }, turnCount: 7, ttftMs: 6360, tpotMs: 38 },
+  };
+
+  it.each([undefined, "full", "context", "off"] as const)("highlights only the portfolio with legacy HUD mode %s", hudMode => {
+    const buf = new Buffer(140, 1);
+    drawStatus(buf, 0, 140, { ...state, hudMode });
+    expect(buf.toPlain()[0].trimEnd()).toBe("glm-5.3-flash · tushare · Ascend昇腾产业链组合");
+    const portfolioStart = strWidth("glm-5.3-flash · tushare · ");
+    for (const [index, cell] of buf.cells.entries()) {
+      if (!cell.ch.trim()) continue;
+      expect(cell.fg).toBe(index >= portfolioStart ? S.cream.fg : S.muted.fg);
+      expect(cell.bold).not.toBe(true);
+      expect(cell.dim).not.toBe(true);
+    }
+  });
+
+  it("keeps short fields and Chinese theme intact on a narrow terminal", () => {
     const buf = new Buffer(60, 1);
     drawStatus(buf, 0, 60, state);
-    const short = buf.toPlain()[0];
-    expect(short).toContain("◆ visual-fixture");
-    expect(short).toContain("Ctx ░░░░░ -");
-    expect(short).toContain("TTFT 250ms");
-    expect(short).toContain("TPOT 25ms/t");
-    expect(short).toContain("T 2");
-    expect(short).not.toContain("financi");
-    expect(short).not.toContain("No p");
-
-    state.model = "custom/very-long-model-name-with-credentials";
-    buf.clear(); drawStatus(buf, 0, 60, state);
-    const long = buf.toPlain()[0];
-    expect(long).toMatch(/^◆ custom\/very-long-model.*…/u);
-    expect(long).toContain("Ctx ░░░░░ -");
-    expect(long).toContain("T 2");
-    expect(long).not.toContain("financi");
-    expect(long).not.toContain("No p");
+    expect(buf.toPlain()[0].trimEnd()).toBe("glm-5.3-flash · tushare · Ascend昇腾产业链组合");
+    buf.clear();
+    drawStatus(buf, 0, 60, { ...state, model: "custom/very-long-model-name-for-terminal", activePortfolio: `${state.activePortfolio}（长期研究）` });
+    const line = buf.toPlain()[0].trimEnd();
+    expect(line).toMatch(/^custom\/very-long-model.*… · tushare$/u);
+    expect(line).not.toContain("Ascend");
   });
 
-  it("renders the active model, data sources, and portfolio", () => {
-    const buf = new Buffer(140, 4);
-    drawStatus(buf, 3, 140, {
-      model: "openai/gpt-5.5",
-      modelLabel: "gpt-5.5",
-      version: "0",
-      user: "u",
-      activity: "ready",
-      cost: 0,
-      cacheHit: 0,
-      messages: [],
-      panel: [],
-      panelLoading: false,
-      input: "",
-      composerQueue: [],
-      composerStatus: null,
-      activePortfolio: "core.json",
-      source: "financial-datasets",
-      showPortfolioPanel: true,
-        hud: {
-        contextUsage: { tokens: 24576, contextWindow: 200000, percent: 12.3 },
-        turnCount: 7,
-        ttftMs: 1820,
-        tpotMs: 84,      },
-    });
-
-    const statusLine = buf.toPlain()[3];
-    expect(statusLine).toContain("openai/gpt-5.5");
-    expect(statusLine).toContain("financial-datasets");
-    expect(statusLine).toContain("core.json");
-    expect(statusLine).toContain("Ctx");
-    expect(statusLine).toContain("24.6K/200K");
-    expect(statusLine).toContain("TTFT");
-    expect(statusLine).toContain("T 7");
-    expect(statusLine).toContain("TPOT");
-    expect(statusLine).toContain("1.82s");
-    expect(statusLine).toContain("84ms/t");
-    const turnLabelX = statusLine.indexOf("T 7");
-    const turnTCell = buf.cells[3 * buf.w + turnLabelX];
-    const turnValueCell = buf.cells[3 * buf.w + turnLabelX + 2];
-    expect(turnTCell.dim).not.toBe(true);
-    expect(turnTCell.fg).toBe(S.dim.fg);
-    expect(turnValueCell.fg).toBe(S.code.fg);
+  it("omits missing fields and their separators", () => {
+    const buf = new Buffer(80, 1);
+    drawStatus(buf, 0, 80, { ...state, source: "", activePortfolio: "", hud: undefined });
+    expect(buf.toPlain()[0].trimEnd()).toBe(state.model);
+    buf.clear();
+    drawStatus(buf, 0, 80, { ...state, source: "" });
+    expect(buf.toPlain()[0].trimEnd()).toBe("glm-5.3-flash · Ascend昇腾产业链组合");
   });
 
-  it("elevates turn color when context pressure is high", () => {
-    const buf = new Buffer(140, 4);
-    drawStatus(buf, 3, 140, {
-      model: "glm-5.2",
-      modelLabel: "glm-5.2",
-      version: "0",
-      user: "u",
-      activity: "ready",
-      cost: 0,
-      cacheHit: 0,
-      messages: [],
-      panel: [],
-      panelLoading: false,
-      input: "",
-      composerQueue: [],
-      composerStatus: null,
-      activePortfolio: "core.json",
-      source: "financial-datasets",
-      showPortfolioPanel: true,
-        hud: {
-        contextUsage: { tokens: 162000, contextWindow: 200000, percent: 81 },
-        turnCount: 7,
-        ttftMs: 1820,
-        tpotMs: 84,      },
-    });
-
-    const statusLine = buf.toPlain()[3];
-    const turnLabelX = statusLine.indexOf("T 7");
-    const turnValueCell = buf.cells[3 * buf.w + turnLabelX + 2];
-    expect(turnValueCell.fg).toBe(S.gold.fg);
+  it("uses the portfolio actually shown in Overview instead of an independent stale name", () => {
+    const buf = new Buffer(140, 1);
+    drawStatus(buf, 0, 140, { ...state, activePortfolio: "Old portfolio",
+      panel: [{ kind: "group", groupId: "current", title: "当前研究组合", rows: [], collapsed: false }] });
+    expect(buf.toPlain()[0].trimEnd()).toBe("glm-5.3-flash · tushare · 当前研究组合");
   });
-
-  it("elevates context color when turn pressure is high", () => {
-    const buf = new Buffer(140, 4);
-    drawStatus(buf, 3, 140, {
-      model: "glm-5.2",
-      modelLabel: "glm-5.2",
-      version: "0",
-      user: "u",
-      activity: "ready",
-      cost: 0,
-      cacheHit: 0,
-      messages: [],
-      panel: [],
-      panelLoading: false,
-      input: "",
-      composerQueue: [],
-      composerStatus: null,
-      activePortfolio: "core.json",
-      source: "financial-datasets",
-      showPortfolioPanel: true,
-        hud: {
-        contextUsage: { tokens: 24576, contextWindow: 200000, percent: 12.3 },
-        turnCount: 24,
-        ttftMs: 1820,
-        tpotMs: 84,      },
-    });
-
-    const statusLine = buf.toPlain()[3];
-    const contextValueX = statusLine.indexOf("24.6K/200K");
-    const turnLabelX = statusLine.indexOf("T 24");
-    const contextValueCell = buf.cells[3 * buf.w + contextValueX];
-    const turnValueCell = buf.cells[3 * buf.w + turnLabelX + 2];
-    expect(contextValueCell.fg).toBe(S.gold.fg);
-    expect(turnValueCell.fg).toBe(S.gold.fg);
-  });
-
-  it("elevates latency colors when session pressure is high", () => {
-    const buf = new Buffer(140, 4);
-    drawStatus(buf, 3, 140, {
-      model: "glm-5.2",
-      modelLabel: "glm-5.2",
-      version: "0",
-      user: "u",
-      activity: "ready",
-      cost: 0,
-      cacheHit: 0,
-      messages: [],
-      panel: [],
-      panelLoading: false,
-      input: "",
-      composerQueue: [],
-      composerStatus: null,
-      activePortfolio: "core.json",
-      source: "financial-datasets",
-      showPortfolioPanel: true,
-        hud: {
-        contextUsage: { tokens: 24576, contextWindow: 200000, percent: 12.3 },
-        turnCount: 24,
-        ttftMs: 500,
-        tpotMs: 20,      },
-    });
-
-    const statusLine = buf.toPlain()[3];
-    const ttftValueX = statusLine.indexOf("500ms");
-    const tpotValueX = statusLine.indexOf("20ms/t");
-    const ttftValueCell = buf.cells[3 * buf.w + ttftValueX];
-    const tpotValueCell = buf.cells[3 * buf.w + tpotValueX];
-    expect(ttftValueCell.fg).toBe(S.gold.fg);
-    expect(tpotValueCell.fg).toBe(S.gold.fg);
-  });
-
-  it("shows dash instead of zero when turn count is unavailable", () => {
-    const buf = new Buffer(140, 4);
-    drawStatus(buf, 3, 140, {
-      model: "glm-5.2",
-      modelLabel: "glm-5.2",
-      version: "0",
-      user: "u",
-      activity: "ready",
-      cost: 0,
-      cacheHit: 0,
-      messages: [],
-      panel: [],
-      panelLoading: false,
-      input: "",
-      composerQueue: [],
-      composerStatus: null,
-      activePortfolio: "core.json",
-      source: "financial-datasets",
-      showPortfolioPanel: true,
-        hud: {
-        contextUsage: { tokens: 24576, contextWindow: 200000, percent: 12.3 },
-        turnCount: 0,
-        ttftMs: null,
-        tpotMs: null,      },
-    });
-
-    const statusLine = buf.toPlain()[3];
-    expect(statusLine).toContain("T -");
-    expect(statusLine).not.toContain("T 0");
-  });
-
-
 });
+
 describe("portfolio display", () => {
   const holding = (code: string, name: string, pct: number) => ({ code, name, price: 1.5, pct });
 

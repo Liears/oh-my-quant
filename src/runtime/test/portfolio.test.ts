@@ -5,6 +5,10 @@ import { tmpdir } from "node:os";
 import { editPortfolio } from "../research/portfolio.ts";
 import { loadPanelPortfolio, savePanelPortfolio } from "../../storage/index.ts";
 import { portfolioHandler } from "../../cli/handlers/portfolio.ts";
+import { selectResearchPortfolio } from "../workspace/overview.ts";
+import { activePanelPortfolioName } from "../workspace/panel-service.ts";
+import { singlePortfolioToolDenial, withSinglePortfolioResearch } from "../research/active-portfolio.ts";
+import { createDefaultSessionDependencies } from "../session-dependencies.ts";
 
 let root: string;
 let previous: string | undefined;
@@ -20,6 +24,48 @@ afterEach(() => {
 });
 
 describe("custom portfolio workflow", () => {
+  it("persists one selected group, keeps other groups, and uses the same name and members", async () => {
+    const first = editPortfolio({ type: "create", name: "Core" }).groups[0]!;
+    editPortfolio({ type: "add", group: first.id, code: "AAPL" });
+    const second = editPortfolio({ type: "create", name: "Growth" }).groups[1]!;
+    editPortfolio({ type: "add", group: second.id, code: "MSFT" });
+    expect(activePanelPortfolioName(loadPanelPortfolio(), "none")).toBe("Core");
+    expect((await portfolioHandler({}, ["select", second.id], {})).success).toBe(true);
+    expect(loadPanelPortfolio().activeGroupId).toBe(second.id);
+    expect(selectResearchPortfolio(loadPanelPortfolio()).symbols.map(entry => entry.code)).toEqual(["MSFT"]);
+    expect(activePanelPortfolioName(loadPanelPortfolio(), "none")).toBe("Growth");
+    expect(loadPanelPortfolio().groups).toHaveLength(2);
+    editPortfolio({ type: "rename", group: second.id, name: "Research" });
+    expect(activePanelPortfolioName(loadPanelPortfolio(), "none")).toBe("Research");
+    editPortfolio({ type: "delete", group: second.id });
+    expect(loadPanelPortfolio().activeGroupId).toBe(first.id);
+    expect(activePanelPortfolioName(loadPanelPortfolio(), "none")).toBe("Core");
+    expect((await portfolioHandler({}, ["select", "missing"], {})).success).toBe(false);
+    expect(loadPanelPortfolio().activeGroupId).toBe(first.id);
+  });
+
+  it("blocks cross-portfolio research and injects only the selected members into the host prompt", () => {
+    const first = editPortfolio({ type: "create", name: "Core" }).groups[0]!;
+    editPortfolio({ type: "add", group: first.id, code: "AAPL" });
+    const second = editPortfolio({ type: "create", name: "Growth" }).groups[1]!;
+    editPortfolio({ type: "add", group: second.id, code: "MSFT" });
+    const declared = (groupIds: string[], symbols = ["AAPL"]) => ({ action: "declare", task: { scope: { groupIds, symbols, benchmark: "SPY" } } });
+    expect(singlePortfolioToolDenial("compare_portfolios", {})).toContain("disabled");
+    expect(singlePortfolioToolDenial("research_task", declared([first.id, second.id]))).toContain("only");
+    expect(singlePortfolioToolDenial("research_task", declared([second.id]))).toContain("selected");
+    expect(singlePortfolioToolDenial("research_task", declared([first.id], ["MSFT"]))).toContain("outside");
+    expect(singlePortfolioToolDenial("research_task", declared([first.id], ["aapl", "SPY"]))).toBeNull();
+    const deps = withSinglePortfolioResearch(createDefaultSessionDependencies({}));
+    expect(deps.tools.some(tool => tool.name === "compare_portfolios")).toBe(false);
+    const ctx = { lastSymbol: null, lastMarket: null, lastStartDate: null, lastEndDate: null, recentToolState: { toolName: null, resultShape: null } };
+    const prompt = deps.prompts.turn("研究当前组合", ctx);
+    expect(prompt).toContain('"name":"Core"');
+    expect(prompt).toContain('"symbols":["AAPL"]');
+    expect(prompt).not.toContain('"name":"Growth"');
+    editPortfolio({ type: "select", group: second.id });
+    expect(deps.prompts.turn("继续", ctx)).toContain('"symbols":["MSFT"]');
+  });
+
   it("creates, renames, shares symbols, removes memberships and survives reload", () => {
     const first = editPortfolio({ type: "create", name: "Core" }).groups[0]!;
     expect(loadPanelPortfolio().groups).toEqual([first]);

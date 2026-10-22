@@ -5,7 +5,9 @@ WhyJ Quant's TUI is a zero-dependency frame-buffer terminal UI. It renders a fix
 - Header: animated WhyJ Quant mark and version.
 - Main: `◉ Analyzing` message stream, with an optional right-side `◫ Overview` dock.
 - Composer: natural-language input and a compact slash-command suggestion list rendered inside Composer.
-- Status: active model, A-share source, global source, and active local portfolio.
+- Status: active model, data source, and research theme (the active local portfolio name), separated by ` · `. The portfolio uses bright cream; model, source and separators use muted text. All fields use regular weight. No icon, field labels, context usage, latency or turn count.
+
+Overview and Status use one selected research portfolio. Open a group in `/portfolio` and choose `Research this portfolio`, or use `/portfolio select GROUP`. Saved groups remain available; only the active group's members are fetched and included in the default research context. The CLI research host rejects cross-portfolio comparison. Switching interrupts an active request and isolates late quote updates.
 
 The current interaction and layout contract lives in [Quant UI/UX](../../docs/quant-harness/quant-uiux.md); superseded layout choices are recorded in [design decisions](../../docs/blog/10-layout-and-visual-language.md#visual-language). This README is the code map for working in `src/tui`.
 

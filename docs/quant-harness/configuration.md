@@ -192,12 +192,11 @@ Azure、Bedrock、Vertex、Mistral 的原生协议也可导入并在各自 provi
 | Workspace Experience | `Overview Dock` | `showPortfolioPanel` | `true` | 显示右侧 Overview dock；关闭后 Analyzing 面板使用完整终端宽度。 |
 | Workspace Experience | `Auto Artifacts` | `artifactGeneration.auto` | `false` | 开启后在量化分析 turn 完整结束时生成 Dashboard + Trajectory 并打开浏览器；关闭时不自动生成。`/artifact` 始终只浏览、恢复和打开已有报告。 |
 | Workspace Experience | `Market Colors` | `preferences.marketColorScheme` | `red-up` | 红涨绿跌；可选 `green-up` 绿涨红跌。同一工作区的 A/HK/US/基金统一使用所选约定，立即重绘且不额外刷新行情；新报告保存该选择，历史版本不改写。 |
-| Workspace Experience | `Status HUD` | `preferences.hudMode` | `full` | `full` 显示上下文、延迟和轮数；`context` 隐藏延迟；`off` 隐藏这些指标，保留模型和来源。立即生效，重启保留，不触发行情请求。 |
 | Workspace Experience | `Compact At` | `env.WHYJ_QUANT_COMPACT_TRIGGER_TOKENS` | 模型窗口减 16384，最低 1 | 输入 1 到当前窗口之间的 token 数，或 `auto` 恢复自动值；Esc 取消。显示解析后的实际阈值，下一次 prompt 按现有自动压缩流程检查。 |
 
 行情变化、评分/风险和命令结果使用不同语义：切换 Market Colors 不翻转回撤/VaR、成功/失败的颜色；显示精度下的零变化及缺失值保持灰色。完整约定见 [DESIGN](../../DESIGN.md)。
 
-模型性能基准入口、失败/取消语义及 HUD 统计口径见 [模型性能测试](./evaluation.md#model-performance)。Status HUD 只控制展示，不修改模型上下文窗口；Compact At 控制压缩触发，不能扩大供应商窗口。环境中的旧阈值仍按原优先级读取；在面板保存 `auto` 会明确使用自动值。
+模型性能基准入口、失败/取消语义及 HUD 统计口径见 [模型性能测试](./evaluation.md#model-performance)。CLI 底部只显示模型、数据来源和研究主题；Status HUD 控制已移除，旧 `preferences.hudMode` 仅保留读取兼容，不影响状态栏。Compact At 控制压缩触发，不能扩大供应商窗口。环境中的旧阈值仍按原优先级读取；在面板保存 `auto` 会明确使用自动值。
 
 `Auto Artifacts` 只对自然语言量化研究请求生效。运行时会在 turn 完成、session JSONL 已写入后生成报告；证券、基金或组合分析会要求 agent 先形成可审计的技术与风险指标链。仅打开设置、恢复 session 或执行普通本地命令不会生成报告。
 

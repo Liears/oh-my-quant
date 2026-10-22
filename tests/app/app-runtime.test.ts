@@ -7,6 +7,7 @@ import { loadPanelPortfolio, resolveSkillsDir, savePanelPortfolio, saveSettings 
 import { DEFAULT_SETTINGS } from "../../src/types/config.ts";
 import { AppRuntime, createInitialAppState, createRuntimeAgent } from "../../src/app-runtime.ts";
 import type { AppState, PanelSection, UIMessage } from "../../src/types/ui.ts";
+import { editPortfolio } from "../../src/runtime/research/portfolio.ts";
 
 const runtimes: AppRuntime[] = [];
 const OHQ = join(process.cwd(), ".ohquant-test-app-runtime");
@@ -146,6 +147,29 @@ function makeFakeAgent(promptImpl: (agent: any, input: string) => Promise<void>)
 }
 
 describe("AppRuntime.submit", () => {
+  it("interrupts a running research request when the selected portfolio changes", async () => {
+    const first = editPortfolio({ type: "create", name: "Core" }).groups[0]!;
+    const second = editPortfolio({ type: "create", name: "Growth" }).groups[1]!;
+    editPortfolio({ type: "select", group: first.id });
+    let started!: () => void, finish!: () => void, aborts = 0;
+    const began = new Promise<void>(resolve => { started = resolve; });
+    const agent = makeFakeAgent(async agent => {
+      agent.state.isStreaming = true;
+      started();
+      await new Promise<void>(resolve => { finish = resolve; });
+      agent.state.isStreaming = false;
+    });
+    agent.abort = () => { aborts++; finish(); };
+    const { runtime, localStates } = harness(undefined, undefined, () => agent as any);
+    await runtime.bootstrap();
+    const research = runtime.submit("研究当前组合");
+    await began;
+    editPortfolio({ type: "select", group: second.id });
+    await runtime.refreshOverviewPanel(); await research;
+    expect(aborts).toBe(1);
+    expect(localStates.at(-1)?.activePortfolio).toBe("Growth");
+  });
+
   it("builds the default runtime agent with installed project skill paths", async () => {
     const skillsDir = join(resolveSkillsDir(), "__runtime-test-repo__", "llmquant-crypto");
     mkdirSync(skillsDir, { recursive: true });

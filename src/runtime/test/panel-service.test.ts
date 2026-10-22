@@ -9,9 +9,9 @@ import {
 
 describe("runtime panel service", () => {
   it("derives active portfolio names from groups, symbols, or fallback files", () => {
-    expect(activePanelPortfolioName({ symbols: [], groups: [{ name: "Core" }] }, "holdings.json")).toBe("Core");
-    expect(activePanelPortfolioName({ symbols: [], groups: [{ name: "A" }, { name: "B" }] }, "holdings.json")).toBe("2 groups");
-    expect(activePanelPortfolioName({ symbols: [{ code: "510300.SH" }], groups: [] }, "holdings.json")).toBe("1 symbols");
+    expect(activePanelPortfolioName({ symbols: [], groups: [{ id: "core", name: "Core", symbolCodes: [] }] }, "holdings.json")).toBe("Core");
+    expect(activePanelPortfolioName({ symbols: [], groups: [{ id: "a", name: "A", symbolCodes: [] }, { id: "b", name: "B", symbolCodes: [] }] }, "holdings.json")).toBe("A");
+    expect(activePanelPortfolioName({ symbols: [{ code: "510300.SH", name: "ETF" }], groups: [] }, "holdings.json")).toBe("Portfolio");
     expect(activePanelPortfolioName({ symbols: [], groups: [] }, "holdings.json")).toBe("holdings.json");
   });
 
@@ -21,7 +21,7 @@ describe("runtime panel service", () => {
       showPortfolioPanel: false,
     }, {
       symbols: [],
-      groups: [{ name: "Alpha" }],
+      groups: [{ id: "alpha", name: "Alpha", symbolCodes: [] }],
     })).toEqual({
       activePortfolio: "Alpha",
       source: "akshare",

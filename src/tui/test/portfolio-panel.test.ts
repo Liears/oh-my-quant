@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { PanelController } from "../src/panel.ts";
 import { Buffer } from "../src/buffer.ts";
 import { loadPanelPortfolio } from "../../storage/index.ts";
+import { editPortfolio } from "../../runtime/research/portfolio.ts";
 
 let root: string;
 let previous: string | undefined;
@@ -12,6 +13,24 @@ beforeEach(() => {
   previous = process.env.OHQUANT_DIR;
   root = mkdtempSync(join(tmpdir(), "ohq-portfolio-ui-"));
   process.env.OHQUANT_DIR = root;
+});
+
+it("selects a research portfolio through the keyboard and retains it after reopening", () => {
+  editPortfolio({ type: "create", name: "Core" });
+  const second = editPortfolio({ type: "create", name: "Growth" }).groups[1]!;
+  const panel = new PanelController();
+  panel.open("portfolio");
+  const key = (name: string) => panel.handleKey("", { name });
+  key("down"); key("down"); key("return");
+  key("down"); key("down"); key("down");
+  const buf = new Buffer(80, 24); panel.render(buf);
+  expect(buf.toPlain().join("\n")).toContain("Research this portfolio");
+  expect(key("return")).toEqual({ refreshPanel: true });
+  expect(loadPanelPortfolio().activeGroupId).toBe(second.id);
+  expect(panel.activePortfolioName()).toBe("Growth");
+  panel.close(); panel.open("portfolio");
+  expect(panel.activePortfolioName()).toBe("Growth");
+  panel.close();
 });
 afterEach(() => {
   if (previous === undefined) delete process.env.OHQUANT_DIR;

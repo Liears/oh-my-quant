@@ -5,8 +5,18 @@ export { fetchOverviewQuotes, fetchOverviewHoldings, overviewProviderSymbol } fr
 export type { OverviewSymbolEntry, OverviewQuote, OverviewHolding, OverviewPullMeta, OverviewQuoteFetcher, OverviewHoldingFetcher } from "./overview-data.ts";
 
 export interface OverviewPortfolio {
+  activeGroupId?: string;
   symbols: OverviewSymbolEntry[];
   groups?: Array<{ id: string; name: string; symbolCodes: string[] }>;
+}
+
+/** One selected group owns the research view; retain all saved groups outside this projection. */
+export function selectResearchPortfolio<T extends OverviewPortfolio>(portfolio: T): T {
+  const groups = portfolio.groups ?? [];
+  const group = groups.find(group => group.id === portfolio.activeGroupId) ?? groups[0];
+  if (!group) return portfolio;
+  const codes = new Set(group.symbolCodes);
+  return { ...portfolio, groups: [group], symbols: portfolio.symbols.filter(entry => codes.has(entry.code)) };
 }
 
 
