@@ -374,6 +374,77 @@ button {
   font-size: var(--font-size-label);
 }
 
+/* Panel tabs --------------------------------------------------------- */
+
+.tabs {
+  display: flex;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--divider);
+}
+
+.tab {
+  padding: 2px 0;
+  color: var(--on-surface-variant);
+  border-bottom: 1px solid transparent;
+}
+
+.tab:hover {
+  color: var(--on-surface);
+}
+
+.tab[data-active="true"] {
+  color: var(--on-surface);
+  border-bottom-color: var(--primary);
+}
+
+.prose {
+  margin: 0 0 var(--space-2);
+  color: var(--reading-text);
+}
+
+.empty-block {
+  margin: 0;
+  padding: var(--space-2) 0;
+  color: var(--on-surface-variant);
+}
+
+/* Evidence and artifact rows ----------------------------------------- */
+
+.item {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.item__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.item__label {
+  color: var(--reading-text);
+}
+
+.item__state {
+  margin-left: auto;
+  font-size: var(--font-size-label);
+  color: var(--on-surface-variant);
+}
+
+.item__state[data-available="true"] {
+  color: var(--primary);
+}
+
+.item__meta {
+  color: var(--on-surface-variant);
+  font-size: var(--font-size-label);
+}
+
 /* Status bar ---------------------------------------------------------- */
 
 .statusbar {

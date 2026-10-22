@@ -6,8 +6,14 @@
  * states can be screenshotted and diffed. It is replaced by the real client
  * when #46/#75 land; until then it keeps the UI honest about what it does and
  * does not know.
+ *
+ * Two workspaces exist on purpose. One is empty, which is the truthful state
+ * when no data source is configured. The other carries sample output so the
+ * conclusion, evidence and artifact panels can be reviewed; every value in it
+ * is labelled 示例 and none of it is presented as market data.
  */
 import type {
+  Conclusion,
   MarketSnapshot,
   Release,
   SubmitRequest,
@@ -16,10 +22,12 @@ import type {
   WorkbenchClient,
   WorkbenchEvent,
   WorkspaceIdentity,
+  WorkspaceOutput,
   WorkspaceSummary,
 } from "./contract.ts";
 
-const WORKSPACE_ID = "ws-demo-002048";
+const EMPTY_WORKSPACE = "ws-demo-002048";
+const SAMPLE_WORKSPACE = "ws-sample-300308";
 const SESSION_ID = "session-demo-1";
 
 /** Missing data is represented as null, never as a plausible zero. */
@@ -37,13 +45,64 @@ const EMPTY_MARKET: MarketSnapshot = {
 
 const WORKSPACES: readonly WorkspaceSummary[] = [
   {
-    workspaceId: WORKSPACE_ID,
+    workspaceId: EMPTY_WORKSPACE,
     code: "002048.SZ",
     name: "结构跟踪",
     runCount: 0,
     state: "idle",
   },
+  {
+    workspaceId: SAMPLE_WORKSPACE,
+    code: "300308.SZ",
+    name: "回撤结构（示例）",
+    runCount: 2,
+    state: "settled",
+  },
 ];
+
+const EMPTY_OUTPUT: WorkspaceOutput = {
+  conclusion: { statement: null, confidence: null, boundary: null, settled: false },
+  evidence: [
+    { id: "ev-bars", label: "日线行情", source: null, asOf: null, available: false },
+    { id: "ev-finance", label: "财务快照", source: null, asOf: null, available: false },
+    { id: "ev-news", label: "公告与新闻", source: null, asOf: null, available: false },
+  ],
+  artifacts: [],
+};
+
+/** Everything below is sample text: sources say 示例, no number claims a source. */
+const SAMPLE_CONCLUSION: Conclusion = {
+  statement:
+    "示例结论：本轮回撤未破坏中期结构，但量能没有跟上，属于「结构未破、动能不足」，不足以支持加仓判断。",
+  confidence: "medium",
+  boundary: "若收盘价跌破前一轮低点且成交量同步放大，当前判断失效，需要重新取证。",
+  settled: true,
+};
+
+const SAMPLE_OUTPUT: WorkspaceOutput = {
+  conclusion: SAMPLE_CONCLUSION,
+  evidence: [
+    { id: "ev-bars", label: "日线行情（示例）", source: "示例", asOf: "2026-10-21", available: true },
+    { id: "ev-finance", label: "财务快照（示例）", source: "示例", asOf: "2026-09-30", available: true },
+    { id: "ev-news", label: "公告与新闻（示例）", source: "示例", asOf: "2026-10-20", available: false },
+  ],
+  artifacts: [
+    {
+      id: "art-1",
+      title: "300308.SZ 回撤结构（示例）",
+      version: 1,
+      sha256: "0000000000000000000000000000000000000000000000000000000000000001",
+      createdAt: "2026-10-21T14:02:00+08:00",
+    },
+    {
+      id: "art-2",
+      title: "300308.SZ 回撤结构（示例）",
+      version: 2,
+      sha256: "0000000000000000000000000000000000000000000000000000000000000002",
+      createdAt: "2026-10-22T09:41:00+08:00",
+    },
+  ],
+};
 
 export interface FixtureOptions {
   /** Settlement delay in ms. Tests pass 0; the demo uses the default. */
@@ -52,10 +111,15 @@ export interface FixtureOptions {
 
 export function createFixtureClient(options: FixtureOptions = {}): WorkbenchClient {
   const settleAfterMs = options.settleAfterMs ?? 900;
+
   const listeners = new Set<(event: WorkbenchEvent) => void>();
   const transcript: Turn[] = [];
+  const outputs = new Map<string, WorkspaceOutput>([
+    [EMPTY_WORKSPACE, EMPTY_OUTPUT],
+    [SAMPLE_WORKSPACE, SAMPLE_OUTPUT],
+  ]);
   let identity: WorkspaceIdentity = {
-    workspaceId: WORKSPACE_ID,
+    workspaceId: EMPTY_WORKSPACE,
     sessionId: SESSION_ID,
     runId: null,
   };
@@ -94,6 +158,10 @@ export function createFixtureClient(options: FixtureOptions = {}): WorkbenchClie
 
     async market() {
       return EMPTY_MARKET;
+    },
+
+    async output(workspaceId: string) {
+      return outputs.get(workspaceId) ?? EMPTY_OUTPUT;
     },
 
     async submit(request: SubmitRequest): Promise<SubmitResult> {

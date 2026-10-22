@@ -61,6 +61,39 @@ export interface MarketSnapshot {
   readonly source: SourceStatus;
 }
 
+/** A conclusion is only settled when a run finished; drafts stay drafts. */
+export interface Conclusion {
+  readonly statement: string | null;
+  readonly confidence: "low" | "medium" | "high" | null;
+  /** What would break the reading. Empty means the author did not state it. */
+  readonly boundary: string | null;
+  readonly settled: boolean;
+}
+
+/** Evidence is a pointer to a source, not a restatement of its numbers. */
+export interface EvidenceItem {
+  readonly id: string;
+  readonly label: string;
+  readonly source: string | null;
+  readonly asOf: string | null;
+  readonly available: boolean;
+}
+
+/** Artifacts are immutable saved reports, referenced by hash. */
+export interface ArtifactSummary {
+  readonly id: string;
+  readonly title: string;
+  readonly version: number;
+  readonly sha256: string;
+  readonly createdAt: string;
+}
+
+export interface WorkspaceOutput {
+  readonly conclusion: Conclusion;
+  readonly evidence: readonly EvidenceItem[];
+  readonly artifacts: readonly ArtifactSummary[];
+}
+
 export interface SubmitRequest {
   readonly workspaceId: string;
   readonly text: string;
@@ -87,6 +120,7 @@ export interface WorkbenchClient {
   workspaces(): Promise<readonly WorkspaceSummary[]>;
   transcript(sessionId: string): Promise<readonly Turn[]>;
   market(): Promise<MarketSnapshot>;
+  output(workspaceId: string): Promise<WorkspaceOutput>;
   submit(request: SubmitRequest): Promise<SubmitResult>;
   /** Explicit user intent. Releasing a subscription must never do this. */
   cancel(runId: string): Promise<void>;

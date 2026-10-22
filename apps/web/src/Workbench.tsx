@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Composer } from "./components/Composer.tsx";
-import { MarketPanel } from "./components/MarketPanel.tsx";
+import { InsightPanel } from "./components/InsightPanel.tsx";
 import { Rail } from "./components/Rail.tsx";
 import { Thread } from "./components/Thread.tsx";
 import type {
@@ -9,6 +9,7 @@ import type {
   Turn,
   WorkbenchClient,
   WorkspaceIdentity,
+  WorkspaceOutput,
   WorkspaceSummary,
 } from "./contract.ts";
 
@@ -24,12 +25,20 @@ const LOADING_MARKET: MarketSnapshot = {
   source: { provider: null, updatedAt: null, available: 0, total: 0 },
 };
 
+const EMPTY_OUTPUT: WorkspaceOutput = {
+  conclusion: { statement: null, confidence: null, boundary: null, settled: false },
+  evidence: [],
+  artifacts: [],
+};
+
 export function Workbench({ client }: WorkbenchProps) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [identity, setIdentity] = useState<WorkspaceIdentity | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<readonly WorkspaceSummary[]>([]);
   const [turns, setTurns] = useState<readonly Turn[]>([]);
   const [market, setMarket] = useState<MarketSnapshot>(LOADING_MARKET);
+  const [output, setOutput] = useState<WorkspaceOutput>(EMPTY_OUTPUT);
   const [state, setState] = useState<RunState>("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -48,12 +57,17 @@ export function Workbench({ client }: WorkbenchProps) {
         client.workspaces(),
         client.market(),
       ]);
-      const nextTurns = await client.transcript(nextIdentity.sessionId);
+      const [nextTurns, nextOutput] = await Promise.all([
+        client.transcript(nextIdentity.sessionId),
+        client.output(nextIdentity.workspaceId),
+      ]);
       if (attempt.current !== current) return;
       setIdentity(nextIdentity);
+      setActiveId(nextIdentity.workspaceId);
       setWorkspaces(nextWorkspaces);
       setMarket(nextMarket);
       setTurns(nextTurns);
+      setOutput(nextOutput);
       setPhase("ready");
     } catch (cause) {
       if (attempt.current !== current) return;
@@ -86,7 +100,18 @@ export function Workbench({ client }: WorkbenchProps) {
     return release;
   }, [client, load]);
 
-  const activeId = identity?.workspaceId ?? null;
+  // Reading another workspace replaces the panel; it never cancels the run.
+  const select = useCallback(
+    async (workspaceId: string) => {
+      setActiveId(workspaceId);
+      try {
+        setOutput(await client.output(workspaceId));
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法读取研究产出");
+      }
+    },
+    [client],
+  );
 
   const submit = useCallback(
     (text: string) => {
@@ -108,6 +133,8 @@ export function Workbench({ client }: WorkbenchProps) {
     void client.cancel(runId).then(() => setState("cancelled"));
   }, [client, identity?.runId]);
 
+  const activeCode = useMemo(() => workspaces.find(item => item.workspaceId === activeId)?.code ?? null, [activeId, workspaces]);
+
   const crumb = useMemo(() => {
     const workspace = workspaces.find(item => item.workspaceId === activeId);
     return workspace ? `${workspace.code} ${workspace.name}` : "新研究";
@@ -120,7 +147,7 @@ export function Workbench({ client }: WorkbenchProps) {
       <Rail
         workspaces={workspaces}
         activeId={activeId}
-        onSelect={() => undefined}
+        onSelect={workspaceId => void select(workspaceId)}
         onNew={() => undefined}
       />
 
@@ -145,7 +172,7 @@ export function Workbench({ client }: WorkbenchProps) {
             </div>
           ) : null}
 
-          {phase === "ready" ? <Thread turns={turns} /> : null}
+          {phase === "ready" ? <Thread turns={turns} code={activeCode} /> : null}
         </div>
 
         <Composer running={running} onSubmit={submit} onCancel={cancel} />
@@ -159,7 +186,8 @@ export function Workbench({ client }: WorkbenchProps) {
         </div>
       </main>
 
-      <MarketPanel market={market} />
+      <InsightPanel market={market} output={output} />
     </div>
   );
 }
+

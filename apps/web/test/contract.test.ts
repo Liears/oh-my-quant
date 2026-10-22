@@ -59,4 +59,29 @@ describe("WorkbenchClient contract", () => {
       expect(quote.change).toBeNull();
     }
   });
+
+  test("an empty workspace reports no conclusion rather than an unverified one", async () => {
+    const client = createFixtureClient({ settleAfterMs: 0 });
+    const output = await client.output("ws-demo-002048");
+
+    expect(output.conclusion.statement).toBeNull();
+    expect(output.conclusion.settled).toBe(false);
+    expect(output.artifacts).toHaveLength(0);
+    expect(output.evidence.every(item => item.available === false)).toBe(true);
+  });
+
+  test("sample output is labelled as a sample, not as market data", async () => {
+    const client = createFixtureClient({ settleAfterMs: 0 });
+    const output = await client.output("ws-sample-300308");
+
+    expect(output.conclusion.settled).toBe(true);
+    for (const item of output.evidence) {
+      expect(item.label).toContain("示例");
+      expect(item.source).toBe("示例");
+    }
+    for (const artifact of output.artifacts) {
+      expect(artifact.title).toContain("示例");
+      expect(artifact.sha256).toHaveLength(64);
+    }
+  });
 });
