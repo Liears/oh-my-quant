@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Composer } from "./components/Composer.tsx";
 import { MarketPanel } from "./components/MarketPanel.tsx";
 import { Rail } from "./components/Rail.tsx";
@@ -16,6 +16,8 @@ interface WorkbenchProps {
   readonly client: WorkbenchClient;
 }
 
+type Phase = "loading" | "ready" | "error";
+
 const LOADING_MARKET: MarketSnapshot = {
   refreshedAt: new Date().toISOString(),
   quotes: [],
@@ -23,6 +25,7 @@ const LOADING_MARKET: MarketSnapshot = {
 };
 
 export function Workbench({ client }: WorkbenchProps) {
+  const [phase, setPhase] = useState<Phase>("loading");
   const [identity, setIdentity] = useState<WorkspaceIdentity | null>(null);
   const [workspaces, setWorkspaces] = useState<readonly WorkspaceSummary[]>([]);
   const [turns, setTurns] = useState<readonly Turn[]>([]);
@@ -30,33 +33,45 @@ export function Workbench({ client }: WorkbenchProps) {
   const [state, setState] = useState<RunState>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  // Latest load wins: a slow first attempt must not overwrite a retry.
+  const attempt = useRef(0);
 
-    void (async () => {
-      try {
-        const [nextIdentity, nextWorkspaces, nextMarket] = await Promise.all([
-          client.identity(),
-          client.workspaces(),
-          client.market(),
-        ]);
-        if (!active) return;
-        setIdentity(nextIdentity);
-        setWorkspaces(nextWorkspaces);
-        setMarket(nextMarket);
-        setTurns(await client.transcript(nextIdentity.sessionId));
-      } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : "无法读取工作区");
-      }
-    })();
+  const load = useCallback(async () => {
+    const current = attempt.current + 1;
+    attempt.current = current;
+    setPhase("loading");
+    setError(null);
+
+    try {
+      const [nextIdentity, nextWorkspaces, nextMarket] = await Promise.all([
+        client.identity(),
+        client.workspaces(),
+        client.market(),
+      ]);
+      const nextTurns = await client.transcript(nextIdentity.sessionId);
+      if (attempt.current !== current) return;
+      setIdentity(nextIdentity);
+      setWorkspaces(nextWorkspaces);
+      setMarket(nextMarket);
+      setTurns(nextTurns);
+      setPhase("ready");
+    } catch (cause) {
+      if (attempt.current !== current) return;
+      setError(cause instanceof Error ? cause.message : "无法读取工作区");
+      setPhase("error");
+    }
+  }, [client]);
+
+  useEffect(() => {
+    void load();
 
     // Releasing the subscription detaches; it must not cancel shared work.
     const release = client.subscribe(event => {
       if (event.type === "turn") {
-        setTurns(current => {
-          const index = current.findIndex(turn => turn.id === event.turn.id);
-          if (index === -1) return [...current, event.turn];
-          const next = [...current];
+        setTurns(currentTurns => {
+          const index = currentTurns.findIndex(turn => turn.id === event.turn.id);
+          if (index === -1) return [...currentTurns, event.turn];
+          const next = [...currentTurns];
           next[index] = event.turn;
           return next;
         });
@@ -68,11 +83,8 @@ export function Workbench({ client }: WorkbenchProps) {
       if (event.type === "market") setMarket(event.snapshot);
     });
 
-    return () => {
-      active = false;
-      release();
-    };
-  }, [client]);
+    return release;
+  }, [client, load]);
 
   const activeId = identity?.workspaceId ?? null;
 
@@ -84,6 +96,7 @@ export function Workbench({ client }: WorkbenchProps) {
       void client.submit({ workspaceId: activeId, text }).catch(cause => {
         setState("failed");
         setError(cause instanceof Error ? cause.message : "提交失败");
+        setPhase("error");
       });
     },
     [activeId, client],
@@ -121,12 +134,18 @@ export function Workbench({ client }: WorkbenchProps) {
         </header>
 
         <div className="main__thread">
-          {error ? (
-            <p className="empty__example" role="alert">
-              连接中断：{error}。重新载入可继续。
-            </p>
+          {phase === "loading" ? <p className="empty__body">读取工作区…</p> : null}
+
+          {phase === "error" ? (
+            <div className="empty__example" role="alert">
+              <p style={{ margin: 0 }}>连接中断：{error ?? "未知原因"}。</p>
+              <button type="button" className="composer__send" onClick={() => void load()}>
+                重新连接
+              </button>
+            </div>
           ) : null}
-          <Thread turns={turns} />
+
+          {phase === "ready" ? <Thread turns={turns} /> : null}
         </div>
 
         <Composer running={running} onSubmit={submit} onCancel={cancel} />

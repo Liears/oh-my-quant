@@ -45,7 +45,13 @@ const WORKSPACES: readonly WorkspaceSummary[] = [
   },
 ];
 
-export function createFixtureClient(): WorkbenchClient {
+export interface FixtureOptions {
+  /** Settlement delay in ms. Tests pass 0; the demo uses the default. */
+  readonly settleAfterMs?: number;
+}
+
+export function createFixtureClient(options: FixtureOptions = {}): WorkbenchClient {
+  const settleAfterMs = options.settleAfterMs ?? 900;
   const listeners = new Set<(event: WorkbenchEvent) => void>();
   const transcript: Turn[] = [];
   let identity: WorkspaceIdentity = {
@@ -109,7 +115,7 @@ export function createFixtureClient(): WorkbenchClient {
           assistantId,
           "契约演示：这里本该由 Host 返回研究结论。当前没有连接 Host，所以只完成了提交、运行与结算这条链路。",
         );
-      }, 900);
+      }, settleAfterMs);
 
       return { sessionId: SESSION_ID, runId };
     },
