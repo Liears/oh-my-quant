@@ -253,23 +253,33 @@ button {
 .composer {
   border-top: 1px solid var(--divider);
   padding: var(--space-2) var(--space-5) var(--space-3);
+}
+
+/* One container holds the field and its controls, the way a prompt box does:
+   two rows inside one rounded surface read as a single object, while a field
+   plus a detached hint row reads as a table row. 4px is the compact-control
+   radius DESIGN.md allows; nothing here becomes a card. */
+.composer__box {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-width: 920px;
+  padding: 8px 8px 6px 10px;
+  border: 1px solid var(--divider);
+  border-radius: 4px;
+  background: var(--surface-container);
 }
 
-.composer__box {
+/* DESIGN.md asks for a 2px gold focus ring separated from the component. */
+.composer__box:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.composer__row {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  max-width: 920px;
-  border: 1px solid var(--divider);
-  background: var(--surface-container);
-  padding: 6px var(--space-2);
-}
-
-.composer__box:focus-within {
-  border-color: var(--primary);
 }
 
 .composer__prompt {
@@ -297,33 +307,55 @@ button {
   outline: none;
 }
 
-.composer__send {
-  padding: 0 2px;
-  color: var(--primary);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.composer__send:hover:not(:disabled) {
-  color: var(--on-surface);
-}
-
-.composer__send:disabled {
-  color: var(--divider);
-  cursor: not-allowed;
-}
-
-.composer__hint {
+.composer__strip {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-3);
-  max-width: 920px;
   color: var(--on-surface-variant);
   font-size: var(--font-size-label);
 }
 
+.composer__keys {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .composer__status {
   margin-left: auto;
+}
+
+.composer__send {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 4px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Lighter gold token, used here only as the pressed-weight feedback. */
+.composer__send:hover:not(:disabled) {
+  background: var(--reading-link);
+}
+
+.composer__send:disabled {
+  background: transparent;
+  border: 1px solid var(--divider);
+  color: var(--divider);
+  cursor: not-allowed;
+}
+
+kbd {
+  padding: 0 4px;
+  border: 1px solid var(--divider);
+  color: var(--on-surface-variant);
+  font-family: inherit;
+  font-size: 10px;
 }
 
 kbd {
@@ -498,3 +530,4 @@ kbd {
     padding-right: var(--space-3);
   }
 }
+
