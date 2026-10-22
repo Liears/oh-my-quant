@@ -175,15 +175,12 @@ export function Workbench({ client }: WorkbenchProps) {
           {phase === "ready" ? <Thread turns={turns} code={activeCode} /> : null}
         </div>
 
-        <Composer running={running} onSubmit={submit} onCancel={cancel} />
-
-        <div className="statusbar">
-          <span>fixture client</span>
-          <span>·</span>
-          <span>{market.source.provider ?? "数据源未配置"}</span>
-          <span>·</span>
-          <span>{workspaces.length} 个工作区</span>
-        </div>
+        <Composer
+          running={running}
+          status={`fixture client · ${market.source.provider ?? "数据源未配置"} · ${workspaces.length} 个工作区`}
+          onSubmit={submit}
+          onCancel={cancel}
+        />
       </main>
 
       <InsightPanel market={market} output={output} />
