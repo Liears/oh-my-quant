@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Composer } from "./components/Composer.tsx";
+import { FeedbackDialog, SettingsDialog, type DialogName } from "./components/Dialogs.tsx";
 import { InsightPanel } from "./components/InsightPanel.tsx";
 import { Rail } from "./components/Rail.tsx";
 import { Thread } from "./components/Thread.tsx";
@@ -41,6 +42,7 @@ export function Workbench({ client }: WorkbenchProps) {
   const [output, setOutput] = useState<WorkspaceOutput>(EMPTY_OUTPUT);
   const [state, setState] = useState<RunState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<DialogName>(null);
 
   // Latest load wins: a slow first attempt must not overwrite a retry.
   const attempt = useRef(0);
@@ -149,6 +151,8 @@ export function Workbench({ client }: WorkbenchProps) {
         activeId={activeId}
         onSelect={workspaceId => void select(workspaceId)}
         onNew={() => undefined}
+        onFeedback={() => setDialog("feedback")}
+        onSettings={() => setDialog("settings")}
       />
 
       <main className="main">
@@ -184,7 +188,11 @@ export function Workbench({ client }: WorkbenchProps) {
       </main>
 
       <InsightPanel market={market} output={output} />
+
+      {dialog === "settings" ? <SettingsDialog onClose={() => setDialog(null)} /> : null}
+      {dialog === "feedback" ? <FeedbackDialog onClose={() => setDialog(null)} /> : null}
     </div>
   );
 }
+
 

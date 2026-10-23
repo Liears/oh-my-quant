@@ -147,12 +147,35 @@ button {
 }
 
 .rail__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin-top: auto;
   padding-top: var(--space-3);
   border-top: 1px solid var(--divider);
-  color: var(--on-surface-variant);
-  font-size: var(--font-size-label);
-  line-height: 1.7;
+}
+
+.rail__icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 4px;
+  color: var(--reading-text);
+}
+
+.rail__icon svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.rail__icon:hover {
+  color: var(--on-surface);
+  background: var(--surface-container-high);
 }
 
 /* Conversation -------------------------------------------------------- */
@@ -557,5 +580,129 @@ kbd {
   .composer__send {
     margin-left: auto;
   }
+}
+
+
+/* Dialogs ------------------------------------------------------------- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: rgba(6, 6, 6, 0.72);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(460px, 100%);
+  max-height: 82vh;
+  border: 1px solid var(--divider);
+  border-radius: 4px;
+  background: var(--surface-container);
+}
+
+.dialog__head {
+  display: flex;
+  align-items: center;
+  padding: 10px var(--space-3);
+  border-bottom: 1px solid var(--divider);
+  color: var(--on-surface);
+}
+
+.dialog__close {
+  margin-left: auto;
+  padding: 0 4px;
+  color: var(--on-surface-variant);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.dialog__close:hover {
+  color: var(--on-surface);
+}
+
+.dialog__body {
+  overflow-y: auto;
+  padding: var(--space-3);
+}
+
+.dialog__note {
+  margin: 0 0 var(--space-3);
+  color: var(--on-surface-variant);
+  font-size: var(--font-size-label);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: var(--space-3);
+}
+
+.field__label {
+  color: var(--on-surface-variant);
+  font-size: var(--font-size-label);
+}
+
+.field__input {
+  padding: 6px var(--space-2);
+  border: 1px solid var(--divider);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--on-surface);
+  font: inherit;
+}
+
+.field__input--area {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.dialog__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px var(--space-3);
+  border-top: 1px solid var(--divider);
+}
+
+.dialog__hint {
+  margin-right: auto;
+  color: var(--on-surface-variant);
+  font-size: var(--font-size-label);
+}
+
+.dialog__primary,
+.dialog__secondary {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px var(--space-3);
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.dialog__primary {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.dialog__primary:hover {
+  background: var(--reading-link);
+}
+
+.dialog__secondary {
+  border: 1px solid var(--divider);
+  color: var(--on-surface);
+}
+
+
+.dialog__primary--off {
+  border: 1px solid var(--divider);
+  background: transparent;
+  color: var(--on-surface-variant);
+  cursor: not-allowed;
 }
 
