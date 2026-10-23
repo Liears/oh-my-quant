@@ -181,7 +181,9 @@ button {
 .main__thread {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
+  overflow-wrap: anywhere;
   padding: var(--space-5);
 }
 
@@ -311,6 +313,7 @@ button {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-width: 0;
   color: var(--on-surface-variant);
   font-size: var(--font-size-label);
 }
@@ -319,13 +322,22 @@ button {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
+/* The status is the part that may be dropped when space runs out; the send
+   control never is, so it keeps its own size. */
 .composer__status {
   margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .composer__send {
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
   width: 26px;
@@ -528,6 +540,22 @@ kbd {
   .composer {
     padding-left: var(--space-3);
     padding-right: var(--space-3);
+  }
+}
+
+/* AC4 asks for a usable composer at 390px. Keyboard hints are noise on a
+   touch-width screen, and dropping them is what keeps the strip on one line. */
+@media (max-width: 560px) {
+  .composer__keys {
+    display: none;
+  }
+
+  .composer__status {
+    margin-left: 0;
+  }
+
+  .composer__send {
+    margin-left: auto;
   }
 }
 
